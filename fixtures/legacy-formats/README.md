@@ -18,7 +18,7 @@ Golden-Dateien für den Rust-Parser/-Importer. **Alle Daten sind synthetisch**: 
 | `valid/edge/` | gültige, aber schwierige Ströme (Liste, die sich selbst enthält) |
 | `valid/zsync/` | Nutzlasten (1…20 000 Byte, deterministisch) mit `.zsync`; Größe 8191 hat keine `.zsync` (Baseline-Defekt, im Manifest als `zsync-generation-failure`) |
 | `valid/md4-vectors.json` | MD4- und BrokenMD4-Vektoren |
-| `invalid/` | 13 ungültige Ströme (leer, kein GZIP, abgeschnitten, falsche CRC, falsche Streamversion, unbekannte/nicht erlaubte Klasse, UID-Änderung, Tiefe 150, 1-GiB-Array, GZIP-Bombe) und `zip-traversal.zip` |
+| `invalid/` | 15 ungültige Ströme (leer, kein GZIP, abgeschnitten, falsche CRC, falsche Streamversion, unbekannte/nicht erlaubte Klasse, UID-Änderung, Tiefe 150, 1-GiB-Array, GZIP-Bombe) und `zip-traversal.zip` |
 | `expected/` | erwartete Feld-Dumps (siehe `docs/migration/FORMAT_INVENTORY.md`, Abschnitt 4) |
 | `class-inventory.json` | Reflektion der Baseline-Klassen (UID, ob explizit deklariert) |
 | `descriptor-inventory.json` | aus den Strömen abgeleitete Deskriptortabelle (von `verify.py` erzeugt, nicht im Manifest) |

@@ -112,7 +112,7 @@ Die Baseline bleibt unverändert; die Befunde sind Testfälle für die Rust-Vers
 4. **Dateihandle-Leck beim Ablehnen:** `A3SFilesAccessor.read` schließt den `FileInputStream` nicht, wenn `GZIPInputStream` den Header ablehnt (leere/Nicht-GZIP-Datei); unter Windows bleibt die Datei gesperrt.
 5. **Zwei Klassen ohne explizite UID** (Abschnitt 3).
 
-Alle übrigen ungültigen Fixtures lehnt die Baseline ab (Ergebnis je Datei in `manifest.json`, `baseline_reader_outcome`). `verify.py` lehnt alle 13 ungültigen Serialisierungs-/GZIP-Fixtures unter expliziten Grenzen ab (8 MiB entpackt, Tiefe 100, 250 000 Handles, Array ≤ 1 000 000, Deskriptortabelle). `invalid/zip-traversal.zip` wird nur als Fixture bereitgestellt; die Extraktionslogik entsteht in P3/P4.
+Alle übrigen ungültigen Fixtures lehnt die Baseline ab (Ergebnis je Datei in `manifest.json`, `baseline_reader_outcome`). `verify.py` lehnt alle 15 ungültigen Serialisierungs-/GZIP-Fixtures unter expliziten Grenzen ab (8 MiB entpackt, Tiefe 100, 250 000 Handles, Array ≤ 1 000 000, Deskriptortabelle). `invalid/zip-traversal.zip` wird nur als Fixture bereitgestellt; die Extraktionslogik entsteht in P3/P4.
 
 ## 7. Exportstrategie (Spezifikation, nicht implementiert)
 
