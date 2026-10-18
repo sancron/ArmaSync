@@ -8,5 +8,6 @@ Status: `vorgeschlagen`, `angenommen`, `ersetzt`, `verworfen`. Nur angenommene E
 | [0002](0002-gui-toolkit.md) | Native GUI-Technologie und Accessibility-Gate | vorgeschlagen |
 | [0003](0003-legacy-formats.md) | Altformatimport und schrittweiser Cutover | angenommen für sicheren Import; Schreibformat offen |
 | [0004](0004-core-contracts.md) | Kernverträge: Pfade, Manifest, Plan, Fehler, Events, Jobs, Ports | angenommen für die in MIG-011 implementierten Typen |
+| [0005](0005-credentials-and-data-paths.md) | Credentials, Datenverzeichnisse, versionierte Dokumente | angenommen für Format, Pfade und Port (MIG-020); Schlüsselbund-Adapter offen |
 
 Jede neue Entscheidung nennt Datum, Kontext, Optionen, Entscheidung/Status, Folgen, Belege und betroffene Tasks. Bestehende Entscheidung bei Richtungswechsel nicht kommentarlos umschreiben: neue ADR erstellen und alte als ersetzt verlinken.
