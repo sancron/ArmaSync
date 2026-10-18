@@ -413,7 +413,11 @@ fn show_job(model: &mut Model, ui: &mut egui::Ui, dark: bool) {
                 "{} von {} Dateien, {}",
                 view.progress.files_done,
                 total,
-                phase_text(view.phase)
+                if view.state.is_terminal() {
+                    state_text(view.state)
+                } else {
+                    phase_text(view.phase)
+                }
             )
         };
         ui.add(

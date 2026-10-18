@@ -315,10 +315,10 @@ fn progress_is_a_labelled_progress_indicator_and_cancel_ends_in_cancelled() {
     );
     harness.get_by_label("Abbrechen").click();
     step_until(&mut harness, "cancelled state", |h| {
-        h.query_by_label_contains("Abgebrochen").is_some()
+        h.query_all_by_label_contains("Abgebrochen").count() > 0
     });
     step_until(&mut harness, "error summary entry", |h| {
-        h.query_by_label_contains("Fehler (1)").is_some()
+        h.query_all_by_label_contains("Fehler (1)").count() > 0
     });
 }
 
@@ -330,7 +330,7 @@ fn successful_sync_reports_completion_and_updated_status() {
     select_by_clicking(&mut harness, &target.name);
     harness.get_by_label("Synchronisieren").click();
     step_until(&mut harness, "completion", |h| {
-        h.query_by_label_contains("Abgeschlossen").is_some()
+        h.query_all_by_label_contains("Abgeschlossen").count() > 0
     });
     harness.run();
     harness.get_by_label_contains("Aktuell");
@@ -344,7 +344,7 @@ fn error_state_names_repository_cause_and_next_step() {
     select_by_clicking(&mut harness, &target.name);
     harness.get_by_label("Synchronisieren").click();
     step_until(&mut harness, "failure", |h| {
-        h.query_by_label_contains("Fehlgeschlagen").is_some()
+        h.query_all_by_label_contains("Fehlgeschlagen").count() > 0
     });
     harness.run();
     harness.get_by_label_contains(&format!("Fehler in „{}“", target.name));
