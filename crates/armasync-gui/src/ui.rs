@@ -223,20 +223,26 @@ pub fn show(
                 model.cancel_sync();
             }
             ui.separator();
-            egui::ComboBox::from_label("Darstellung")
+            let label = ui.label("Darstellung:");
+            egui::ComboBox::from_id_salt("theme")
                 .selected_text(settings.theme.label())
                 .show_ui(ui, |ui| {
                     for choice in [ThemeChoice::System, ThemeChoice::Light, ThemeChoice::Dark] {
                         ui.selectable_value(&mut settings.theme, choice, choice.label());
                     }
-                });
-            egui::ComboBox::from_label("Skalierung")
+                })
+                .response
+                .labelled_by(label.id);
+            let label = ui.label("Skalierung:");
+            egui::ComboBox::from_id_salt("scale")
                 .selected_text(format!("{} %", (settings.scale * 100.0).round()))
                 .show_ui(ui, |ui| {
                     for scale in [1.0_f32, 1.25, 1.5, 2.0] {
                         ui.selectable_value(&mut settings.scale, scale, format!("{} %", (scale * 100.0).round()));
                     }
-                });
+                })
+                .response
+                .labelled_by(label.id);
         });
         ui.label("Prototyp: Alle Repositories und Übertragungen sind simuliert (Speicherdaten); es werden keine echten Server oder Dateien verwendet.");
     });
@@ -325,9 +331,9 @@ fn show_list(model: &mut Model, ui: &mut egui::Ui, interactive: bool) {
         .striped(true)
         .resizable(true)
         .cell_layout(Layout::left_to_right(Align::Center))
-        .column(Column::remainder().at_least(220.0).clip(true))
-        .column(Column::auto().at_least(190.0))
-        .column(Column::auto().at_least(80.0))
+        .column(Column::remainder().at_least(160.0).clip(true))
+        .column(Column::initial(200.0).at_least(120.0).clip(true))
+        .column(Column::initial(80.0).at_least(60.0))
         .min_scrolled_height(120.0);
     if let Some(row) = selected_row {
         table = table.scroll_to_row(row, None);
