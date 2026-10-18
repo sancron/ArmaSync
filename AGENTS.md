@@ -19,7 +19,7 @@ Prüfe Git-Status, Branch, HEAD und vorhandene Änderungen. Nenne Task-ID, Basis
 - Neue unabhängige Rust-Quellen: `AGPL-3.0-only`. Bestehende GPL-/Drittlizenzen und Urheberhinweise erhalten; kein pauschales Umetikettieren.
 - Keine alten Team-/Länderpräfixe in neuen Typen, Modulen, Namespaces, Assets oder UI. Eng begrenzte Format-/Rechtsausnahmen stehen im Brandingplan. Kein globales Ersetzen von `fr`, `sof`, `soe` oder `a3s`.
 - Nutzerdaten erhalten; Dateioperationen atomar, abbrechbar und plattformübergreifend sicher gestalten.
-- Zugängliche GUI als Release-Kriterium behandeln.
+- Zugängliche GUI als Release-Kriterium behandeln. Leitvorgabe: vertraute Abläufe und Informationsstruktur der Baseline, aber moderner, intuitiver und zugänglicher; keine Altmarken/-grafiken (siehe `docs/migration/UI_REQUIREMENTS.md`, Abschnitt „Leitvorgabe“).
 
 ## Zusammenarbeit und Git
 

@@ -2,6 +2,18 @@
 
 Planungsbrief, keine fertig implementierte oder visuell abgenommene GUI. Verbindlich sind moderne, intuitive und zugängliche Bedienung sowie Lynxnode.it-Branding. Konkrete visuelle Ausarbeitung und Toolkitwahl werden in P1 anhand eines lauffähigen Desktop-Prototyps entschieden; keine unbestätigten Logos oder Farbwerte als bestehendes Designsystem ausgeben.
 
+## Leitvorgabe: vertraute Abläufe, moderne Bedienung (Projektverantwortlicher, 2026-10-18)
+
+Die ArmaSync-GUI orientiert sich an den **vertrauten Abläufen und der Informationsstruktur der ursprünglichen Anwendung** (Legacy-Baseline), soll dabei aber **moderner, intuitiver, angenehmer und zugänglicher** werden. Nutzer sollen bekannte Aufgaben wiederfinden (Repository hinzufügen und prüfen, Änderungen ansehen, synchronisieren, Profile/Gruppen verwalten, unter Windows starten, Einstellungen, Administration), aber **klarere Navigation, verständliche Beschriftungen, bessere Rückmeldungen und zugängliche Zustände** erhalten.
+
+Folgerungen für jeden GUI-Task (MIG-012 und alle späteren, insbesondere MIG-031, MIG-043, MIG-050, MIG-053):
+
+- **Aufgabenparität vor Layoutkopie:** Eine Aufgabe der Baseline darf nicht ohne dokumentierte Entscheidung entfallen oder schwerer erreichbar werden. Reihenfolge, Gruppierung und Begriffe der Baseline dienen als Ausgangspunkt, werden aber nur übernommen, wenn sie verständlich sind; Abweichungen kurz begründen (Paritätsmatrix bzw. Report).
+- **Besser statt gleich:** Klare Hauptaktion je Ansicht, sprechende Beschriftungen statt Fachjargon, sichtbarer Zustand und Rückmeldung nach jeder Aktion (Phase, Ergebnis, nächste sichere Handlung), Fehler neben dem betroffenen Objekt, Status durch Text und Symbol.
+- **Zugänglichkeit ist Teil der Vorgabe**, nicht nachgelagert: Kriterien siehe unten; NVDA/Orca-Nachweis bleibt Gate.
+- **Keine Übernahme von Altmarken, Classnames, Team-/Länderpräfixen oder ungeklärten Grafiken, Icons und Texten** (RQ-04, [BRANDING](BRANDING.md)). Vertraut heißt Ablauf und Struktur, nicht Optik oder Quelltext der Baseline. Die Baseline dient nur als Verhaltens- und Strukturquelle; Wortlaut und Oberflächentexte werden neu formuliert.
+- Der Abgleich neuer Ansichten mit der Baseline erfolgt anhand des Verhaltens (Quellcode, Fixtures, Screenshots eigener Testläufe), nicht aus alter Dokumentation.
+
 ## Aufgaben und Informationsarchitektur
 
 Die Hauptaufgabe ist ein verifizierter synchroner Modbestand mit nachvollziehbaren Änderungen. Hauptnavigation: **Repositories**, **Synchronisation**, **Profile & Start** unter Windows beziehungsweise **Profile** unter Linux, **Administration**, **Einstellungen**, **Hilfe & Lizenzen**. Administrationsoptionen nicht in jeden Einsteigerablauf mischen; Fähigkeiten über denselben Core anbieten.

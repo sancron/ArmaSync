@@ -38,7 +38,7 @@ Voraussetzung: P0-Gate für die jeweils verwendeten Daten und Quellen.
 ## P3 — Erster vollständiger GUI-/CLI-Sync-Ablauf
 
 - `MIG-030`: Scan → Plan → HTTP(S)-Download → Hashprüfung → atomare Installation → Verify. Range/Resume mit Validatoren und begrenzten Retries.
-- `MIG-031`: GUI für Import, Zielauswahl, Änderungsprüfung, Start, Fortschritt, Abbruch und Ergebnis; CLI für denselben Ablauf einschließlich JSON und nichtinteraktivem Betrieb.
+- `MIG-031`: GUI für Import, Zielauswahl, Änderungsprüfung, Start, Fortschritt, Abbruch und Ergebnis (Leitvorgabe aus [UI_REQUIREMENTS](UI_REQUIREMENTS.md): vertraute Abläufe der Baseline, moderner und zugänglicher); CLI für denselben Ablauf einschließlich JSON und nichtinteraktivem Betrieb.
 - `MIG-032`: Fehlerfälle: Offline, Auth/TLS, fehlender Platz, Schreibschutz, geänderte Remote-Datei, Prozessabbruch, ungültige Pfade und parallele Zielzugriffe.
 
 **Gate:** Beide Frontends synchronisieren denselben Testbestand mit identischem Dateiinhalt unter Windows/Linux. GUI bleibt bedienbar; Abbruch hinterlässt keine beschädigten Zieldateien. Ergebnisse und verbleibende Lücken sind als Alpha dokumentiert.
@@ -57,7 +57,7 @@ Voraussetzung: P0-Gate für die jeweils verwendeten Daten und Quellen.
 - `MIG-050`: Profile/Gruppen/Prioritäten, Favoriten, DLC/CDLC, Workshop-Metadaten und Launcher-Presets; Argumentvergleich mit Baseline.
 - `MIG-051`: Windows-Spielstart, externe Anwendungen, Shortcuts, Autostart, Single-Instance; kein Shell-Stringaufbau aus Nutzereingaben.
 - `MIG-052`: Bikey/TFAR/ACRE/RPT-Funktionen gemäß Paritätsmatrix prüfen und portieren; Paket-/Toollizenzen beachten.
-- `MIG-053`: vollständige GUI-Einstellungen, Diagnose, Hilfe, Lizenzen, Deutsch/Englisch, Light/Dark/System, Tastatur-/Screenreader-Abnahme.
+- `MIG-053`: (Leitvorgabe [UI_REQUIREMENTS](UI_REQUIREMENTS.md)) vollständige GUI-Einstellungen, Diagnose, Hilfe, Lizenzen, Deutsch/Englisch, Light/Dark/System, Tastatur-/Screenreader-Abnahme.
 
 **Gate:** Windows-Funktionsparität nachgewiesen. Linux-Synchronisation vollständig; Windows-/Spielstartfunktionen mit klarer Capability-Begründung N/A. Kein Protonziel ohne neue Scope-Entscheidung.
 
