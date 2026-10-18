@@ -44,8 +44,8 @@ if (Test-Path -LiteralPath $target) {
 
 git diff --quiet b7753cea18b2ac2cc57e29f926901997a4de8570 -- src updater build.gradle
 if ($LASTEXITCODE -ne 0) { throw "src/updater/build.gradle differ from the baseline commit (or git failed); fixtures must be generated from the baseline classes." }
-gradle compileJava --console=plain -q
-Check "gradle compileJava"
+gradle :compileJava --console=plain -q
+Check "gradle :compileJava"
 if (Test-Path -LiteralPath $gen) { Remove-Item -LiteralPath $gen -Recurse -Force }  # no stale classes
 New-Item -ItemType Directory -Force $gen | Out-Null
 javac -encoding UTF-8 -cp build/classes/java/main -d $gen migration-tools/fixture-generator/FixtureGenerator.java
