@@ -1,0 +1,103 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# ArmaSync CI (MIG-013). Prepared locally; it has NOT run on GitHub yet. See docs/migration/CI.md.
+# Third-party actions are referenced by major tag for now; pin them to reviewed commit SHAs before enabling
+# the workflow for required checks.
+name: CI
+
+on:
+  pull_request:
+    branches: [development, testing, master, legacy]
+  push:
+    branches: [development, testing, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: never
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  branch-policy:
+    name: Branch flow
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check source and target branch
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+          BASE_REPO: ${{ github.repository }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        run: sh .github/scripts/branch-policy.sh
+      - name: Self-test of the policy script
+        run: sh .github/scripts/test-branch-policy.sh
+
+  rust:
+    name: Rust (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install the pinned toolchain (rust-toolchain.toml)
+        run: |
+          rustup show active-toolchain
+          rustc --version
+          cargo --version
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Tests
+        run: cargo test --workspace --locked
+      - name: Build the headless CLI
+        run: cargo build -p armasync-cli --locked
+      - name: CLI dependency tree has no GUI crates
+        run: sh .github/scripts/cli-gui-free.sh
+      - name: CLI smoke test
+        run: |
+          cargo run -q -p armasync-cli --locked -- version
+          cargo run -q -p armasync-cli --locked -- --json version
+
+  msrv:
+    name: MSRV 1.85 (without GUI crate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install Rust 1.85.0
+        run: rustup toolchain install 1.85.0 --profile minimal --no-self-update
+      - name: Tests on the MSRV
+        run: cargo +1.85.0 test --workspace --exclude armasync-gui --locked
+
+  fixtures:
+    name: Fixtures and test server
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify the legacy-format fixtures (JVM-free verifier)
+        run: python3 -I migration-tools/fixture-generator/verify.py fixtures/legacy-formats/generated
+      - name: Loopback transport server self-test
+        run: python3 -B migration-tools/transport-testserver/server.py --self-test
+      - name: Shell guard tests (mount namespace needed, skipped without privileges)
+        run: |
+          sh migration-tools/fixture-generator/test-output-guard.sh || test "$?" -eq 2
