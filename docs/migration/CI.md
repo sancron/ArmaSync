@@ -18,7 +18,7 @@ Stand: 2026-10-18. **Erster GitHub-Lauf am 2026-10-18** (Push von `development`,
 | `branch-policy` (nur Pull Requests) | ubuntu-latest | Quell-/Zielbranch und Fork-Herkunft; Selbsttest des Skripts |
 | `rust` (Matrix) | windows-latest, ubuntu-latest | Toolchain aus `rust-toolchain.toml` (1.99.1), `cargo fmt --check`, `clippy -D warnings`, `cargo test --workspace --locked`, `cargo build -p armasync-cli --locked`, GUI-freier CLI-Baum, CLI-Rauchtest (`version`, `--json version`) |
 | `msrv` | ubuntu-latest | `cargo +1.85.0 test --workspace --exclude armasync-gui --locked` |
-| `fixtures` | ubuntu-latest | JVM-freier Fixture-Verifier (MIG-001), Selbsttest des Transport-Testservers (MIG-003), Shell-Guard-Test (ohne Mount-Namespace-Rechte als „übersprungen“ akzeptiert, Exitcode 2) |
+| `fixtures` | ubuntu-latest | JVM-freier Fixture-Verifier (MIG-001), Offline-Exporter-Tests (MIG-021), Selbsttest des Transport-Testservers (MIG-003), Shell-Guard-Test (ohne Mount-Namespace-Rechte als „übersprungen“ akzeptiert, Exitcode 2) |
 
 Nicht in der CI: die Java-Baseline (`gradle test :updater:test`, braucht JDK 21 und 25), der Fixture-Generator-Lauf (`run.sh`/`run.ps1`), `cargo audit`/`cargo deny`, Releasebuilds, Pakete/Installer, Signaturen, GUI-Tests mit Screenreader. Die bestehende WinGet-Automatik (`publish-winget.yml`) bleibt unverändert.
 

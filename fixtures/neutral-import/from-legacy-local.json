@@ -1,0 +1,45 @@
+{
+  "kind": "armasync.import",
+  "schema_version": 1,
+  "source": {
+    "tool": "armasync-legacy-export",
+    "tool_version": "1",
+    "format": "legacy-local-files"
+  },
+  "repositories": [],
+  "profiles": [
+    {
+      "name": "Alpha",
+      "repositories": [
+        "Example SFTP"
+      ]
+    }
+  ],
+  "notes": [
+    {
+      "code": "skipped-invalid-profile-name"
+    },
+    {
+      "code": "skipped-duplicate-profile",
+      "subject": "Alpha"
+    },
+    {
+      "code": "skipped-favorite-servers",
+      "count": 1
+    },
+    {
+      "code": "skipped-encrypted-repository",
+      "subject": "Example-Http",
+      "count": 1
+    },
+    {
+      "code": "skipped-encrypted-repository",
+      "subject": "Example-Sftp",
+      "count": 1
+    },
+    {
+      "code": "skipped-settings",
+      "count": 2
+    }
+  ]
+}
