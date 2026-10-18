@@ -6,6 +6,7 @@ members = [
     "crates/armasync-application",
     "crates/armasync-adapters",
     "crates/armasync-cli",
+    "crates/armasync-gui",
 ]
 # GUI crate (armasync-gui) is added by MIG-012 after the ADR-0002 toolkit decision; the CLI must stay GUI-free.
 
