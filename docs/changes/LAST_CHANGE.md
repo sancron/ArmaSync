@@ -2,7 +2,7 @@
 
 **2026-10-18 · MIG-021 · Claude · Offline-Export und neutraler Import lokaler Altdaten**
 
-Lokal nach `development` integriert (Merge `814720a`). Davor war `development` bis `734a20b` (MIG-012A, MIG-020) gepusht; die zugehörige CI war grün.
+Nach `development` integriert (Merge `814720a`) und mit `development` nach `origin/development` gepusht. Davor war `development` bis `734a20b` (MIG-012A, MIG-020) gepusht; die zugehörige CI war grün.
 
 * **Neu:** neutrales Importformat `armasync.import` ([IMPORT_SCHEMA](../migration/IMPORT_SCHEMA.md)), Rust-Importer (Vorschau ohne Schreibzugriff, `--apply` mit Vorab-Sicherung, atomarem Commit, Abbruch, Journal ohne Geheimnisse, deterministische IDs, Konfliktrichtlinien, Wiederholung ohne Duplikate), CLI `armasync import`, Offline-Exporter `migration-tools/legacy-export/export.py` für unverschlüsselte Profile, Golden-Dateien `fixtures/neutral-import/`, zusätzlicher CI-Schritt im Job `fixtures`. [Bericht](2026-10-18-MIG-021.md), [Handoff](../handoffs/MIG-021.md).
 * **Nicht enthalten:** Entschlüsselung lokaler `.a3s.repository`-Dateien (ADR-0003 und RQ-01 offen; der Export liefert deshalb Profile ohne Repository-Definitionen), Profilinhalte, Einstellungen, Favoritenserver, Keyring/persistente Credentials. MSRV bleibt 1.85.

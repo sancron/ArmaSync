@@ -16,6 +16,6 @@ Aktueller Batch: Integrator **Claude**. Rollenregel: Claude ist Standard-Hauptbe
 | MIG-013 | CI Windows/Linux, Branch-Flow-Prüfung | Claude (`claude/mig-013-ci`) | integriert; mit `development` am 2026-10-18 gepusht, erster GitHub-Lauf erfolgreich (siehe STATUS); Rulesets/Required Checks offen und nicht freigegeben | MIG-010 |
 | MIG-012A | GUI-Nachbesserung: Kontrast Auswahlfläche, Screenreader-Prüfprotokoll | Claude (`claude/mig-012a-contrast`) | integriert (Merge `9577b58`, gepusht); P1-Gate bleibt offen | MIG-012 |
 | MIG-020 | Datenmodell, Stores, Pfade, Credentials | Claude (`claude/mig-020-data-store`) | integriert (Merge `83e8ebe`, gepusht); Schlüsselbund-Adapter offen (ADR-0005) | MIG-011 |
-| MIG-021 | Offline-Export und neutraler Import lokaler Altdaten | Claude (`claude/mig-021-import`) | integriert (Merge `814720a`, lokal); verschlüsselte Repositorydateien nicht importiert (ADR-0003/RQ-01 offen) | MIG-020 |
+| MIG-021 | Offline-Export und neutraler Import lokaler Altdaten | Claude (`claude/mig-021-import`) | integriert (Merge `814720a`, gepusht 2026-10-18); verschlüsselte Repositorydateien nicht importiert (ADR-0003/RQ-01 offen) | MIG-020 |
 
 Weitere IDs und Gates: [ROADMAP.md](../migration/ROADMAP.md). Neue Taskdateien aus [TEMPLATE.md](TEMPLATE.md) erstellen. MIG-001/002 dürfen parallel laufen, wenn Zuweisungen zuvor auf gemeinsamer Basis committed wurden.
