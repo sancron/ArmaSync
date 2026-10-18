@@ -1,30 +1,28 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! ArmaSync core.
+//! ArmaSync core: product identity and the shared contracts (paths, manifests, plans, errors, events, jobs, ports).
 //!
-//! Holds the product identity today; domain models, ports, errors and events follow in MIG-011.
-//! This crate must not depend on GUI, operating-system or network libraries (see ADR-0001).
+//! The core has no GUI, operating-system or network dependencies and only uses the standard library
+//! (ADR-0001, ADR-0004). Frontends and adapters depend on it, never the other way round.
 
-/// Product identity shared by all frontends.
-pub mod product {
-    /// Visible product name.
-    pub const NAME: &str = "ArmaSync";
-    /// Visible publisher / brand.
-    pub const PUBLISHER: &str = "Lynxnode.it";
-    /// Stable technical identifier (package and settings namespace).
-    pub const TECHNICAL_ID: &str = "it.lynxnode.armasync";
-    /// Workspace version of the Rust implementation (not the legacy Java release version).
-    pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-}
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
-#[cfg(test)]
-mod tests {
-    use super::product;
+pub mod error;
+pub mod event;
+pub mod hash;
+pub mod ids;
+pub mod job;
+pub mod manifest;
+pub mod path;
+pub mod plan;
+pub mod port;
+pub mod product;
 
-    #[test]
-    fn identity_is_stable() {
-        assert_eq!(product::NAME, "ArmaSync");
-        assert_eq!(product::PUBLISHER, "Lynxnode.it");
-        assert_eq!(product::TECHNICAL_ID, "it.lynxnode.armasync");
-        assert!(!product::VERSION.is_empty());
-    }
-}
+pub use error::{Error, ErrorKind};
+pub use event::{EVENT_SCHEMA_VERSION, EventSink, OperationEvent, Phase, Progress};
+pub use hash::{ContentHash, HashAlgorithm, HashError};
+pub use ids::{IdError, OperationId, RepositoryId};
+pub use job::{InvalidTransition, JobState};
+pub use manifest::{FileEntry, Manifest, ManifestError};
+pub use path::{PathError, RelativePath};
+pub use plan::{LocalFile, PlanOptions, PlanSummary, PlanWarning, SyncPlan, SyncStep, plan_sync};
+pub use port::{CancelToken, Hasher, LocalStore, RepositorySource};

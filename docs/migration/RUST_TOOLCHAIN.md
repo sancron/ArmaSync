@@ -17,9 +17,9 @@ Stand: 2026-10-18. Gepflegt vom Eigentümer des Workspace (Integrator); Änderun
 ## Struktur
 
 ```text
-crates/armasync-core         Produktidentität (Namen, technische ID, Version); später Modelle, Regeln, Ports
-crates/armasync-application  Use-Case-Schicht; heute nur read-only `version_info()`; hängt nur von core ab
-crates/armasync-adapters     `Platform` (cfg target_os); später FS/Netz/OS-Adapter; hängt nur von core ab
+crates/armasync-core         Produktidentität; Verträge (ADR-0004): RelativePath, Manifest, SyncPlan, Fehler, Events, Jobs, Ports
+crates/armasync-application  Use-Cases: `sync::plan`/`sync::apply` (+ `version_info()`); hängt produktiv nur von core ab (dev: adapters für Tests)
+crates/armasync-adapters     `Platform` (cfg target_os), SHA-256-Hasher und In-Memory-Adapter; später FS/Netz/OS; hängt von core (+ sha2) ab
 crates/armasync-cli          Binary `armasync` (+ Lib `armasync_cli`): clap, JSON-Envelope, Exitcodes
 ```
 
@@ -31,7 +31,7 @@ Abhängigkeitsrichtung: `cli → application → core`, `cli → adapters → co
 
 ## Abhängigkeitsinventar (extern, aus `Cargo.lock`)
 
-Direkt deklariert: `clap` 4 (Features `std derive help usage error-context suggestions`; ohne `color`, `env`, `wrap_help`) und `serde_json` 1 – beide nur in `armasync-cli`. Übrige sind transitive Pakete. Lizenzangaben stammen aus den Crate-Metadaten (`cargo metadata`); **sie sind kein Rechtsgutachten**. Die Release-BOM mit Lizenztexten/Notices ist noch zu erzeugen (offen: RQ-06).
+Direkt deklariert: `clap` 4 (Features `std derive help usage error-context suggestions`; ohne `color`, `env`, `wrap_help`) und `serde_json` 1 – beide nur in `armasync-cli` – sowie `sha2` 0.11.0 in `armasync-adapters` (MIG-011; 0.11.1 verlangt Rust 1.88 und wird durch die MSRV-Auflösung ausgeschlossen). Übrige sind transitive Pakete. Lizenzangaben stammen aus den Crate-Metadaten (`cargo metadata`); **sie sind kein Rechtsgutachten**. Die Release-BOM mit Lizenztexten/Notices ist noch zu erzeugen (offen: RQ-06).
 
 | Crate | Version | Lizenz (Metadaten) | rust-version | Zweck |
 | --- | --- | --- | --- | --- |
@@ -51,6 +51,16 @@ Direkt deklariert: `clap` 4 (Features `std derive help usage error-context sugge
 | serde / serde_derive | 1.0.229 | MIT OR Apache-2.0 | 1.56 / 1.71 | im Lockfile (Feature-Auflösung), nicht im normalen Laufzeitbaum |
 | itoa | 1.0.18 | MIT OR Apache-2.0 | 1.68 | Zahlenformatierung |
 | memchr | 2.8.3 | Unlicense OR MIT | 1.61 | Bytesuche |
+| sha2 | 0.11.0 | MIT OR Apache-2.0 | 1.85 | SHA-256 (direkt, adapters; RustCrypto) |
+| digest | 0.11.3 | MIT OR Apache-2.0 | 1.85 | RustCrypto-Digest-Traits |
+| crypto-common | 0.2.2 | MIT OR Apache-2.0 | 1.85 | RustCrypto-Basis |
+| block-buffer | 0.12.1 | MIT OR Apache-2.0 | 1.85 | Blockpuffer für Hashes |
+| const-oid | 0.10.2 | Apache-2.0 OR MIT | 1.85 | OID-Konstanten (digest) |
+| hybrid-array | 0.4.15 | MIT OR Apache-2.0 | 1.85 | Arrays fester Größe (RustCrypto) |
+| typenum | 1.20.1 | MIT OR Apache-2.0 | 1.41.0 | Typ-Level-Zahlen |
+| cpufeatures | 0.3.1 | MIT OR Apache-2.0 | 1.85 | CPU-Feature-Erkennung (Hash-Beschleunigung) |
+| cfg-if | 1.0.5 | MIT OR Apache-2.0 | 1.32 | cfg-Makro |
+| libc | 0.2.191 | MIT OR Apache-2.0 | 1.65 | C-Bindungen (nur Unix-Ziele, über cpufeatures) |
 | zmij | 1.0.23 | MIT | 1.71 | Gleitkomma-Formatierung (serde_json) |
 
 Keine dieser Crates stammt aus dem Java-Bestand; es wurden **kein** Jazsync-/MD4-Code, **keine** Icons/Installergrafiken/JARs übernommen (Auflagen RQ-02/03/04 eingehalten).
