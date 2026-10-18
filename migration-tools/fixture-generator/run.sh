@@ -61,7 +61,8 @@ fi
 if ! git diff --quiet b7753cea18b2ac2cc57e29f926901997a4de8570 -- src updater build.gradle; then
   echo "src/updater/build.gradle differ from the baseline commit (or git failed)" >&2; exit 1
 fi
-gradle compileJava --console=plain -q
+# Root project only: the generator needs the baseline main classes, not the updater subproject (which needs a JDK 21 toolchain).
+gradle :compileJava --console=plain -q
 GEN=build/fixture-generator
 rm -rf --one-file-system "$GEN"
 mkdir -p "$GEN"
