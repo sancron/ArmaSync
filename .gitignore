@@ -52,3 +52,6 @@ packaging/*
 !packaging/
 !packaging/winget/
 !packaging/winget/**
+
+# Rust build output
+/target

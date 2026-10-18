@@ -1,0 +1,231 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! ArmaSync command line interface.
+//!
+//! Contract: `docs/migration/CLI_CONTRACT.md`. Structured results go to stdout, diagnostics to stderr, and the
+//! process never waits for input (`--no-input` is accepted for forward compatibility; there is no prompt yet).
+//! Only `version` exists so far; synchronisation commands are added with the use cases in later tasks.
+
+use std::ffi::OsString;
+use std::io::Write;
+
+use clap::{Parser, Subcommand};
+
+/// Version of the JSON envelope schema.
+pub const JSON_SCHEMA_VERSION: u32 = 1;
+
+/// Process exit codes (CLI contract, "Vorgeschlagene Exitcodes").
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExitStatus {
+    /// Successful.
+    Success,
+    /// Argument or usage error.
+    Usage,
+    /// Configuration, missing consent or credentials.
+    Config,
+    /// Network, authentication or trust failure.
+    Network,
+    /// File system, permissions or disk space.
+    FileSystem,
+    /// Integrity or verification failure.
+    Integrity,
+    /// Format or migration failure.
+    Format,
+    /// Unsupported platform or transport capability.
+    Unsupported,
+    /// Explicit cancellation (Ctrl+C).
+    Cancelled,
+}
+
+impl ExitStatus {
+    /// Numeric process exit code.
+    #[must_use]
+    pub const fn code(self) -> u8 {
+        match self {
+            Self::Success => 0,
+            Self::Usage => 2,
+            Self::Config => 3,
+            Self::Network => 4,
+            Self::FileSystem => 5,
+            Self::Integrity => 6,
+            Self::Format => 7,
+            Self::Unsupported => 8,
+            Self::Cancelled => 130,
+        }
+    }
+}
+
+/// ArmaSync command line.
+#[derive(Debug, Parser)]
+#[command(
+    name = "armasync",
+    version,
+    about = "ArmaSync by Lynxnode.it - command line interface",
+    arg_required_else_help = true
+)]
+struct Cli {
+    /// Emit a versioned JSON result on stdout instead of text.
+    #[arg(long, global = true)]
+    json: bool,
+    /// Never wait for input; fail with a clear error instead.
+    #[arg(long, global = true)]
+    no_input: bool,
+    /// Suppress non-essential text output.
+    #[arg(long, global = true)]
+    quiet: bool,
+    #[command(subcommand)]
+    command: Command,
+}
+
+#[derive(Debug, Subcommand)]
+enum Command {
+    /// Show product, version and platform.
+    Version,
+}
+
+/// Runs the CLI with the given arguments and returns the exit status.
+pub fn run<I, T>(args: I, stdout: &mut dyn Write, stderr: &mut dyn Write) -> ExitStatus
+where
+    I: IntoIterator<Item = T>,
+    T: Into<OsString> + Clone,
+{
+    let cli = match Cli::try_parse_from(args) {
+        Ok(cli) => cli,
+        Err(error) => {
+            // A closed pipe must not turn into a panic; the exit status is what matters.
+            if error.use_stderr() {
+                let _ = write!(stderr, "{}", error.render());
+                return ExitStatus::Usage;
+            }
+            let _ = write!(stdout, "{}", error.render());
+            return ExitStatus::Success;
+        }
+    };
+    // No prompts exist yet, so `--no-input` changes nothing today.
+    let _ = cli.no_input;
+    match cli.command {
+        Command::Version => version(cli.json, cli.quiet, stdout),
+    }
+}
+
+fn version(json: bool, quiet: bool, stdout: &mut dyn Write) -> ExitStatus {
+    let info = armasync_application::version_info();
+    let platform = armasync_adapters::Platform::current();
+    let written = if json {
+        let envelope = serde_json::json!({
+            "schema_version": JSON_SCHEMA_VERSION,
+            "command": "version",
+            "operation_id": serde_json::Value::Null,
+            "status": "ok",
+            "result": {
+                "name": info.name,
+                "publisher": info.publisher,
+                "technical_id": info.technical_id,
+                "version": info.version,
+                "platform": platform.name(),
+                "can_launch_game": platform.can_launch_game(),
+            },
+        });
+        writeln!(stdout, "{envelope}")
+    } else if quiet {
+        writeln!(stdout, "{}", info.version)
+    } else {
+        writeln!(
+            stdout,
+            "{} {} ({}, {})",
+            info.name,
+            info.version,
+            info.publisher,
+            platform.name()
+        )
+    };
+    if written.is_ok() {
+        ExitStatus::Success
+    } else {
+        ExitStatus::FileSystem
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ExitStatus, run};
+
+    fn run_args(args: &[&str]) -> (ExitStatus, String, String) {
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let status = run(args.iter().copied(), &mut out, &mut err);
+        (
+            status,
+            String::from_utf8(out).unwrap_or_default(),
+            String::from_utf8(err).unwrap_or_default(),
+        )
+    }
+
+    #[test]
+    fn exit_codes_follow_contract() {
+        let expected = [
+            (ExitStatus::Success, 0),
+            (ExitStatus::Usage, 2),
+            (ExitStatus::Config, 3),
+            (ExitStatus::Network, 4),
+            (ExitStatus::FileSystem, 5),
+            (ExitStatus::Integrity, 6),
+            (ExitStatus::Format, 7),
+            (ExitStatus::Unsupported, 8),
+            (ExitStatus::Cancelled, 130),
+        ];
+        for (status, code) in expected {
+            assert_eq!(status.code(), code);
+        }
+    }
+
+    #[test]
+    fn version_text() {
+        let (status, out, err) = run_args(&["armasync", "version"]);
+        assert_eq!(status, ExitStatus::Success);
+        assert!(out.starts_with("ArmaSync 0.0.0 (Lynxnode.it, "), "{out}");
+        assert!(err.is_empty());
+    }
+
+    #[test]
+    fn version_json_is_a_versioned_envelope_without_secrets() {
+        let (status, out, err) = run_args(&["armasync", "--json", "version"]);
+        assert_eq!(status, ExitStatus::Success);
+        assert!(err.is_empty());
+        let value: serde_json::Value = serde_json::from_str(&out).unwrap_or_default();
+        assert_eq!(value["schema_version"], 1);
+        assert_eq!(value["status"], "ok");
+        assert_eq!(value["result"]["technical_id"], "it.lynxnode.armasync");
+        assert!(value["operation_id"].is_null());
+    }
+
+    #[test]
+    fn global_flags_work_after_the_subcommand() {
+        let (status, out, _) = run_args(&["armasync", "version", "--json", "--no-input"]);
+        assert_eq!(status, ExitStatus::Success);
+        assert!(out.trim_start().starts_with('{'));
+    }
+
+    #[test]
+    fn unknown_command_is_a_usage_error_on_stderr() {
+        let (status, out, err) = run_args(&["armasync", "sync-everything"]);
+        assert_eq!(status, ExitStatus::Usage);
+        assert!(out.is_empty());
+        assert!(!err.is_empty());
+    }
+
+    #[test]
+    fn no_arguments_prints_help_as_usage_error() {
+        let (status, _, err) = run_args(&["armasync"]);
+        assert_eq!(status, ExitStatus::Usage);
+        assert!(err.contains("Usage"), "{err}");
+    }
+
+    #[test]
+    fn help_and_version_flags_succeed_on_stdout() {
+        let (status, out, _) = run_args(&["armasync", "--help"]);
+        assert_eq!(status, ExitStatus::Success);
+        assert!(out.contains("version"));
+        let (status, out, _) = run_args(&["armasync", "--version"]);
+        assert_eq!(status, ExitStatus::Success);
+        assert!(out.contains("armasync"));
+    }
+}

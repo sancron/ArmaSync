@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Pinned, exact toolchain (verified on the development machine: stable 1.99.1, 2026-10-13). Bump deliberately via a task.
+# MSRV (workspace `rust-version`) is documented and checked separately, see docs/migration/RUST_TOOLCHAIN.md.
+[toolchain]
+channel = "1.99.1"
+components = ["rustfmt", "clippy"]
+profile = "minimal"
