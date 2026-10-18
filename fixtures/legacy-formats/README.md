@@ -36,4 +36,6 @@ sh   migration-tools/fixture-generator/run.sh          # Linux
 
 Die Skripte kompilieren die Baseline-Klassen, erzeugen den Ordner `generated/` neu und führen `verify.py` aus (JVM-freie Dekodierung, Hash-/Erwartungsabgleich, zsync-/MD4-Nachrechnung, Ablehnung der ungültigen Fälle). Nur prüfen, ohne neu zu erzeugen: `python -I migration-tools/fixture-generator/verify.py fixtures/legacy-formats/generated`; Hashprüfung allein mit `FixtureGenerator verify <dir>`.
 
+Die Skripte löschen nur ein vorhandenes `generated/` mit Marker-Manifest und lehnen Pfade mit Links/Junctions in jeder Komponente ab; Test: `pwsh migration-tools/fixture-generator/test-output-guard.ps1`.
+
 Reproduzierbarkeit: feste Zeit (2026-01-01T00:00:00Z), UTC, LCG-Nutzlasten, deterministische Serialisierung. Zwei aufeinanderfolgende Läufe auf JDK 25.0.2 (Windows) ergaben byte-identische Verzeichnisse. Andere JDK-/zlib-Versionen können andere GZIP-Bytes liefern; dann bleibt `payload_sha256` gleich.
