@@ -77,6 +77,7 @@ class ClassDesc:
         self.flags = 0
         self.fields = []  # (typecode, name, classname-or-None)
         self.sup = None
+        self.complete = False  # False while its own header/superclass chain is still being read
 
 
 class JObj:
@@ -188,11 +189,22 @@ class Reader:
             h = self._i4() - BASE_HANDLE
             if h < 0 or h >= len(self.handles) or not isinstance(self.handles[h], ClassDesc):
                 raise FormatError("invalid class descriptor reference")
+            if not self.handles[h].complete:
+                raise FormatError("class descriptor refers to itself (cyclic superclass chain)")
             return self.handles[h]
         if tc == TC_PROXYCLASSDESC:
             raise FormatError("proxy classes are not part of the legacy formats")
         if tc != TC_CLASSDESC:
             raise FormatError("expected class descriptor")
+        self.depth += 1  # superclass chains recurse through here
+        try:
+            return self._classdesc_body()
+        finally:
+            self.depth -= 1
+
+    def _classdesc_body(self):
+        if self.depth > MAX_DEPTH:
+            raise LimitError("class descriptor chain too deep")
         d = ClassDesc()
         d.name = self._utf()
         d.suid = self._i8()
@@ -217,6 +229,7 @@ class Reader:
                 break
             self._skip_annotation_item(tc2)
         d.sup = self._classdesc()
+        d.complete = True
         return d
 
     def _skip_annotation_item(self, tc):
@@ -256,6 +269,8 @@ class Reader:
         c = desc
         while c is not None:
             chain.append(c)
+            if len(chain) > MAX_DEPTH:
+                raise LimitError("superclass chain too long")
             c = c.sup
         for c in reversed(chain):
             if not c.flags & SC_SERIALIZABLE:

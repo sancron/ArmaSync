@@ -556,6 +556,37 @@ public class FixtureGenerator {
 		d.writeInt(0x40000000);
 		invalid("array-declared-1gib.bin", "byte[] declared with 1 GiB length and no content; a parser must reject before allocating",
 				gzip(arr.toByteArray()));
+		// class descriptor whose superclass is itself (back reference to the incomplete descriptor)
+		ByteArrayOutputStream cyc = new ByteArrayOutputStream();
+		DataOutputStream cd = new DataOutputStream(cyc);
+		cd.writeShort(0xACED);
+		cd.writeShort(5);
+		cd.writeByte(0x73); // TC_OBJECT
+		cd.writeByte(0x72); // TC_CLASSDESC
+		cd.writeUTF("Cyclic");
+		cd.writeLong(1L);
+		cd.writeByte(0x02);
+		cd.writeShort(0);
+		cd.writeByte(0x78); // TC_ENDBLOCKDATA
+		cd.writeByte(0x71); // TC_REFERENCE as superclass
+		cd.writeInt(0x7E0000); // handle 0 = the descriptor being defined
+		invalid("superclass-cycle.bin", "class descriptor that is its own superclass; must be a controlled format error", gzip(cyc.toByteArray()));
+		// superclass chain of 150 distinct descriptors (baseline-independent limit test)
+		ByteArrayOutputStream chain = new ByteArrayOutputStream();
+		DataOutputStream ch = new DataOutputStream(chain);
+		ch.writeShort(0xACED);
+		ch.writeShort(5);
+		ch.writeByte(0x73);
+		for (int i = 0; i < 150; i++) {
+			ch.writeByte(0x72);
+			ch.writeUTF("Chain" + i);
+			ch.writeLong(i);
+			ch.writeByte(0x02);
+			ch.writeShort(0);
+			ch.writeByte(0x78);
+		}
+		ch.writeByte(0x70); // TC_NULL ends the chain
+		invalid("superclass-chain-150.bin", "150 nested superclass descriptors (limit 100)", gzip(chain.toByteArray()));
 		// highly compressible: GZIP expands to 64 MiB of zeros (not a serialization stream)
 		byte[] zeros = new byte[64 * 1024 * 1024];
 		invalid("gzip-expands-64mib.bin", "small GZIP expanding to 64 MiB; decompression must be bounded", gzip(zeros));

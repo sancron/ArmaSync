@@ -1,0 +1,2 @@
+# The ZIP traversal fixture must be versioned (root .gitignore ignores *.zip).
+!*.zip
