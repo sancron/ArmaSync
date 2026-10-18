@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+[package]
+name = "armasync-gui"
+description = "ArmaSync desktop GUI prototype (egui/eframe with AccessKit)."
+version.workspace = true
+edition.workspace = true
+rust-version = "1.95"
+license.workspace = true
+publish.workspace = true
+
+
+[dependencies]
+armasync-core.workspace = true
+armasync-application.workspace = true
+armasync-adapters.workspace = true
+eframe = "0.37.0"
+egui_extras = "0.37.0"
+
+[dev-dependencies]
+egui_kittest = "0.37.0"
+
+[lints]
+workspace = true

@@ -7,7 +7,7 @@ Stand: 2026-10-18. Gepflegt vom Eigentümer des Workspace (Integrator); Änderun
 | Gegenstand | Wert | Beleg / Regel |
 | --- | --- | --- |
 | Toolchain | exakt `1.99.1` (`rust-toolchain.toml`, Profil `minimal`, Komponenten `rustfmt`, `clippy`) | Verifiziert: `rustc 1.99.1 (58cf8f9c3 2026-10-13)`, `cargo 1.99.1`, Windows `x86_64-pc-windows-msvc`; Linux (WSL2 Ubuntu) `x86_64-unknown-linux-gnu`. `rustup` wählt die Version im Repo automatisch. Aktualisierung nur bewusst per Task. |
-| MSRV | `rust-version = "1.85"` (`[workspace.package]`) | Untergrenze durch Edition 2024 (ab 1.85) und `clap` 4.6 (`rust-version` 1.85) bestimmt. Geprüft: `cargo +1.85.0 test --workspace --locked` auf Windows bestanden. MSRV nur mit Begründung und erneuter Prüfung anheben. |
+| MSRV | `rust-version = "1.85"` (`[workspace.package]`); **Ausnahme `armasync-gui`: 1.95** (egui 0.37) | Untergrenze durch Edition 2024 (ab 1.85) und `clap` 4.6 (`rust-version` 1.85) bestimmt. Geprüft: `cargo +1.85.0 test --workspace --locked` auf Windows bestanden. MSRV nur mit Begründung und erneuter Prüfung anheben. |
 | Edition / Resolver | Edition 2024, `resolver = "3"` | Resolver 3 wählt Versionen kompatibel zur MSRV; `Cargo.lock` wurde so erzeugt („highest Rust 1.85 compatible versions“). |
 | Lockdatei | `Cargo.lock` eingecheckt; alle Prüfungen mit `--locked` | Anwendung, nicht Bibliothek (AGENTS.md). Pflege ausschließlich durch den Integrator. |
 | Lizenz | `AGPL-3.0-only` (`license` im Workspace, SPDX-Header in allen Quelldateien) | Neue, unabhängig geschriebene Quellen; keine Bestandsquellen übernommen. |
@@ -23,7 +23,7 @@ crates/armasync-adapters     `Platform` (cfg target_os), SHA-256-Hasher und In-M
 crates/armasync-cli          Binary `armasync` (+ Lib `armasync_cli`): clap, JSON-Envelope, Exitcodes
 ```
 
-Abhängigkeitsrichtung: `cli → application → core`, `cli → adapters → core`; keine Zyklen. Es gibt **kein GUI-Crate**: `armasync-gui` entsteht mit MIG-012 nach der Toolkit-Entscheidung (ADR-0002), um kein leeres Gerüst zu schaffen. Der CLI-Baum enthält nachweislich keine GUI-/Windowing-Crates (siehe unten).
+Abhängigkeitsrichtung: `cli → application → core`, `cli → adapters → core`; keine Zyklen. `crates/armasync-gui` (MIG-012): egui/eframe-Prototyp, **vorläufige** Toolkitwahl (ADR-0002), eigene `rust-version = "1.95"`; MSRV-Prüfung des übrigen Workspace: `cargo +1.85.0 test --workspace --exclude armasync-gui --locked`. Der CLI-Baum enthält nachweislich keine GUI-/Windowing-Crates (siehe unten). Die GUI-Abhängigkeiten (ca. 400 Pakete) stehen mit Version und Lizenz in [gui-evidence/gui-dependencies.txt](gui-evidence/gui-dependencies.txt).
 
 ## CLI-Basis (Umfang MIG-010)
 
@@ -73,7 +73,7 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
 cargo build -p armasync-cli --locked
 cargo tree -p armasync-cli --locked -e normal --prefix none      # keine GUI-/Windowing-Crates
-cargo +1.85.0 test --workspace --locked                          # MSRV (Toolchain 1.85.0 installiert)
+cargo +1.85.0 test --workspace --exclude armasync-gui --locked  # MSRV (ohne GUI-Crate, dessen MSRV 1.95 ist)
 ```
 
 Auf Linux zusätzlich in einem LF-Checkout (nicht auf NTFS-Arbeitskopie über `/mnt`) ausführen.
