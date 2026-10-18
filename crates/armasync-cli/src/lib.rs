@@ -3,12 +3,15 @@
 //!
 //! Contract: `docs/migration/CLI_CONTRACT.md`. Structured results go to stdout, diagnostics to stderr, and the
 //! process never waits for input (`--no-input` is accepted for forward compatibility; there is no prompt yet).
-//! Only `version` exists so far; synchronisation commands are added with the use cases in later tasks.
+//! `version` and `import` exist so far; synchronisation commands are added with the use cases in later tasks.
 
 use std::ffi::OsString;
 use std::io::Write;
+use std::path::PathBuf;
 
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
+
+mod import_cmd;
 
 /// Version of the JSON envelope schema.
 pub const JSON_SCHEMA_VERSION: u32 = 1;
@@ -80,6 +83,24 @@ struct Cli {
 enum Command {
     /// Show product, version and platform.
     Version,
+    /// Import repositories and profiles from a neutral import file (preview unless --apply is given).
+    Import(ImportArgs),
+}
+
+#[derive(Debug, Args)]
+struct ImportArgs {
+    /// The neutral import file (`armasync.import`).
+    file: PathBuf,
+    /// Write the changes. Without this flag the command only shows what would happen.
+    #[arg(long)]
+    apply: bool,
+    /// What to do when an imported item collides with an existing one.
+    #[arg(long, value_name = "POLICY", default_value = "keep-both",
+          value_parser = ["keep-both", "fail", "replace"])]
+    on_conflict: String,
+    /// Config directory holding `library.json` (default: the platform's ArmaSync config directory).
+    #[arg(long, value_name = "DIR")]
+    config: Option<PathBuf>,
 }
 
 /// Runs the CLI with the given arguments and returns the exit status.
@@ -104,6 +125,16 @@ where
     let _ = cli.no_input;
     match cli.command {
         Command::Version => version(cli.json, cli.quiet, stdout),
+        Command::Import(args) => {
+            let args = import_cmd::ImportArgs {
+                file: args.file,
+                apply: args.apply,
+                on_conflict: armasync_adapters::import::OnConflict::from_name(&args.on_conflict)
+                    .unwrap_or_default(),
+                config: args.config,
+            };
+            import_cmd::run(&args, cli.json, cli.quiet, stdout, stderr)
+        }
     }
 }
 

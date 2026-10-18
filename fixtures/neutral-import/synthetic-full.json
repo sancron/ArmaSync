@@ -1,0 +1,44 @@
+{
+  "kind": "armasync.import",
+  "schema_version": 1,
+  "source": {
+    "tool": "hand-written",
+    "tool_version": "1",
+    "format": "synthetic"
+  },
+  "repositories": [
+    {
+      "key": "Example HTTP",
+      "name": "Example HTTP",
+      "url": "https://repo.example.invalid/arma",
+      "needs_credentials": true
+    },
+    {
+      "key": "Example SFTP",
+      "name": "Example SFTP",
+      "url": "sftp://sftp.example.invalid:2222/data"
+    },
+    {
+      "key": "Plain Mirror",
+      "name": "Plain Mirror (unencrypted)",
+      "url": "http://mirror.example.invalid/pub"
+    }
+  ],
+  "profiles": [
+    {
+      "name": "Alpha",
+      "repositories": ["Example SFTP", "Example HTTP"]
+    },
+    {
+      "name": "Everything",
+      "repositories": ["Example HTTP", "Example SFTP", "Plain Mirror", "Not Exported"]
+    },
+    {
+      "name": "Empty",
+      "repositories": []
+    }
+  ],
+  "notes": [
+    { "code": "synthetic-fixture", "subject": "all addresses use the reserved .invalid domain" }
+  ]
+}

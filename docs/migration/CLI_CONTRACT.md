@@ -27,6 +27,14 @@ armasync license
 
 Global: `--config <path>`, `--portable`, `--json`, `--no-input`, `--verbose`, `--quiet`, `--no-color`. Gültigkeit/Kombination pro Befehl in P1 mit Help-Snapshots fixieren. Updateanwenden nur bei tatsächlich freigegebenem Updater, sonst definierte Meldung. Keine Passwörter als Commandline-Flags.
 
+## Umgesetzt: `armasync import` (MIG-021)
+
+```text
+armasync import <neutral-export> [--apply] [--on-conflict keep-both|fail|replace] [--config <dir>] [--json] [--quiet]
+```
+
+Importiert Repositories und Profile aus dem neutralen Format (`armasync.import`, [IMPORT_SCHEMA](IMPORT_SCHEMA.md)). Ohne `--apply` nur Vorschau, ohne Schreibzugriff. Wartet nie auf Eingaben; kein Geheimnis in Ein- oder Ausgabe. Exitcodes laut Tabelle unten (2 Aufruf, 3 Konflikt unter `fail`, 5 Dateisystem, 7 Format). Die Zeilen `repository import` und `profile import` oben bleiben für den Direktimport aus Autoconfig/Server (MIG-022) vorgesehen.
+
 ## Ausgabevertrag
 
 Menschenlesbare Fortschritte/Diagnosen nach stderr, strukturiertes Ergebnis nach stdout. `--json`: versionierter Ergebnis-Envelope mit `schema_version`, `operation_id`, `status`, `result` oder typisiertem `error`; niemals Secrets. Für lange Events optional separat dokumentiertes NDJSON-Format, nicht still mehrere JSON-Dokumente in eine Ausgabe mischen. Lokalisierte Meldungen dürfen stabile Fehlercodes nicht verändern.
