@@ -7,13 +7,13 @@ Statuswerte: `offen`, `in Arbeit`, `implementiert`, `verifiziert`, `N/A`. Eine F
 | ID | Fähigkeit / Referenz im Java-Bestand | Phase | Ziel und Abnahme | Rust-Status |
 | --- | --- | --- | --- | --- |
 | F01 | Repository-CRUD, Import/Autoconfig; RepositoryService, ConnectionService | P2 | GUI/CLI nutzen denselben Store; Geheimnisse getrennt | offen |
-| F02 | GZIP/Java-Serialisierung, verschlüsselte Konfiguration; A3SFilesAccessor | P0/P2 | Offline-Import plus direkter Metadatenparser, schema- und datenverlustgeprüft | offen |
+| F02 | GZIP/Java-Serialisierung, verschlüsselte Konfiguration; A3SFilesAccessor | P0/P2 | Offline-Import plus direkter Metadatenparser, schema- und datenverlustgeprüft | offen (Fixtures/Inventar: MIG-001 integriert, [FORMAT_INVENTORY](FORMAT_INVENTORY.md)) |
 | F03 | Lokaler Scan, Modvergleich, Dateicache | P2/P3 | deterministischer SyncPlan, Case-/Unicode-/Symlinkregeln | offen |
 | F04 | HTTP(S)-Download, Range/Resume, Proxy | P3 | echter GUI/CLI-Download, TLS, Abbruch/Resume, Server ohne Range | offen |
 | F05 | FTP/FTPS-Download/-Upload | P4 | vorhandene Modi interoperabel; bekannte FTPS-Einschränkung gesondert prüfen | offen |
 | F06 | SFTP-Transfer | P4 | Passwort sowie geplante Schlüsseloption bewerten, Host-Key-Validierung | offen |
 | F07 | HTTP(S)-WebDAV-Upload | P4 | Serverinteroperabilität, Auth, sichere Pfade | offen |
-| F08 | zsync/Jazsync, MD4/BrokenMD4, SHA-1 | P0/P4 | Golden Vectors, Byte-/Dateiergebnisparität; getesteter Voll-Download-Fallback | offen |
+| F08 | zsync/Jazsync, MD4/BrokenMD4, SHA-1 | P0/P4 | Golden Vectors, Byte-/Dateiergebnisparität; getesteter Voll-Download-Fallback | offen (zsync-/MD4-Fixtures: MIG-001 integriert) |
 | F09 | Entpacken und exakter Abgleich | P3/P4 | kein Pfadausbruch; Löschplan explizit, nur verwaltete Dateien | offen |
 | F10 | Repository-Build, Revision, Prüfen, versteckte Dateien | P4 | atomare Metadatenveröffentlichung; deterministische Ergebnisse | offen |
 | F11 | Uploadparallelität, Session-Reuse, Limits | P4 | unabhängige Check-/Download-/Upload-Limits, konsistenter Abbruch | offen |

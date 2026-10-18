@@ -1,13 +1,9 @@
 # Letzte integrierte Änderung
 
-**2026-10-18 · MIG-000 · Codex · Migrationsvorbereitung für ArmaSync / Lynxnode.it**
+**2026-10-18 · MIG-001 · Claude · Formatfixtures, Class-/UID-Inventar und Exportstrategie**
 
-Analyse und Anweisungs-/Planungspaket auf `development`. Kein Rust-Code und kein bestehendes Laufzeitverhalten geändert. [Vollständiger Bericht](2026-10-18-MIG-000.md), [Handoff](../handoffs/MIG-000.md), [aktueller Stand](../migration/STATUS.md).
+Lokal nach `development` integriert (Merge `de8c868`, nicht gepusht; Codex-Review bis `4f71a36` freigegeben). Neu: `fixtures/legacy-formats/`, `migration-tools/fixture-generator/`, `docs/migration/FORMAT_INVENTORY.md`, `.gitattributes` (Shell-Skripte LF). Kein Rust-Code, kein Laufzeitverhalten geändert. [Bericht](2026-10-18-MIG-001.md), [Handoff](../handoffs/MIG-001.md), [aktueller Stand](../migration/STATUS.md).
 
-Ausgang: `b7753cea18b2ac2cc57e29f926901997a4de8570`. Den zugehörigen Commit ohne Selbstreferenz zuverlässig ermitteln:
+Prüfung im zusammengesetzten Stand: `run.ps1` Exit 0, `verify.py` 0 Probleme, Ergebnis byte-identisch zum eingecheckten Stand. **Offen:** vollständiger Linux-Generatorlauf (kein JDK in WSL-Ubuntu), macOS/BSD, Hardlinks.
 
-```text
-git log -1 --format=fuller -- docs/changes/2026-10-18-MIG-000.md
-```
-
-Nächste Arbeit: MIG-001 zuweisen und Formatfixtures/Importgrundlage erstellen. P0 ist noch nicht abgeschlossen. Diese Datei nur bei der nächsten tatsächlichen Integration durch den Integrator ersetzen; einzelne parallel laufende Systeme schreiben eigene Reports.
+Vorherige Integration: [MIG-000](2026-10-18-MIG-000.md). Nächste Arbeit: MIG-002 und MIG-003 (Codex, reserviert). Das P0-Gate bleibt bis zu deren Abschluss offen.
