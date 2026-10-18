@@ -1,15 +1,23 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! ArmaSync adapters.
 //!
-//! File-system, transport, credential and OS adapters are added behind core ports (P3 and later).
+//! Persistence (versioned JSON/TOML documents, atomic writes, platform data directories) and credential adapters
+//! live here since MIG-020; transport and file-system sync adapters follow behind core ports (P3 and later).
 //! OS-specific code stays here, gated by `cfg(target_os)`. For now the crate also provides the SHA-256
 //! [`Sha256Hasher`] and in-memory adapters used to prove the ports and to test use cases without I/O.
 
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+pub mod credentials;
+mod fsutil;
 pub mod memory;
+pub mod paths;
+pub mod store;
 
+pub use credentials::SessionCredentialStore;
 pub use memory::{InMemoryRepository, InMemoryStore, MemoryEventSink, Sha256Hasher};
+pub use paths::{DataRoots, PathMode};
+pub use store::{LibraryStore, SettingsStore};
 
 /// Operating systems the project targets first.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
