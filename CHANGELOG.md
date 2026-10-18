@@ -18,6 +18,8 @@
 - MIG-012A integriert: Kontrast der Auswahlfläche im hellen Theme 3,17:1 (Ausnahme entfernt), manuelles NVDA-/Orca-Prüfprotokoll [GUI_SCREENREADER_PROTOCOL](docs/migration/GUI_SCREENREADER_PROTOCOL.md); P1-GUI-Gate weiterhin offen.
 - MIG-020 integriert: neutrales Datenmodell, versionierte `library.json`/`settings.toml`, atomares Schreiben mit Backup, Datenverzeichnisse Windows/Linux/portabel, Credential-Port; [DATA_MODEL](docs/migration/DATA_MODEL.md), [ADR-0005](docs/adr/0005-credentials-and-data-paths.md). Kein Schlüsselbund-Adapter, keine Legacy-Formate.
 - GUI-Leitvorgabe dokumentiert: vertraute Abläufe der Baseline, moderner, intuitiver und zugänglicher, keine Altmarken ([UI_REQUIREMENTS](docs/migration/UI_REQUIREMENTS.md)).
+- `development` bis `734a20b` (inkl. MIG-012A, MIG-020) gepusht; CI grün.
+- MIG-021 integriert: neutrales Importformat `armasync.import`, Rust-Importer mit Vorschau, Backup, Abbruch und Journal, `armasync import`, Offline-Exporter für unverschlüsselte Profile; verschlüsselte Repositorydateien (ADR-0003/RQ-01 offen) nicht importiert; [IMPORT_SCHEMA](docs/migration/IMPORT_SCHEMA.md).
 - MIG-001: vollständiger Linux-Generatorlauf bestanden; `run.sh`/`run.ps1` bauen nur das Root-Gradle-Projekt.
 - `.gitattributes`: Shell-Skripte mit LF.
 - Noch keine Rust-Portierung oder Änderung am bestehenden Laufzeitcode.

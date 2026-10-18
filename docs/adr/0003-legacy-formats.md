@@ -12,6 +12,10 @@ Lokale Altdateien über einen separaten kontrollierten Offline-Export und neutra
 
 Nicht gewählt: globales Package-Replacement; unbeschränkte Deserialisierung; JVM als Dauerabhängigkeit; stiller Verlust alter Profile oder bestehender Serverkompatibilität.
 
+## Stand nach MIG-021 (2026-10-18)
+
+Der lokale Weg ist umgesetzt: Offline-Exporter (nur lesend, unverschlüsselte Dateien) → neutrales `armasync.import` → Rust-Import ([IMPORT_SCHEMA](../migration/IMPORT_SCHEMA.md)). **Nicht entschieden und nicht umgesetzt:** das Entschlüsseln der `.a3s.repository`-Dateien (Rust-Konstante aus dem Altquelltext oder einmaliger JVM-Export, siehe FORMAT_INVENTORY Abschnitt 7) – abhängig von der Herkunfts-/Rechtefrage RQ-01. Der Exporter listet diese Dateien nur als übersprungen.
+
 ## Offene Schreibentscheidung
 
 Vor P4-Repository-Publisher verbindlich wählen: (A) legacy-kompatible Ausgabe mit Gegentests in Java oder (B) neues Manifestformat mit versioniertem Servercutover, Export und ausdrücklich erklärten Clientgrenzen. Lesekompatibilität allein beweist keine Schreibkompatibilität.
