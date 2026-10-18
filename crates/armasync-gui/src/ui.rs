@@ -74,9 +74,11 @@ pub fn error_color(dark: bool) -> Color32 {
 ///
 /// * secondary ("weak") text at least 4.5:1,
 /// * widget outlines (also used as the focus outline) at least 3:1 against the panel,
-/// * selection: text on the selection fill at least 4.5:1 and the selection outline (used by egui as the focus ring of
-///   text fields) at least 3:1. In the light theme the selection fill itself is a light tint (about 1.6:1 against the
-///   panel), so a selected list row is additionally set in bold type; it is not conveyed by fill colour alone.
+/// * selection: the fill at least 3:1 against the panel, text on the selection fill at least 4.5:1 and the selection
+///   outline (used by egui as the focus ring of text fields) at least 3:1. egui draws text in selected rows and the
+///   outline with the same colour (`selection.stroke`), so the light theme uses a near-black one on a mid blue fill:
+///   the narrow band that satisfies all three limits at once. A selected list row is still also announced as
+///   `selected` and set in bold type, so the state is not conveyed by colour alone.
 #[must_use]
 pub fn themed_visuals(dark: bool) -> egui::Visuals {
     let mut visuals = if dark {
@@ -97,8 +99,8 @@ pub fn themed_visuals(dark: bool) -> egui::Visuals {
             Color32::from_rgb(0x5A, 0x5A, 0x5A),
             Color32::from_rgb(0x6E, 0x6E, 0x6E),
             Color32::from_rgb(0x00, 0x2D, 0x64),
-            Color32::from_rgb(0xAA, 0xCD, 0xF0),
-            Color32::from_rgb(0x00, 0x2D, 0x64),
+            Color32::from_rgb(0x5A, 0x8F, 0xCC),
+            Color32::from_rgb(0x10, 0x10, 0x10),
         )
     };
     visuals.weak_text_color = Some(weak);
