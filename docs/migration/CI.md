@@ -1,6 +1,6 @@
 # CI (MIG-013)
 
-Stand: 2026-10-18. **Der Workflow ist lokal vorbereitet und hat auf GitHub noch nie gelaufen.** Er ist nicht gepusht, nicht aktiviert und nicht als Required Check eingetragen. Aussagen unten über „bestanden“ beziehen sich auf die **lokale Ausführung derselben Befehle**, nicht auf einen GitHub-Lauf.
+Stand: 2026-10-18. **Erster GitHub-Lauf am 2026-10-18** (Push von `development`, [Run 39164378010](https://github.com/sancron/ArmaSync/actions/runs/39164378010), Commit `6b1f261`): die Jobs `Rust (windows-latest)`, `Rust (ubuntu-latest)`, `MSRV 1.85 (without GUI crate)` und `Fixtures and test server` waren **erfolgreich**; `Branch flow` wurde übersprungen, weil er nur bei Pull Requests läuft und damit noch **nie ausgeführt** wurde. Weiterhin gilt: kein `actionlint`, Actions nicht auf Commit-SHAs gepinnt, nicht als Required Check eingetragen, keine Rulesets. Lokale Läufe unten beziehen sich auf dieselben Befehle unter Windows 11 und WSL2.
 
 ## Dateien
 

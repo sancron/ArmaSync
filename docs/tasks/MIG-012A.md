@@ -13,5 +13,5 @@
 - Ziele: Auswahlfläche im hellen Theme von 1,56:1 auf mindestens 3:1 gegen die Panelfläche bringen, ohne den Kontrast des Texts auf der Auswahl (4,5:1) und des Fokus-/Auswahlrings (3:1) zu verletzen; Ausnahme im Test und Protokoll entfernen. Konkrete, ausführbare manuelle Prüfschritte für NVDA und Orca (Vorbereitung, Bedienung, erwartete Ansagen, Protokollvorlage) bereitstellen.
 - Nicht im Scope: Gate auf „bestanden“ setzen, Toolkitwechsel, neue Funktionen, Layoutänderungen.
 - Abnahme: `cargo fmt/clippy/test` (GUI-Crate und Workspace), Kontrasttabelle aus dem Test, Nachweis des hellen Themes soweit ohne Zusatzsoftware möglich, `git diff --check`.
-- Resultat / Codecommits / Report / Handoff: siehe `docs/changes/` und `docs/handoffs/MIG-012A.md` nach Abschluss.
+- Resultat / Codecommits / Report / Handoff: Codecommit `554f065`, Dokumentation `0a15ead` auf `claude/mig-012a-contrast`, Merge `9577b58`; [Bericht](../changes/2026-10-18-MIG-012A.md), [Handoff](../handoffs/MIG-012A.md).
 - Blocker: NVDA/Orca in dieser Umgebung nicht vorhanden (Lücke bleibt, manueller Schritt für den Projektverantwortlichen).

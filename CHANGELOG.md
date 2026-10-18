@@ -13,7 +13,11 @@
 - MIG-010 integriert: Cargo-Workspace (`armasync-core`, `-application`, `-adapters`, `-cli`), Rust 1.99.1 gepinnt (MSRV 1.85), CLI `armasync version [--json]`; Dokument [RUST_TOOLCHAIN](docs/migration/RUST_TOOLCHAIN.md).
 - MIG-011 integriert: Kernverträge (sichere Pfade, Manifest, SyncPlan, Fehler, Events, Jobzustände, Ports), Use-Cases `sync::plan`/`sync::apply` und In-Memory-Adapter; [ADR-0004](docs/adr/0004-core-contracts.md). Noch keine echte Synchronisation.
 - MIG-012 integriert: GUI-Prototyp `armasync-gui` (egui/eframe mit AccessKit) auf simulierten Daten; ADR-0002 „vorläufig gewählt“, Screenreader-Nachweis (NVDA/Orca) und damit das P1-GUI-Gate offen; [Prüfprotokoll](docs/migration/GUI_PROTOTYPE_EVIDENCE.md).
-- MIG-013 integriert: lokal vorbereiteter CI-Workflow und Branch-Flow-Prüfung (`.github/workflows/ci.yml`, `.github/scripts/`); auf GitHub nie gelaufen, keine Branchregeln aktiviert; [CI](docs/migration/CI.md).
+- MIG-013 integriert: lokal vorbereiteter CI-Workflow und Branch-Flow-Prüfung (`.github/workflows/ci.yml`, `.github/scripts/`); erster GitHub-Lauf am 2026-10-18 erfolgreich, keine Branchregeln aktiviert; [CI](docs/migration/CI.md).
+- `development` am 2026-10-18 nach `origin/development` gepusht (Fast-Forward); erste GitHub-CI erfolgreich.
+- MIG-012A integriert: Kontrast der Auswahlfläche im hellen Theme 3,17:1 (Ausnahme entfernt), manuelles NVDA-/Orca-Prüfprotokoll [GUI_SCREENREADER_PROTOCOL](docs/migration/GUI_SCREENREADER_PROTOCOL.md); P1-GUI-Gate weiterhin offen.
+- MIG-020 integriert: neutrales Datenmodell, versionierte `library.json`/`settings.toml`, atomares Schreiben mit Backup, Datenverzeichnisse Windows/Linux/portabel, Credential-Port; [DATA_MODEL](docs/migration/DATA_MODEL.md), [ADR-0005](docs/adr/0005-credentials-and-data-paths.md). Kein Schlüsselbund-Adapter, keine Legacy-Formate.
+- GUI-Leitvorgabe dokumentiert: vertraute Abläufe der Baseline, moderner, intuitiver und zugänglicher, keine Altmarken ([UI_REQUIREMENTS](docs/migration/UI_REQUIREMENTS.md)).
 - MIG-001: vollständiger Linux-Generatorlauf bestanden; `run.sh`/`run.ps1` bauen nur das Root-Gradle-Projekt.
 - `.gitattributes`: Shell-Skripte mit LF.
 - Noch keine Rust-Portierung oder Änderung am bestehenden Laufzeitcode.

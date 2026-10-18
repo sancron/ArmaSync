@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-only
-# ArmaSync CI (MIG-013). Prepared locally; it has NOT run on GitHub yet. See docs/migration/CI.md.
+# ArmaSync CI (MIG-013). First GitHub run on development: 2026-10-18 (all four jobs passed). See docs/migration/CI.md.
 # Third-party actions are referenced by major tag for now; pin them to reviewed commit SHAs before enabling
 # the workflow for required checks.
 name: CI
