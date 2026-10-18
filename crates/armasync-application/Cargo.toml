@@ -11,5 +11,9 @@ publish.workspace = true
 [dependencies]
 armasync-core.workspace = true
 
+[dev-dependencies]
+# Test-only: in-memory adapters prove the ports. The production dependency direction stays application -> core.
+armasync-adapters.workspace = true
+
 [lints]
 workspace = true

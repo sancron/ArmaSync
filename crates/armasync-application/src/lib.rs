@@ -1,8 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! ArmaSync application layer.
 //!
-//! Use cases (inspect, plan, apply, verify, ...) are added from MIG-011 on. Only the read-only
-//! product description is available now; no synchronisation is implemented.
+//! Use cases live in submodules: [`sync`] plans and applies a synchronisation against core ports (MIG-011).
+//! More use cases (verify, build, upload, import) follow. The read-only product description is [`version_info`].
+//! No real transport or file-system adapter exists yet, so nothing here syncs real data.
+
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
+
+pub mod sync;
 
 use armasync_core::product;
 
