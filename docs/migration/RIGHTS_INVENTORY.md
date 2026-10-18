@@ -52,7 +52,7 @@ Direkte Laufzeitabhängigkeiten aus `build.gradle` und aufgelöste Transitiven a
 
 ## Lokal gebündelte JARs
 
-SHA-256 wurde am MIG-002-Worktree unter Windows mit Python `hashlib` über die getrackten `resources/lib/*.jar` berechnet. Die Hashes identifizieren die konkreten Dateien, nicht die Rechte daran. „Build direkt“ bedeutet Eintrag in `build.gradle`; die übrigen sind im Bestand, aber nicht im aktuellen Gradle-Runtime-Graph.
+SHA-256 wurde mit Python `hashlib` über die unveränderten Git-Blob-Bytes (`git cat-file blob b7753cea…:<Pfad>`, keine Zeilenenden-Konvertierung der Arbeitskopie) der 30 `resources/lib/*.jar` berechnet. Die Hashes identifizieren die konkreten Dateien, nicht die Rechte daran. „Build direkt“ bedeutet Eintrag in `build.gradle`; die übrigen sind im Bestand, aber nicht im aktuellen Gradle-Runtime-Graph.
 
 | Datei | SHA-256 | Verwendung / eingebetteter Rechtebeleg |
 | --- | --- | --- |
@@ -60,19 +60,19 @@ SHA-256 wurde am MIG-002-Worktree unter Windows mit Python `hashlib` über die g
 | `JTattoo-1.6.10.jar` | `4e2e5d8cd972478d5c2a5ad006407f9ba29ec4c5da234f597f4ea348c784223b` | Build direkt; keine LICENSE/NOTICE-Datei im JAR gefunden; Herkunft/Recht offen |
 | `junique-1.0.4.jar` | `aa259f12cd4d6aeb22e0d35b55f6274c634f742008a45264133aa2db767ed678` | Build direkt; keine LICENSE/NOTICE-Datei im JAR gefunden; Herkunft/Recht offen |
 | `commons-io-2.15.0.jar`, `commons-io-2.0.1.jar` | `a328dad730921d197b6a9b195dffa00e41c974c2dac8fe37e84d31706bca7792`, `2a3f5a206480863aae9dff03f53c930c3add6912f8785498d59442c7ebb98c5c` | Nicht aktuelle direkte Version (Build nutzt 2.15.1); enthalten Apache LICENSE/NOTICE |
-| `commons-codec-1.16.0.jar`, `commons-codec-1.13.jar` | `56595fb20b0b85bc91d0d503dad50bb7f1b9afc0eed5dffa6c6bb25929000484d`, `61f7a3079e92b9fdd605238d0295af5fd11ac411a0a0af48deace1f6c5ffa072` | 1.16.0 ist aktuell; beide enthalten Apache LICENSE/NOTICE |
-| `commons-net-3.10.0.jar`, `commons-net-3.4.jar` | `2230eec44ef4b8112ea09cbeb6de826977abe792e627cee2770e35ca8c39dce1`, `b2fe39162714d059c6b6f2623298a34c6a8a5608ee8abb3077132cbd94a4c01` | 3.10.0 aktuell; beide enthalten Apache LICENSE/NOTICE |
+| `commons-codec-1.16.0.jar`, `commons-codec-1.13.jar` | `56595fb20b0b85bc91d0d503dad50bb7f1b9afc0eed5dffa6cbb25929000484d`, `61f7a3079e92b9fdd605238d0295af5fd11ac411a0a0af48deace1f6c5ffa072` | 1.16.0 ist aktuell; beide enthalten Apache LICENSE/NOTICE |
+| `commons-net-3.10.0.jar`, `commons-net-3.4.jar` | `2230eec44ef4b8112ea09cbeb6de826977abe792e627cee2770e35ca8c39dce1`, `b2fe39162714d059c6b6f2623298a34c6a8a5608bee8abb3077132cbd94a4c01` | 3.10.0 aktuell; beide enthalten Apache LICENSE/NOTICE |
 | `commons-logging-1.2.jar` | `daddea1ea0be0f56978ab3006b8ac92834afeefbd9b7e4e6316fca57df0fa636` | Apache LICENSE/NOTICE; Gradle-Artefakt ebenfalls verwendet |
 | `httpclient-4.5.14.jar`, `httpclient-4.5.3.jar` | `c8bc7e1c51a6d4ce72f40d2ebbabf1c4b68bfe76e732104b04381b493478e9d6`, `db3d1b6c2d6a5e5ad47577ad61854e2f0e0936199b8e05eb541ed52349263135` | 4.5.14 aktuell; beide enthalten Apache LICENSE/NOTICE |
 | `httpcore-4.4.16.jar`, `httpcore-4.4.6.jar` | `6c9b3dd142a09dc468e23ad39aad6f75a0f2b85125104469f026e52a474e464f`, `d7f853dee87680b07293d30855b39b9eb56c1297bd16ff1cd6f19ddb8fa745fb` | 4.4.16 aktuell; beide enthalten Apache LICENSE/NOTICE |
 | `flatlaf-3.6.1.jar`, `flatlaf-3.1.1.jar`, `flatlaf-extras-3.6.1.jar` | `687be33e1e3eface1681fd194732d16e008126a47b6116b4301e7070c918c4c9`, `264ef9528627510ca20f3c680c4e3ac0129bcac235b8d4d9f014261f3cd6d56f`, `76686734e6f9fce97f639226e5fc25e5e543af72266ef787a8e1e4c42247f3c6` | Bundled LICENSE; current Gradle version 3.6.1 |
 | `jsvg-2.0.0.jar` | `81fc9ada579fc3f4924ec35f904c043de13ee8fba280322e638c7092006f1b52` | Bundled LICENSE; transitiv und direkt |
 | `sardine-5.12.jar`, `sardine-5.8.jar` | `368a8866bd10328c542a8a1a4ff183594f538105ca83551979d84f0f330eec07`, `ea4e8b253b8362b3f9a041fded9d6957066c5f0eb74d7c259d713e59665980bb` | 5.12 aktuell; JAR enthält keine benannte Lizenzdatei; Lizenznachweis aus Projektmetadaten für Release archivieren |
-| `angus-activation-2.0.0.jar`, `jakarta.activation-api-2.1.1.jar`, `jakarta.xml.bind-api-4.0.0.jar`, `jaxb-core-4.0.2.jar`, `jaxb-runtime-4.0.2.jar`, `txw2-4.0.2.jar` | `3a12d321…079147`, `33bae3f0…d0491a04`, `57e3796a…a5515aa122`, `d7ff2954…c470ccd`, `1bc271e6…fe0e9a939`, `ea71912e…29a0cf0c` | Laufzeitartefakte enthalten LICENSE/NOTICE-Dateien; im aktuellen Gradle-Graph verwendet. Hashes hier zur Lesbarkeit gekürzt; vollständige SHA-256 siehe MIG-002-Bericht. |
-| `jaxb-api-2.3.0.jar`, `istack-commons-runtime-4.1.1.jar` | `88300798…5101bb3d03`, `7e8148c5…3918dcd3` | Historische Bestandskopien; LICENSE teils eingebettet, Ist-Verwendung nicht im aktuellen Runtime-Graph |
-| `slf4j-api-2.0.7.jar`, `slf4j-simple-2.0.7.jar` | `5d6298b9…85d946f4`, `50eae3f1…f3bc01a7` | Transitive aktuelle Laufzeit; LICENSE im JAR |
+| `angus-activation-2.0.0.jar`, `jakarta.activation-api-2.1.1.jar`, `jakarta.xml.bind-api-4.0.0.jar`, `jaxb-core-4.0.2.jar`, `jaxb-runtime-4.0.2.jar`, `txw2-4.0.2.jar` | `3a12d321a0f35aa9458ff9b6ee93a3de76b78e3f18b077c81721473d83079147`, `33bae3f0f12dbb5a7afc81d802a130359cdb44bbc7fb4b213f49b349d0491a04`, `57e3796ad5753640088f5f9d3c53c183f2c250b7dad90529ea3e19a5515aa122`, `d7ff2954ad78480bbab9391cccff3a22f42a82b6e09aeca1c7d502411c470ccd`, `1bc271e61b71ca4bd89eb053f3d2c91d478211b02a8982cb520f216fe0e9a939`, `ea71912e4f0a42530f77c9840ae90019c46402dedfdf007cff03797429a0cf0c` | Laufzeitartefakte enthalten LICENSE/NOTICE-Dateien; im aktuellen Gradle-Graph verwendet. |
+| `jaxb-api-2.3.0.jar`, `istack-commons-runtime-4.1.1.jar` | `883007989d373d19f352ba9792b25dec21dc7d0e205a710a93a3815101bb3d03`, `7e8148c5bf5d5ae6f8c4534c1873f82e80bf7f9164fd09ee573df0013918dcd3` | Historische Bestandskopien; LICENSE teils eingebettet, Ist-Verwendung nicht im aktuellen Runtime-Graph |
+| `slf4j-api-2.0.7.jar`, `slf4j-simple-2.0.7.jar` | `5d6298b93a1905c32cda6478808ac14c2d4a47e91535e53c41f7feeb85d946f4`, `50eae3f1cc9a78a970970518e005d3f43d5cd3262d234f47ebdf3ca3f8bc01a7` | Transitive aktuelle Laufzeit; LICENSE im JAR |
 
-Die Tabelle erfasst alle 30 JAR-Pfade aus `resources/lib/`. Für kompakte Tabellenzeilen sind zehn Hashes auf Präfix und Suffix gekürzt; vollständige Werte stehen im MIG-002-Bericht. Für eine signierte Release-BOM sind SHA-256 und Lizenztexte aller tatsächlich gepackten Artefakte erneut maschinell zu erfassen.
+Die Tabelle erfasst alle 30 JAR-Pfade aus `resources/lib/`. Alle Hashes sind vollständig angegeben (64 Hex-Zeichen) und per Skript gegen die Baseline-Blobs geprüft (siehe Abschnitt „Verifikation und Grenzen“). Für eine signierte Release-BOM sind SHA-256 und Lizenztexte aller tatsächlich gepackten Artefakte erneut maschinell zu erfassen.
 
 ## Offene Rechtefragen und Zuständigkeit
 
@@ -89,7 +89,7 @@ Die Tabelle erfasst alle 30 JAR-Pfade aus `resources/lib/`. Für kompakte Tabell
 
 ## Hashes der visuellen Assets und Fonts
 
-Die folgenden SHA-256-Werte wurden über die im MIG-002-Worktree ausgecheckten Dateien berechnet. Für 42 SVG-Icons und die alten App-/Installerbilder fand sich kein eindeutiger Herkunfts-/Lizenzbeleg im Repo. Die 12 Fontdateien liegen unter dem OFL-Hinweis im Fonts-Verzeichnis.
+Die folgenden SHA-256-Werte wurden über die unveränderten Git-Blob-Bytes der Baseline `b7753cea…` berechnet (nicht über Arbeitskopien). Für 42 SVG-Icons und die alten App-/Installerbilder fand sich kein eindeutiger Herkunfts-/Lizenzbeleg im Repo. Die 12 Fontdateien liegen unter dem OFL-Hinweis im Fonts-Verzeichnis.
 
 | Baseline-Pfad | SHA-256 |
 | --- | --- |
@@ -110,8 +110,8 @@ Die folgenden SHA-256-Werte wurden über die im MIG-002-Worktree ausgecheckten D
 | `src/main/resources/resources/icons/edit.svg` | `593934de80c0e75c26a7e0139dc7b67c558e96e63c80e1221cb800cf08c8c5ad` |
 | `src/main/resources/resources/icons/events.svg` | `1ef699e119b2945b26b49ef737ba6a10dcd748644924c4e182b56c8941939bcb` |
 | `src/main/resources/resources/icons/file.svg` | `3835382f7201c06efde19132124d4ee266d7b281d29f1f8e81b067ab652394bb` |
-| `src/main/resources/resources/icons/folder-open.svg` | `b4703a36ab10020e2771e94370fe46001fa18d304976770f30f7619a9db3e557` |
-| `src/main/resources/resources/icons/folder.svg` | `2a716337c8e61b1afdaf3d2f2aa9b5a24178ed778be4c002e64756a550e186f9` |
+| `src/main/resources/resources/icons/folder-open.svg` | `a27eec73708145d541748148f605be05a86c1f4f14c5f1f0f607d272a0dc3d6f` |
+| `src/main/resources/resources/icons/folder.svg` | `1e227bf610cd15786d37cac2534ac2b12db860028c0339bcb84c346319fdfe4f` |
 | `src/main/resources/resources/icons/globe.svg` | `298e1979f06ceaa3580ada620eb7c580efc409f5b34406f815e4b9d1b4fc9c06` |
 | `src/main/resources/resources/icons/help.svg` | `cb920bd4be8c4535b5d296fff74452f7eb57a7e82f61bca0b04d0b0edd381700` |
 | `src/main/resources/resources/icons/info.svg` | `0053e441daff038d46f55c1ac551873949c058f7a5642e06841b2a1912f759fc` |
@@ -159,3 +159,5 @@ Die folgenden SHA-256-Werte wurden über die im MIG-002-Worktree ausgecheckten D
 - Quellheader wurden in `src/main/java/fr/soe/a3s/jazsync/**` und `DataRange.java` geprüft. Bildursprung und Rechtekette konnten aus den Binärdateien/Repo-Metadaten nicht festgestellt werden.
 - Kein individueller Rechtsrat, keine externe Upstream-Lizenzprüfung, keine Verifikation der Rechtekette von Projektcontributors und keine Entscheidung zur Zulässigkeit eines abgeleiteten Jazsync-Ports.
 - Ausstehende Rechtefragen sind Gate-Befunde; MIG-002 allein schließt das P0-Gate daher nicht, solange RQ-02 bis RQ-05 ungeklärt sind.
+- Hash-Prüfung (Korrektur nach Integrationsreview): Alle 87 dokumentierten Hashes (30 JARs, 42 SVGs, 12 Fonts, 2 PNG, 1 ICO; `app-rendered.png` und `Arma3Sync.png` sind byte-identisch) wurden automatisiert gegen `git cat-file blob b7753cea18b2ac2cc57e29f926901997a4de8570:<Pfad>` verglichen: 0 Abweichungen, keine undokumentierte Datei. Vier Werte waren zuvor falsch (`commons-codec-1.16.0.jar`, `commons-net-3.4.jar` Tippfehler; `icons/folder.svg`, `icons/folder-open.svg` aus CRLF-Arbeitskopie); ein gekürzter Suffix (`slf4j-simple-2.0.7.jar`) war ebenfalls falsch und ist durch den vollen Hash ersetzt.
+- Die Rechtefragen RQ-01 bis RQ-08 bleiben offen; diese Korrektur ändert keine Rechtebewertung und erteilt keine Freigabe.
