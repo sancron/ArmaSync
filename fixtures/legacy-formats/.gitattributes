@@ -1,0 +1,3 @@
+# Fixture bytes and hashes must never be normalised (no EOL conversion, no keyword expansion).
+* -text -diff
+*.md text

@@ -1,0 +1,19 @@
+{
+  "description": "Digest outputs of the two baseline digest classes. 'MD4' pads like RFC 1320; 'BrokenMD4' is rsync-compatible and does not pad when the input length is a multiple of 64.",
+  "vectors": [
+    {"length": 0, "seed": null, "ascii": "", "md4": "31d6cfe0d16ae931b73c59d7e0c089c0", "broken_md4": "0123456789abcdeffedcba9876543210"},
+    {"length": 1, "seed": null, "ascii": "a", "md4": "bde52cb31de33e46245e05fbdbd6fb24", "broken_md4": "bde52cb31de33e46245e05fbdbd6fb24"},
+    {"length": 3, "seed": null, "ascii": "abc", "md4": "a448017aaf21d8525fc10ae87aa6729d", "broken_md4": "a448017aaf21d8525fc10ae87aa6729d"},
+    {"length": 14, "seed": null, "ascii": "message digest", "md4": "d9130a8164549fe818874806e1c7014b", "broken_md4": "d9130a8164549fe818874806e1c7014b"},
+    {"length": 55, "seed": 1, "ascii": null, "md4": "c732a13101390f5d326d8baa1c62bbac", "broken_md4": "c732a13101390f5d326d8baa1c62bbac"},
+    {"length": 56, "seed": 1, "ascii": null, "md4": "4b86bc9bf963428ec0cee02a951ad68a", "broken_md4": "4b86bc9bf963428ec0cee02a951ad68a"},
+    {"length": 63, "seed": 1, "ascii": null, "md4": "286e1ced838cbeefa2258d664615ba0d", "broken_md4": "286e1ced838cbeefa2258d664615ba0d"},
+    {"length": 64, "seed": 1, "ascii": null, "md4": "ac830e16ba0638811ecfab91695caa1b", "broken_md4": "c2bc3a417a156dbcf00cc8fa21c21fe3"},
+    {"length": 65, "seed": 1, "ascii": null, "md4": "9fa01eef798eb92d1012aac2f90889d4", "broken_md4": "9fa01eef798eb92d1012aac2f90889d4"},
+    {"length": 128, "seed": 1, "ascii": null, "md4": "abb9be13edb4ccc3a93b579960f3c093", "broken_md4": "1ca130af4de56828238ec83b5662856d"},
+    {"length": 8191, "seed": 1, "ascii": null, "md4": "e185be411733db9966fed7fc26951569", "broken_md4": "e185be411733db9966fed7fc26951569"},
+    {"length": 8192, "seed": 1, "ascii": null, "md4": "c265a8004da3a462131b4c88cc7d227c", "broken_md4": "de79cba604e8bc552425cb66b5709670"},
+    {"length": 8193, "seed": 1, "ascii": null, "md4": "022d12443182ac666c4deca05461a0b3", "broken_md4": "022d12443182ac666c4deca05461a0b3"}
+  ],
+  "payload_generator": "LCG: x = 0x9E3779B97F4A7C15 ^ seed; per byte x = x*6364136223846793005 + 1442695040888963407 (mod 2^64); byte = x >>> 56"
+}

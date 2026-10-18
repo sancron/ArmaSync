@@ -1,0 +1,1 @@
+{"_type": "Events", "list": [{"_type": "Event", "addonNames": {"@example_core": true, "@second": false}, "description": "Synthetic event", "dlcNames": {"DLC One": true}, "name": "Event One", "userconfigFolderNames": {"userconfig_a": true}}]}

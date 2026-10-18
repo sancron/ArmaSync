@@ -1,0 +1,1548 @@
+{
+ "description": "Derived by verify.py from the decoded fixtures; not part of manifest.json.",
+ "classes": [
+  {
+   "name": "[B",
+   "suid": -5984413125824719648,
+   "suid_hex": "acf317f8060854e0",
+   "flags": 2,
+   "super": null,
+   "fields": [],
+   "seen_in": [
+    "valid/local/repositories/Example-Http.a3s.repository",
+    "valid/local/repositories/Example-Sftp.a3s.repository"
+   ],
+   "explicit_uid_in_source": null
+  },
+  {
+   "name": "fr.soe.a3s.constant.CheckRepositoriesFrequency",
+   "suid": 0,
+   "suid_hex": "0000000000000000",
+   "flags": 18,
+   "super": "java.lang.Enum",
+   "fields": [],
+   "seen_in": [
+    "valid/local/a3s.prefs"
+   ],
+   "explicit_uid_in_source": false
+  },
+  {
+   "name": "fr.soe.a3s.constant.IconResize",
+   "suid": 0,
+   "suid_hex": "0000000000000000",
+   "flags": 18,
+   "super": "java.lang.Enum",
+   "fields": [],
+   "seen_in": [
+    "valid/local/a3s.prefs"
+   ],
+   "explicit_uid_in_source": false
+  },
+  {
+   "name": "fr.soe.a3s.constant.LookAndFeel",
+   "suid": 0,
+   "suid_hex": "0000000000000000",
+   "flags": 18,
+   "super": "java.lang.Enum",
+   "fields": [],
+   "seen_in": [
+    "valid/local/a3s.prefs"
+   ],
+   "explicit_uid_in_source": false
+  },
+  {
+   "name": "fr.soe.a3s.constant.MinimizationType",
+   "suid": 0,
+   "suid_hex": "0000000000000000",
+   "flags": 18,
+   "super": "java.lang.Enum",
+   "fields": [],
+   "seen_in": [
+    "valid/local/a3s.prefs"
+   ],
+   "explicit_uid_in_source": false
+  },
+  {
+   "name": "fr.soe.a3s.constant.ModsetType",
+   "suid": 0,
+   "suid_hex": "0000000000000000",
+   "flags": 18,
+   "super": "java.lang.Enum",
+   "fields": [],
+   "seen_in": [
+    "valid/local/autoconfig-export/export.a3s.autoconfig",
+    "valid/local/profiles/Alpha.a3s.profile"
+   ],
+   "explicit_uid_in_source": false
+  },
+  {
+   "name": "fr.soe.a3s.constant.ProtocolType",
+   "suid": 0,
+   "suid_hex": "0000000000000000",
+   "flags": 18,
+   "super": "java.lang.Enum",
+   "fields": [],
+   "seen_in": [
+    "valid/local/a3s.cfg",
+    "valid/local/autoconfig-export/export.a3s.autoconfig",
+    "valid/server/empty/.a3s/autoconfig",
+    "valid/server/hostile-paths/.a3s/autoconfig",
+    "valid/server/small/.a3s/autoconfig"
+   ],
+   "explicit_uid_in_source": false
+  },
+  {
+   "name": "fr.soe.a3s.constant.StartWithOS",
+   "suid": 0,
+   "suid_hex": "0000000000000000",
+   "flags": 18,
+   "super": "java.lang.Enum",
+   "fields": [],
+   "seen_in": [
+    "valid/local/a3s.prefs"
+   ],
+   "explicit_uid_in_source": false
+  },
+  {
+   "name": "fr.soe.a3s.domain.AbstractProtocole",
+   "suid": -886357032287815203,
+   "suid_hex": "f3b306f9aa50b9dd",
+   "flags": 2,
+   "super": null,
+   "fields": [
+    [
+     "Z",
+     "validateSSLCertificate",
+     null
+    ],
+    [
+     "L",
+     "connectionTimeOut",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "encryptionMode",
+     "Lfr/soe/a3s/constant/EncryptionMode;"
+    ],
+    [
+     "L",
+     "login",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "password",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "port",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "protocolType",
+     "Lfr/soe/a3s/constant/ProtocolType;"
+    ],
+    [
+     "L",
+     "readTimeOut",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "url",
+     "Ljava/lang/String;"
+    ]
+   ],
+   "seen_in": [
+    "valid/local/a3s.cfg",
+    "valid/local/autoconfig-export/export.a3s.autoconfig",
+    "valid/server/empty/.a3s/autoconfig",
+    "valid/server/hostile-paths/.a3s/autoconfig",
+    "valid/server/small/.a3s/autoconfig"
+   ],
+   "explicit_uid_in_source": true
+  },
+  {
+   "name": "fr.soe.a3s.domain.AutoConfig",
+   "suid": 6424431620520340750,
+   "suid_hex": "59282a8550e6ed0e",
+   "flags": 2,
+   "super": null,
+   "fields": [
+    [
+     "L",
+     "favoriteServers",
+     "Ljava/util/List;"
+    ],
+    [
+     "L",
+     "profiles",
+     "Ljava/util/List;"
+    ],
+    [
+     "L",
+     "repositories",
+     "Ljava/util/List;"
+    ]
+   ],
+   "seen_in": [
+    "valid/local/autoconfig-export/export.a3s.autoconfig"
+   ],
+   "explicit_uid_in_source": false
+  },
+  {
+   "name": "fr.soe.a3s.domain.Http",
+   "suid": -20,
+   "suid_hex": "ffffffffffffffec",
+   "flags": 2,
+   "super": "fr.soe.a3s.domain.AbstractProtocole",
+   "fields": [],
+   "seen_in": [
+    "valid/server/empty/.a3s/autoconfig",
+    "valid/server/hostile-paths/.a3s/autoconfig",
+    "valid/server/small/.a3s/autoconfig"
+   ],
+   "explicit_uid_in_source": true
+  },
+  {
+   "name": "fr.soe.a3s.domain.Preferences",
+   "suid": 7034433806261372240,
+   "suid_hex": "619f5446da354550",
+   "flags": 2,
+   "super": null,
+   "fields": [
+    [
+     "L",
+     "checkRepositoriesFrequency",
+     "Lfr/soe/a3s/constant/CheckRepositoriesFrequency;"
+    ],
+    [
+     "L",
+     "iconResizeSize",
+     "Lfr/soe/a3s/constant/IconResize;"
+    ],
+    [
+     "L",
+     "launchPanelGameLaunch",
+     "Lfr/soe/a3s/constant/MinimizationType;"
+    ],
+    [
+     "L",
+     "launchPanelMinimized",
+     "Lfr/soe/a3s/constant/MinimizationType;"
+    ],
+    [
+     "L",
+     "lookAndFeel",
+     "Lfr/soe/a3s/constant/LookAndFeel;"
+    ],
+    [
+     "L",
+     "preferGitHubUpdates",
+     "Ljava/lang/Boolean;"
+    ],
+    [
+     "L",
+     "startWithOS",
+     "Lfr/soe/a3s/constant/StartWithOS;"
+    ]
+   ],
+   "seen_in": [
+    "valid/local/a3s.prefs"
+   ],
+   "explicit_uid_in_source": true
+  },
+  {
+   "name": "fr.soe.a3s.domain.Profile",
+   "suid": -4395099790449721021,
+   "suid_hex": "c3017806ddd9c143",
+   "flags": 2,
+   "super": null,
+   "fields": [
+    [
+     "L",
+     "additionalParameters",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "addonNamesByPriority",
+     "Ljava/util/List;"
+    ],
+    [
+     "L",
+     "addonSearchDirectories",
+     "Ljava/util/List;"
+    ],
+    [
+     "L",
+     "lastAddedAddonSearchDirectory",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "launcherOptions",
+     "Lfr/soe/a3s/domain/configration/LauncherOptions;"
+    ],
+    [
+     "L",
+     "name",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "tree",
+     "Lfr/soe/a3s/domain/TreeDirectory;"
+    ]
+   ],
+   "seen_in": [
+    "valid/local/autoconfig-export/export.a3s.autoconfig",
+    "valid/local/profiles/Alpha.a3s.profile",
+    "valid/local/profiles/Unicode-Long.a3s.profile"
+   ],
+   "explicit_uid_in_source": true
+  },
+  {
+   "name": "fr.soe.a3s.domain.Sftp",
+   "suid": 1,
+   "suid_hex": "0000000000000001",
+   "flags": 2,
+   "super": "fr.soe.a3s.domain.AbstractProtocole",
+   "fields": [],
+   "seen_in": [
+    "valid/local/autoconfig-export/export.a3s.autoconfig"
+   ],
+   "explicit_uid_in_source": true
+  },
+  {
+   "name": "fr.soe.a3s.domain.Socks",
+   "suid": -40,
+   "suid_hex": "ffffffffffffffd8",
+   "flags": 2,
+   "super": "fr.soe.a3s.domain.AbstractProtocole",
+   "fields": [],
+   "seen_in": [
+    "valid/local/a3s.cfg"
+   ],
+   "explicit_uid_in_source": true
+  },
+  {
+   "name": "fr.soe.a3s.domain.TreeDirectory",
+   "suid": -3917102856123611985,
+   "suid_hex": "c9a3a7b4c01584af",
+   "flags": 2,
+   "super": null,
+   "fields": [
+    [
+     "Z",
+     "marked",
+     null
+    ],
+    [
+     "Z",
+     "optional",
+     null
+    ],
+    [
+     "Z",
+     "selected",
+     null
+    ],
+    [
+     "L",
+     "list",
+     "Ljava/util/List;"
+    ],
+    [
+     "L",
+     "modsetRepositoryName",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "modsetType",
+     "Lfr/soe/a3s/constant/ModsetType;"
+    ],
+    [
+     "L",
+     "name",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "parent",
+     "Lfr/soe/a3s/domain/TreeDirectory;"
+    ]
+   ],
+   "seen_in": [
+    "valid/local/autoconfig-export/export.a3s.autoconfig",
+    "valid/local/profiles/Alpha.a3s.profile",
+    "valid/local/profiles/Unicode-Long.a3s.profile"
+   ],
+   "explicit_uid_in_source": true
+  },
+  {
+   "name": "fr.soe.a3s.domain.TreeLeaf",
+   "suid": 8681722025933532378,
+   "suid_hex": "787bac2f5273ecda",
+   "flags": 2,
+   "super": null,
+   "fields": [
+    [
+     "Z",
+     "duplicate",
+     null
+    ],
+    [
+     "Z",
+     "optional",
+     null
+    ],
+    [
+     "Z",
+     "selected",
+     null
+    ],
+    [
+     "L",
+     "dlcAppId",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "name",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "parent",
+     "Lfr/soe/a3s/domain/TreeDirectory;"
+    ],
+    [
+     "L",
+     "workshopId",
+     "Ljava/lang/String;"
+    ]
+   ],
+   "seen_in": [
+    "valid/local/autoconfig-export/export.a3s.autoconfig",
+    "valid/local/profiles/Alpha.a3s.profile"
+   ],
+   "explicit_uid_in_source": true
+  },
+  {
+   "name": "fr.soe.a3s.domain.configration.Acre2Options",
+   "suid": -8995842831822253145,
+   "suid_hex": "8328589b41fd93a7",
+   "flags": 2,
+   "super": null,
+   "fields": [
+    [
+     "L",
+     "acre2PluginPath",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "ts3Path",
+     "Ljava/lang/String;"
+    ]
+   ],
+   "seen_in": [
+    "valid/local/a3s.cfg"
+   ],
+   "explicit_uid_in_source": true
+  },
+  {
+   "name": "fr.soe.a3s.domain.configration.AcreOptions",
+   "suid": -1596307340587244621,
+   "suid_hex": "e9d8c6ee6bf2e3b3",
+   "flags": 2,
+   "super": null,
+   "fields": [
+    [
+     "L",
+     "acrePluginPath",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "acreUserconfigPath",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "ts3Path",
+     "Ljava/lang/String;"
+    ]
+   ],
+   "seen_in": [
+    "valid/local/a3s.cfg"
+   ],
+   "explicit_uid_in_source": true
+  },
+  {
+   "name": "fr.soe.a3s.domain.configration.BikeyExtractOptions",
+   "suid": 12345,
+   "suid_hex": "0000000000003039",
+   "flags": 2,
+   "super": null,
+   "fields": [
+    [
+     "L",
+     "sourceDirectoryPath",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "targetDirectoryPath",
+     "Ljava/lang/String;"
+    ]
+   ],
+   "seen_in": [
+    "valid/local/a3s.cfg"
+   ],
+   "explicit_uid_in_source": true
+  },
+  {
+   "name": "fr.soe.a3s.domain.configration.Configuration",
+   "suid": -8310476744472497506,
+   "suid_hex": "8cab416e8392729e",
+   "flags": 2,
+   "super": null,
+   "fields": [
+    [
+     "I",
+     "height",
+     null
+    ],
+    [
+     "Z",
+     "viewModeTree",
+     null
+    ],
+    [
+     "I",
+     "width",
+     null
+    ],
+    [
+     "L",
+     "acre2Options",
+     "Lfr/soe/a3s/domain/configration/Acre2Options;"
+    ],
+    [
+     "L",
+     "acreOptions",
+     "Lfr/soe/a3s/domain/configration/AcreOptions;"
+    ],
+    [
+     "L",
+     "addonSearchDirectoryPaths",
+     "Ljava/util/Set;"
+    ],
+    [
+     "L",
+     "bikeyExtractOptions",
+     "Lfr/soe/a3s/domain/configration/BikeyExtractOptions;"
+    ],
+    [
+     "L",
+     "defaultModset",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "externalApplications",
+     "Ljava/util/List;"
+    ],
+    [
+     "L",
+     "favoriteServers",
+     "Ljava/util/List;"
+    ],
+    [
+     "L",
+     "gameVersion",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "launcherOptions",
+     "Lfr/soe/a3s/domain/configration/LauncherOptions;"
+    ],
+    [
+     "L",
+     "profileName",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "proxy",
+     "Lfr/soe/a3s/domain/configration/Proxy;"
+    ],
+    [
+     "L",
+     "rptOptions",
+     "Lfr/soe/a3s/domain/configration/RptOptions;"
+    ],
+    [
+     "L",
+     "serverName",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "tfarOptions",
+     "Lfr/soe/a3s/domain/configration/TfarOptions;"
+    ]
+   ],
+   "seen_in": [
+    "valid/local/a3s.cfg"
+   ],
+   "explicit_uid_in_source": true
+  },
+  {
+   "name": "fr.soe.a3s.domain.configration.ExternalApplication",
+   "suid": 6695449091678057038,
+   "suid_hex": "5ceb0379912eb24e",
+   "flags": 2,
+   "super": null,
+   "fields": [
+    [
+     "Z",
+     "enable",
+     null
+    ],
+    [
+     "L",
+     "executablePath",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "name",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "parameters",
+     "Ljava/lang/String;"
+    ]
+   ],
+   "seen_in": [
+    "valid/local/a3s.cfg"
+   ],
+   "explicit_uid_in_source": true
+  },
+  {
+   "name": "fr.soe.a3s.domain.configration.FavoriteServer",
+   "suid": 4613236292596702132,
+   "suid_hex": "400581f7552a9bb4",
+   "flags": 2,
+   "super": null,
+   "fields": [
+    [
+     "I",
+     "port",
+     null
+    ],
+    [
+     "Z",
+     "selected",
+     null
+    ],
+    [
+     "L",
+     "ipAddress",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "modsetName",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "name",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "password",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "repositoryName",
+     "Ljava/lang/String;"
+    ]
+   ],
+   "seen_in": [
+    "valid/local/a3s.cfg",
+    "valid/local/autoconfig-export/export.a3s.autoconfig",
+    "valid/server/empty/.a3s/autoconfig",
+    "valid/server/hostile-paths/.a3s/autoconfig",
+    "valid/server/small/.a3s/autoconfig"
+   ],
+   "explicit_uid_in_source": true
+  },
+  {
+   "name": "fr.soe.a3s.domain.configration.LauncherOptions",
+   "suid": 7112913210279158291,
+   "suid_hex": "62b624e100df6213",
+   "flags": 2,
+   "super": null,
+   "fields": [
+    [
+     "Z",
+     "autoRestart",
+     null
+    ],
+    [
+     "Z",
+     "checkSignatures",
+     null
+    ],
+    [
+     "I",
+     "cpuCountSelection",
+     null
+    ],
+    [
+     "Z",
+     "defaultWorld",
+     null
+    ],
+    [
+     "Z",
+     "enableHT",
+     null
+    ],
+    [
+     "Z",
+     "filePatching",
+     null
+    ],
+    [
+     "Z",
+     "hugePages",
+     null
+    ],
+    [
+     "Z",
+     "launchArma3AsAdministrator",
+     null
+    ],
+    [
+     "Z",
+     "missionFile",
+     null
+    ],
+    [
+     "Z",
+     "noFilePatching",
+     null
+    ],
+    [
+     "Z",
+     "noPause",
+     null
+    ],
+    [
+     "Z",
+     "noSplashScreen",
+     null
+    ],
+    [
+     "Z",
+     "nologs",
+     null
+    ],
+    [
+     "Z",
+     "runBeta",
+     null
+    ],
+    [
+     "Z",
+     "showScriptErrors",
+     null
+    ],
+    [
+     "Z",
+     "windowMode",
+     null
+    ],
+    [
+     "Z",
+     "xpCompatibilityMode",
+     null
+    ],
+    [
+     "L",
+     "arma3ExePath",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "exThreadsSelection",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "gameProfile",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "mallocSelection",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "maxMemorySelection",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "missionFilePath",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "steamExePath",
+     "Ljava/lang/String;"
+    ]
+   ],
+   "seen_in": [
+    "valid/local/a3s.cfg",
+    "valid/local/autoconfig-export/export.a3s.autoconfig",
+    "valid/local/profiles/Alpha.a3s.profile",
+    "valid/local/profiles/Unicode-Long.a3s.profile"
+   ],
+   "explicit_uid_in_source": true
+  },
+  {
+   "name": "fr.soe.a3s.domain.configration.Proxy",
+   "suid": -6891013124542313138,
+   "suid_hex": "a05e3412c919cd4e",
+   "flags": 2,
+   "super": null,
+   "fields": [
+    [
+     "Z",
+     "enableProxy",
+     null
+    ],
+    [
+     "L",
+     "proxyProtocol",
+     "Lfr/soe/a3s/domain/AbstractProtocole;"
+    ]
+   ],
+   "seen_in": [
+    "valid/local/a3s.cfg"
+   ],
+   "explicit_uid_in_source": false
+  },
+  {
+   "name": "fr.soe.a3s.domain.configration.RptOptions",
+   "suid": 7740252023809740200,
+   "suid_hex": "6b6ae634bf2d8da8",
+   "flags": 2,
+   "super": null,
+   "fields": [
+    [
+     "L",
+     "rptPath",
+     "Ljava/lang/String;"
+    ]
+   ],
+   "seen_in": [
+    "valid/local/a3s.cfg"
+   ],
+   "explicit_uid_in_source": true
+  },
+  {
+   "name": "fr.soe.a3s.domain.configration.TfarOptions",
+   "suid": -9099384809608223793,
+   "suid_hex": "81b87db9ecb763cf",
+   "flags": 2,
+   "super": null,
+   "fields": [
+    [
+     "L",
+     "tfarPluginPath",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "tfarUserconfigPath",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "ts3Path",
+     "Ljava/lang/String;"
+    ]
+   ],
+   "seen_in": [
+    "valid/local/a3s.cfg"
+   ],
+   "explicit_uid_in_source": true
+  },
+  {
+   "name": "fr.soe.a3s.domain.repository.AutoConfig",
+   "suid": 2706280725619197755,
+   "suid_hex": "258ea3fb4104c73b",
+   "flags": 2,
+   "super": null,
+   "fields": [
+    [
+     "L",
+     "favoriteServers",
+     "Ljava/util/List;"
+    ],
+    [
+     "L",
+     "protocole",
+     "Lfr/soe/a3s/domain/AbstractProtocole;"
+    ],
+    [
+     "L",
+     "repositoryName",
+     "Ljava/lang/String;"
+    ]
+   ],
+   "seen_in": [
+    "valid/server/empty/.a3s/autoconfig",
+    "valid/server/hostile-paths/.a3s/autoconfig",
+    "valid/server/small/.a3s/autoconfig"
+   ],
+   "explicit_uid_in_source": true
+  },
+  {
+   "name": "fr.soe.a3s.domain.repository.Changelog",
+   "suid": 749128678979864247,
+   "suid_hex": "0a65709081a706b7",
+   "flags": 2,
+   "super": null,
+   "fields": [
+    [
+     "Z",
+     "contentUpdated",
+     null
+    ],
+    [
+     "I",
+     "revision",
+     null
+    ],
+    [
+     "L",
+     "addons",
+     "Ljava/util/List;"
+    ],
+    [
+     "L",
+     "buildDate",
+     "Ljava/util/Date;"
+    ],
+    [
+     "L",
+     "deletedAddons",
+     "Ljava/util/List;"
+    ],
+    [
+     "L",
+     "newAddons",
+     "Ljava/util/List;"
+    ],
+    [
+     "L",
+     "updatedAddons",
+     "Ljava/util/List;"
+    ]
+   ],
+   "seen_in": [
+    "valid/server/empty/.a3s/changelogs",
+    "valid/server/hostile-paths/.a3s/changelogs",
+    "valid/server/small/.a3s/changelogs"
+   ],
+   "explicit_uid_in_source": true
+  },
+  {
+   "name": "fr.soe.a3s.domain.repository.Changelogs",
+   "suid": 7332983755625818660,
+   "suid_hex": "65c3fddfb9c96a24",
+   "flags": 2,
+   "super": null,
+   "fields": [
+    [
+     "L",
+     "list",
+     "Ljava/util/List;"
+    ]
+   ],
+   "seen_in": [
+    "valid/server/empty/.a3s/changelogs",
+    "valid/server/hostile-paths/.a3s/changelogs",
+    "valid/server/small/.a3s/changelogs"
+   ],
+   "explicit_uid_in_source": true
+  },
+  {
+   "name": "fr.soe.a3s.domain.repository.Event",
+   "suid": 7456226002765813117,
+   "suid_hex": "6779d60b73e3157d",
+   "flags": 2,
+   "super": null,
+   "fields": [
+    [
+     "L",
+     "addonNames",
+     "Ljava/util/Map;"
+    ],
+    [
+     "L",
+     "description",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "dlcNames",
+     "Ljava/util/Map;"
+    ],
+    [
+     "L",
+     "name",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "userconfigFolderNames",
+     "Ljava/util/Map;"
+    ]
+   ],
+   "seen_in": [
+    "valid/server/small/.a3s/events"
+   ],
+   "explicit_uid_in_source": true
+  },
+  {
+   "name": "fr.soe.a3s.domain.repository.Events",
+   "suid": -5141643688299352462,
+   "suid_hex": "b8a5364e9d49ae72",
+   "flags": 2,
+   "super": null,
+   "fields": [
+    [
+     "L",
+     "list",
+     "Ljava/util/List;"
+    ]
+   ],
+   "seen_in": [
+    "valid/edge/events-self-referencing-list.bin",
+    "valid/server/empty/.a3s/events",
+    "valid/server/hostile-paths/.a3s/events",
+    "valid/server/small/.a3s/events"
+   ],
+   "explicit_uid_in_source": true
+  },
+  {
+   "name": "fr.soe.a3s.domain.repository.Repository",
+   "suid": -8142021113361619970,
+   "suid_hex": "8f01baef8859a3fe",
+   "flags": 2,
+   "super": null,
+   "fields": [
+    [
+     "Z",
+     "auto",
+     null
+    ],
+    [
+     "Z",
+     "compressed",
+     null
+    ],
+    [
+     "Z",
+     "exactMatch",
+     null
+    ],
+    [
+     "D",
+     "maximumClientDownloadSpeed",
+     null
+    ],
+    [
+     "Z",
+     "noAutoDiscover",
+     null
+    ],
+    [
+     "Z",
+     "noPartialFileTransfer",
+     null
+    ],
+    [
+     "Z",
+     "notify",
+     null
+    ],
+    [
+     "I",
+     "numberOfClientConnections",
+     null
+    ],
+    [
+     "I",
+     "numberOfConnections",
+     null
+    ],
+    [
+     "I",
+     "numberOfRepositoryCheckConnections",
+     null
+    ],
+    [
+     "Z",
+     "outOfSynk",
+     null
+    ],
+    [
+     "I",
+     "parallelUploadConnections",
+     null
+    ],
+    [
+     "I",
+     "revision",
+     null
+    ],
+    [
+     "Z",
+     "uploadCompressedPboFilesOnly",
+     null
+    ],
+    [
+     "L",
+     "autoConfigURL",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "bitTorrentProtocole",
+     "Lfr/soe/a3s/domain/AbstractProtocole;"
+    ],
+    [
+     "L",
+     "defaultDownloadLocation",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "excludedFilesFromBuild",
+     "Ljava/util/Set;"
+    ],
+    [
+     "L",
+     "excludedFoldersFromSync",
+     "Ljava/util/Set;"
+    ],
+    [
+     "L",
+     "favoriteServersSetToAutoconfig",
+     "Ljava/util/List;"
+    ],
+    [
+     "L",
+     "hidddenFolderPaths",
+     "Ljava/util/Set;"
+    ],
+    [
+     "L",
+     "mapEventsDownloadLocation",
+     "Ljava/util/Map;"
+    ],
+    [
+     "L",
+     "mapFilesForBuild",
+     "Ljava/util/Map;"
+    ],
+    [
+     "L",
+     "mapFilesForSync",
+     "Ljava/util/Map;"
+    ],
+    [
+     "L",
+     "name",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "path",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "protocole",
+     "Lfr/soe/a3s/domain/AbstractProtocole;"
+    ],
+    [
+     "L",
+     "uploadProtocole",
+     "Lfr/soe/a3s/domain/AbstractProtocole;"
+    ]
+   ],
+   "seen_in": [
+    "valid/local/autoconfig-export/export.a3s.autoconfig"
+   ],
+   "explicit_uid_in_source": true
+  },
+  {
+   "name": "fr.soe.a3s.domain.repository.ServerInfo",
+   "suid": 7697232677958952953,
+   "suid_hex": "6ad21056c345a7f9",
+   "flags": 2,
+   "super": null,
+   "fields": [
+    [
+     "Z",
+     "compressedPboFilesOnly",
+     null
+    ],
+    [
+     "Z",
+     "noPartialFileTransfer",
+     null
+    ],
+    [
+     "I",
+     "numberOfConnections",
+     null
+    ],
+    [
+     "J",
+     "numberOfFiles",
+     null
+    ],
+    [
+     "Z",
+     "repositoryContentUpdated",
+     null
+    ],
+    [
+     "I",
+     "revision",
+     null
+    ],
+    [
+     "J",
+     "totalFilesSize",
+     null
+    ],
+    [
+     "L",
+     "buildDate",
+     "Ljava/util/Date;"
+    ],
+    [
+     "L",
+     "hiddenFolderPaths",
+     "Ljava/util/Set;"
+    ]
+   ],
+   "seen_in": [
+    "valid/server/empty/.a3s/serverinfo",
+    "valid/server/hostile-paths/.a3s/serverinfo",
+    "valid/server/small/.a3s/serverinfo"
+   ],
+   "explicit_uid_in_source": true
+  },
+  {
+   "name": "fr.soe.a3s.domain.repository.SyncTreeDirectory",
+   "suid": -2855304993780573704,
+   "suid_hex": "d85feb3c784f59f8",
+   "flags": 2,
+   "super": null,
+   "fields": [
+    [
+     "Z",
+     "deleted",
+     null
+    ],
+    [
+     "Z",
+     "hidden",
+     null
+    ],
+    [
+     "Z",
+     "markAsAddon",
+     null
+    ],
+    [
+     "Z",
+     "updated",
+     null
+    ],
+    [
+     "L",
+     "list",
+     "Ljava/util/List;"
+    ],
+    [
+     "L",
+     "name",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "parent",
+     "Lfr/soe/a3s/domain/repository/SyncTreeDirectory;"
+    ]
+   ],
+   "seen_in": [
+    "valid/server/empty/.a3s/sync",
+    "valid/server/hostile-paths/.a3s/sync",
+    "valid/server/small/.a3s/sync"
+   ],
+   "explicit_uid_in_source": true
+  },
+  {
+   "name": "fr.soe.a3s.domain.repository.SyncTreeLeaf",
+   "suid": 8849248143660225239,
+   "suid_hex": "7aced84d242712d7",
+   "flags": 2,
+   "super": null,
+   "fields": [
+    [
+     "Z",
+     "compressed",
+     null
+    ],
+    [
+     "J",
+     "compressedSize",
+     null
+    ],
+    [
+     "Z",
+     "deleted",
+     null
+    ],
+    [
+     "J",
+     "size",
+     null
+    ],
+    [
+     "Z",
+     "updated",
+     null
+    ],
+    [
+     "L",
+     "name",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "parent",
+     "Lfr/soe/a3s/domain/repository/SyncTreeDirectory;"
+    ],
+    [
+     "L",
+     "sha1",
+     "Ljava/lang/String;"
+    ]
+   ],
+   "seen_in": [
+    "valid/server/hostile-paths/.a3s/sync",
+    "valid/server/small/.a3s/sync"
+   ],
+   "explicit_uid_in_source": true
+  },
+  {
+   "name": "java.lang.Boolean",
+   "suid": -3665804199014368530,
+   "suid_hex": "cd207280d59cfaee",
+   "flags": 2,
+   "super": null,
+   "fields": [
+    [
+     "Z",
+     "value",
+     null
+    ]
+   ],
+   "seen_in": [
+    "valid/local/a3s.prefs",
+    "valid/server/small/.a3s/events"
+   ],
+   "explicit_uid_in_source": null
+  },
+  {
+   "name": "java.lang.Enum",
+   "suid": 0,
+   "suid_hex": "0000000000000000",
+   "flags": 18,
+   "super": null,
+   "fields": [],
+   "seen_in": [
+    "valid/local/a3s.cfg",
+    "valid/local/a3s.prefs",
+    "valid/local/autoconfig-export/export.a3s.autoconfig",
+    "valid/local/profiles/Alpha.a3s.profile",
+    "valid/server/empty/.a3s/autoconfig",
+    "valid/server/hostile-paths/.a3s/autoconfig",
+    "valid/server/small/.a3s/autoconfig"
+   ],
+   "explicit_uid_in_source": null
+  },
+  {
+   "name": "java.util.ArrayList",
+   "suid": 8683452581122892189,
+   "suid_hex": "7881d21d99c7619d",
+   "flags": 3,
+   "super": null,
+   "fields": [
+    [
+     "I",
+     "size",
+     null
+    ]
+   ],
+   "seen_in": [
+    "valid/edge/events-self-referencing-list.bin",
+    "valid/local/a3s.cfg",
+    "valid/local/autoconfig-export/export.a3s.autoconfig",
+    "valid/local/profiles/Alpha.a3s.profile",
+    "valid/local/profiles/Unicode-Long.a3s.profile",
+    "valid/server/empty/.a3s/autoconfig",
+    "valid/server/empty/.a3s/changelogs",
+    "valid/server/empty/.a3s/events",
+    "valid/server/empty/.a3s/sync",
+    "valid/server/hostile-paths/.a3s/autoconfig",
+    "valid/server/hostile-paths/.a3s/changelogs",
+    "valid/server/hostile-paths/.a3s/events",
+    "valid/server/hostile-paths/.a3s/sync",
+    "valid/server/small/.a3s/autoconfig",
+    "valid/server/small/.a3s/changelogs",
+    "valid/server/small/.a3s/events",
+    "valid/server/small/.a3s/sync"
+   ],
+   "explicit_uid_in_source": null
+  },
+  {
+   "name": "java.util.Date",
+   "suid": 7523967970034938905,
+   "suid_hex": "686a81014b597419",
+   "flags": 3,
+   "super": null,
+   "fields": [],
+   "seen_in": [
+    "valid/server/empty/.a3s/changelogs",
+    "valid/server/empty/.a3s/serverinfo",
+    "valid/server/hostile-paths/.a3s/changelogs",
+    "valid/server/hostile-paths/.a3s/serverinfo",
+    "valid/server/small/.a3s/changelogs",
+    "valid/server/small/.a3s/serverinfo"
+   ],
+   "explicit_uid_in_source": null
+  },
+  {
+   "name": "java.util.HashMap",
+   "suid": 362498820763181265,
+   "suid_hex": "0507dac1c31660d1",
+   "flags": 3,
+   "super": null,
+   "fields": [
+    [
+     "F",
+     "loadFactor",
+     null
+    ],
+    [
+     "I",
+     "threshold",
+     null
+    ]
+   ],
+   "seen_in": [
+    "valid/local/autoconfig-export/export.a3s.autoconfig",
+    "valid/server/small/.a3s/events"
+   ],
+   "explicit_uid_in_source": null
+  },
+  {
+   "name": "java.util.HashSet",
+   "suid": -5024744406713321676,
+   "suid_hex": "ba44859596b8b734",
+   "flags": 3,
+   "super": null,
+   "fields": [],
+   "seen_in": [
+    "valid/local/autoconfig-export/export.a3s.autoconfig",
+    "valid/server/empty/.a3s/serverinfo",
+    "valid/server/hostile-paths/.a3s/serverinfo",
+    "valid/server/small/.a3s/serverinfo"
+   ],
+   "explicit_uid_in_source": null
+  },
+  {
+   "name": "java.util.TreeSet",
+   "suid": -2479143000061671589,
+   "suid_hex": "dd98509395ed875b",
+   "flags": 3,
+   "super": null,
+   "fields": [],
+   "seen_in": [
+    "valid/local/a3s.cfg"
+   ],
+   "explicit_uid_in_source": null
+  },
+  {
+   "name": "javax.crypto.SealedObject",
+   "suid": 4482838265551344752,
+   "suid_hex": "3e363da6c3b75470",
+   "flags": 2,
+   "super": null,
+   "fields": [
+    [
+     "[",
+     "encodedParams",
+     "[B"
+    ],
+    [
+     "[",
+     "encryptedContent",
+     "[B"
+    ],
+    [
+     "L",
+     "paramsAlg",
+     "Ljava/lang/String;"
+    ],
+    [
+     "L",
+     "sealAlg",
+     "Ljava/lang/String;"
+    ]
+   ],
+   "seen_in": [
+    "valid/local/repositories/Example-Http.a3s.repository",
+    "valid/local/repositories/Example-Sftp.a3s.repository"
+   ],
+   "explicit_uid_in_source": null
+  }
+ ]
+}
