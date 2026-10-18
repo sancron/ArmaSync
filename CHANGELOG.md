@@ -10,10 +10,12 @@
 - MIG-002 integriert: Rechte-, Asset- und JAR-Inventur ([RIGHTS_INVENTORY](docs/migration/RIGHTS_INVENTORY.md)); Rechtefragen RQ-01..RQ-08 offen ([Tracker](docs/tasks/RIGHTS_QUESTIONS.md)), keine Rechtefreigabe.
 - MIG-003 integriert: Transportmatrix ([TRANSPORT_MATRIX](docs/migration/TRANSPORT_MATRIX.md)) und Loopback-Testserver (`migration-tools/transport-testserver/`, nur HTTP/WebDAV-Ausschnitt).
 - Rollenregel in `docs/ai/WORKFLOW.md`: Claude Standard-Hauptbearbeiter/Integrator, Codex Fallback.
+- MIG-010 integriert: Cargo-Workspace (`armasync-core`, `-application`, `-adapters`, `-cli`), Rust 1.99.1 gepinnt (MSRV 1.85), CLI `armasync version [--json]`; Dokument [RUST_TOOLCHAIN](docs/migration/RUST_TOOLCHAIN.md).
+- MIG-001: vollständiger Linux-Generatorlauf bestanden; `run.sh`/`run.ps1` bauen nur das Root-Gradle-Projekt.
 - `.gitattributes`: Shell-Skripte mit LF.
 - Noch keine Rust-Portierung oder Änderung am bestehenden Laufzeitcode.
 
-Technische Berichte: [MIG-000](docs/changes/2026-10-18-MIG-000.md), [MIG-001](docs/changes/2026-10-18-MIG-001.md), [MIG-002](docs/changes/2026-10-18-MIG-002.md), [MIG-003](docs/changes/2026-10-18-MIG-003.md). Aktuelle letzte Integration: [LAST_CHANGE.md](docs/changes/LAST_CHANGE.md).
+Technische Berichte: [MIG-000](docs/changes/2026-10-18-MIG-000.md), [MIG-001](docs/changes/2026-10-18-MIG-001.md), [MIG-002](docs/changes/2026-10-18-MIG-002.md), [MIG-003](docs/changes/2026-10-18-MIG-003.md), [MIG-010](docs/changes/2026-10-18-MIG-010.md). Aktuelle letzte Integration: [LAST_CHANGE.md](docs/changes/LAST_CHANGE.md).
 
 ## Historischer Java-Änderungsverlauf
 
