@@ -470,11 +470,10 @@ fn colours_meet_wcag_aa() {
                 contrast_ratio(focus, background),
                 3.0,
             ),
-            // Light theme: the selection fill is a light tint, selection is also shown in bold (documented exception).
             (
                 "Auswahlfläche gegen Fläche",
                 contrast_ratio(selection_background, background),
-                if dark { 3.0 } else { 1.4 },
+                3.0,
             ),
         ];
         for (what, ratio, minimum) in checks {
