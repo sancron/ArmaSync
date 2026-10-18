@@ -22,9 +22,9 @@ Legende: **Quellcode** = Verhalten ist implementiert; **Unit** = vorhandener Tes
 
 ## Reproduzierbarer Loopback-Harness
 
-`migration-tools/transport-testserver/` enthält einen Python-3-Standardbibliotheksserver mit Windows- und Linux-Startskript. Er bindet ausschließlich an Loopback, hält alle Dateien im Speicher und akzeptiert synthetische Zugangsdaten nur am `/auth/`-Pfad. Der Selbsttest prüft elf HTTP-/WebDAV-/Pfadsicherheitsfälle und verwendet einen ephemeren Loopback-Port. Er ist ein reproduzierbarer Testbaustein; er ersetzt keine echten FTP-, FTPS-, SSH-/SFTP- oder TLS-Server.
+`migration-tools/transport-testserver/` enthält einen Python-3-Standardbibliotheksserver mit Windows- und Linux-Startskript. Er bindet ausschließlich an Loopback, hält alle Dateien im Speicher und verlangt für alle Pfade unter `/auth` die synthetischen Zugangsdaten (Authentifizierung und Routing nutzen dieselbe einmalig dekodierte, normalisierte Pfaddarstellung; kodierte Varianten wie `/%61uth/…` werden nicht durchgelassen). Der Selbsttest prüft 31 HTTP-/WebDAV-/Pfadsicherheits- und Auth-Regressionsfälle und verwendet einen ephemeren Loopback-Port. Er ist ein reproduzierbarer Testbaustein; er ersetzt keine echten FTP-, FTPS-, SSH-/SFTP- oder TLS-Server.
 
-Ergebnis auf den lokalen Plattformen (Windows 11 und WSL2-Ubuntu, 2026-10-18): `py -3 .../server.py --self-test` bzw. `python3 .../server.py --self-test` — jeweils 11 Checks bestanden. `python`-Version des Servers ist Standardbibliothek-only; keine Paketinstallation erforderlich. `run.sh` besteht `sh -n` unter WSL; die Startskripte selbst wurden nicht als langlebige Hintergrunddienste erprobt. TLS, FTP/FTPS, SFTP, Proxy, Unterbrechung und Lasttests bleiben offen.
+Ergebnis auf den lokalen Plattformen (Windows 11 und WSL2-Ubuntu, 2026-10-18): `py -3 .../server.py --self-test` bzw. `python3 .../server.py --self-test` — jeweils 31 Checks bestanden (Stand nach Korrektur des Auth-Bypasses, siehe Bericht). `python`-Version des Servers ist Standardbibliothek-only; keine Paketinstallation erforderlich. `run.sh` besteht `sh -n` unter WSL; die Startskripte selbst wurden nicht als langlebige Hintergrunddienste erprobt. TLS, FTP/FTPS, SFTP, Proxy, Unterbrechung und Lasttests bleiben offen.
 
 ## Rust-Migrationsanforderungen aus der Matrix
 

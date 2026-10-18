@@ -33,25 +33,38 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self, fmt: str, *args: object) -> None:
         print("%s - %s" % (self.client_address[0], fmt % args), flush=True)
 
-    def _path(self) -> str | None:
-        path = urllib.parse.urlsplit(self.path).path
-        decoded = urllib.parse.unquote(path)
-        if "\\" in decoded or any(part in (".", "..") for part in decoded.split("/")):
-            return None
-        if decoded.startswith("/auth/"):
-            decoded = decoded[len("/auth") :]
-        return decoded.rstrip("/") or "/"
+    def _route(self) -> str | None:
+        """Decode the request path exactly once, normalise it and authenticate on that same form.
 
-    def _auth_ok(self) -> bool:
-        if self.path.startswith("/auth/"):
+        Returns the storage path (``/auth`` prefix stripped), or ``None`` after a 400/401 response was sent.
+        Routing and authentication share this single representation, so percent-encoded variants of
+        ``/auth/`` cannot bypass the check.
+        """
+        decoded = urllib.parse.unquote(urllib.parse.urlsplit(self.path).path)
+        segments = decoded.split("/")
+        unsafe = (
+            not decoded.startswith("/")
+            or "\\" in decoded
+            or "\x00" in decoded
+            or any(part in (".", "..") for part in segments)
+            or any(part == "" for part in segments[1:-1])  # no empty segments such as "//" inside the path
+        )
+        if unsafe:
+            self._reject(400)
+            return None
+        path = decoded.rstrip("/") or "/"
+        if path == "/auth" or path.startswith("/auth/"):
             expected = "Basic " + base64.b64encode(b"fixture-user:fixture-pass").decode("ascii")
             if self.headers.get("Authorization") != expected:
-                self.send_response(401)
-                self.send_header("WWW-Authenticate", 'Basic realm="ArmaSync MIG-003 fixture"')
-                self.send_header("Content-Length", "0")
-                self.end_headers()
-                return False
-        return True
+                self._reject(401, {"WWW-Authenticate": 'Basic realm="ArmaSync MIG-003 fixture"'})
+                return None
+            path = path[len("/auth") :] or "/"
+        return path
+
+    def _reject(self, status: int, headers: dict[str, str] | None = None) -> None:
+        # The request body (if any) is not read on rejection; close so it cannot be parsed as the next request.
+        self.close_connection = True
+        self._send(status, headers={**(headers or {}), "Connection": "close"})
 
     def _send(self, status: int, body: bytes = b"", headers: dict[str, str] | None = None) -> None:
         self.send_response(status)
@@ -63,11 +76,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(body)
 
     def do_GET(self) -> None:
-        if not self._auth_ok():
-            return
-        path = self._path()
+        path = self._route()
         if path is None:
-            self._send(400)
             return
         if path == "/health":
             self._send(200, b"ok\n", {"Content-Type": "text/plain"})
@@ -107,11 +117,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self._send(200, headers={"Allow": "GET, HEAD, OPTIONS, PROPFIND, PUT, DELETE, MKCOL"})
 
     def do_PROPFIND(self) -> None:
-        if not self._auth_ok():
-            return
-        path = self._path()
+        path = self._route()
         if path is None:
-            self._send(400)
             return
         with self.state.lock:
             exists = path in self.state.directories or path in self.state.files
@@ -136,11 +143,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self._send(207, ET.tostring(root, encoding="utf-8", xml_declaration=True), {"Content-Type": "application/xml; charset=utf-8"})
 
     def do_MKCOL(self) -> None:
-        if not self._auth_ok():
+        path = self._route()
+        if path is None:
             return
-        path = self._path()
-        if path is None or path == "/":
-            self._send(400)
+        if path == "/":
+            self._reject(400)
             return
         parent = path.rsplit("/", 1)[0] or "/"
         with self.state.lock:
@@ -154,11 +161,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self._send(201)
 
     def do_PUT(self) -> None:
-        if not self._auth_ok():
+        path = self._route()
+        if path is None:
             return
-        path = self._path()
-        if path is None or path == "/":
-            self._send(400)
+        if path == "/":
+            self._reject(400)
             return
         parent = path.rsplit("/", 1)[0] or "/"
         try:
@@ -167,7 +174,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._send(400)
             return
         if length < 0 or length > 8 * 1024 * 1024:
-            self._send(413)
+            self._reject(413)
             return
         body = self.rfile.read(length)
         with self.state.lock:
@@ -178,11 +185,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self._send(201)
 
     def do_DELETE(self) -> None:
-        if not self._auth_ok():
+        path = self._route()
+        if path is None:
             return
-        path = self._path()
-        if path is None or path == "/":
-            self._send(400)
+        if path == "/":
+            self._reject(400)
             return
         with self.state.lock:
             if path in self.state.files:
@@ -223,21 +230,47 @@ def self_test() -> None:
         conn.close()
         return result
 
+    checks = 0
+
+    def check(condition: bool, label: str = "") -> None:
+        nonlocal checks
+        assert condition, label
+        checks += 1
+
     auth = {"Authorization": "Basic " + base64.b64encode(b"fixture-user:fixture-pass").decode("ascii")}
     try:
-        assert request("GET", "/health")[0] == 200
+        check(request("GET", "/health")[0] == 200)
         status, part, headers = request("GET", "/files/sample.bin", headers={"Range": "bytes=5-12"})
-        assert status == 206 and part == SAMPLE[5:13] and headers["Content-Range"].startswith("bytes 5-12/")
-        assert request("GET", "/files/sample.bin", headers={"Range": "bytes=99999-"})[0] == 416
-        assert request("GET", "/auth/files/sample.bin")[0] == 401
-        assert request("GET", "/auth/files/sample.bin", headers=auth)[0] == 200
-        assert request("PROPFIND", "/files/sample.bin")[0] == 207
-        assert request("MKCOL", "/files/upload")[0] == 201
-        assert request("PUT", "/files/upload/result.bin", b"test-upload")[0] == 201
-        assert request("GET", "/files/upload/result.bin")[1] == b"test-upload"
-        assert request("DELETE", "/files/upload/result.bin")[0] == 204
-        assert request("GET", "/files/%2e%2e/outside")[0] == 400
-        print("self-test: 11 checks passed (HTTP range/auth + WebDAV + path guard)")
+        check(status == 206 and part == SAMPLE[5:13] and headers["Content-Range"].startswith("bytes 5-12/"))
+        check(request("GET", "/files/sample.bin", headers={"Range": "bytes=99999-"})[0] == 416)
+        check(request("GET", "/auth/files/sample.bin")[0] == 401)
+        check(request("GET", "/auth/files/sample.bin", headers=auth)[0] == 200)
+        check(request("PROPFIND", "/files/sample.bin")[0] == 207)
+        check(request("MKCOL", "/files/upload")[0] == 201)
+        check(request("PUT", "/files/upload/result.bin", b"test-upload")[0] == 201)
+        check(request("GET", "/files/upload/result.bin")[1] == b"test-upload")
+        check(request("DELETE", "/files/upload/result.bin")[0] == 204)
+        check(request("GET", "/files/%2e%2e/outside")[0] == 400)
+        # Regression: percent-encoded variants of /auth/ must not bypass authentication (routing and auth share
+        # one decoded path); unauthenticated requests must not create or modify anything.
+        for encoded in ("/%61uth/files/sample.bin", "/auth%2Ffiles/sample.bin", "/%61%75th/files/sample.bin"):
+            check(request("GET", encoded)[0] == 401, encoded)
+            check(request("GET", encoded, headers=auth)[0] == 200, encoded)
+        check(request("GET", "/auth%2f..%2ffiles/sample.bin", headers=auth)[0] == 400)
+        check(request("GET", "/auth//files/sample.bin", headers=auth)[0] == 400)
+        check(request("PUT", "/%61uth/files/evil.bin", b"x")[0] == 401)
+        check(request("PUT", "/auth%2Ffiles/evil.bin", b"x")[0] == 401)
+        check(request("GET", "/files/evil.bin")[0] == 404)
+        check(request("PUT", "/%61uth/files/sample.bin", b"overwrite")[0] == 401)
+        check(request("DELETE", "/%61uth/files/sample.bin")[0] == 401)
+        check(request("MKCOL", "/%61uth/files/newdir")[0] == 401)
+        check(request("PROPFIND", "/%61uth/files/sample.bin")[0] == 401)
+        check(request("GET", "/files/sample.bin")[1] == SAMPLE)
+        check(request("PROPFIND", "/files/newdir")[0] == 404)
+        check(request("PUT", "/%61uth/files/ok.bin", b"authed", auth)[0] == 201)
+        check(request("GET", "/files/ok.bin")[1] == b"authed")
+        check(request("DELETE", "/%61uth/files/ok.bin", headers=auth)[0] == 204)
+        print(f"self-test: {checks} checks passed (HTTP range/auth + WebDAV + path guard + encoded-auth regression)")
     finally:
         server.shutdown()
         server.server_close()
