@@ -5,7 +5,7 @@ Aktualisiert: **2026-10-18**, Europe/Berlin. Diesen globalen Stand nur durch den
 ## Erreicht
 
 - MIG-000: Projektanalyse, vollständiges Baseline-Dateiinventar, P0–P7-Roadmap, Architektur-/Daten-/Branding-/Lizenzstrategie, GUI-/CLI-Anforderungen und gemeinsame KI-Arbeitsregeln erstellt.
-- `legacy` am Ausgangs-Commit `b7753cea18b2ac2cc57e29f926901997a4de8570` eingefroren; Branchaufgaben in [BRANCHING.md](../BRANCHING.md) definiert.
+- Alle vier Branches lokal und auf `origin` vorhanden und verifiziert. `legacy`, `master` und `testing` unverändert auf `b7753cea18b2ac2cc57e29f926901997a4de8570`; Migrationspaket auf `development`. Branchaufgaben in [BRANCHING.md](../BRANCHING.md).
 - Java-Hauptprojekt und Updater erfolgreich getestet: 64 Tests, 63 erfolgreich, 1 wegen fehlendem Releasearchiv übersprungen.
 - AGPLv3-Referenztext für neue Komponenten aufgenommen; vorhandene GPL-Lizenz nicht ersetzt.
 
