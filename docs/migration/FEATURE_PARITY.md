@@ -24,7 +24,7 @@ Statuswerte: `offen`, `in Arbeit`, `implementiert`, `verifiziert`, `N/A`. Eine F
 | F16 | Windows-Spielstart, Parameter, externe Anwendungen | P5 | Argumentvektoren, Pfade mit Leerzeichen, keine Shell-Injektion | offen |
 | F17 | Windows-Autostart, Shortcuts, Registry, Single-Instance | P5/P6 | nur passende OS-Capabilities; CLI-Jobs nicht global blockieren | offen |
 | F18 | Bikey-Extraktion, TFAR/ACRE-Werkzeuge, RPT-Anzeige | P5 | Toolumfang/Fremdlizenzen getrennt verifizieren; nichts still entfernen | offen |
-| F19 | GUI-Navigation, Themes, Diagnose, Einstellungen | P1/P3/P5 | primäre vollständige Oberfläche, Tastatur/NVDA/Orca/Skalierung | offen |
+| F19 | GUI-Navigation, Themes, Diagnose, Einstellungen | P1/P3/P5 | primäre vollständige Oberfläche, Tastatur/NVDA/Orca/Skalierung | offen (Prototyp: MIG-012 integriert, Accessibility-Nachweis NVDA/Orca offen, [Protokoll](GUI_PROTOTYPE_EVIDENCE.md)) |
 | F20 | CLI-Befehle einschließlich Build/Check/Sync/Extract/Update | P1–P6 | Subcommands, JSON, Exitcodes; Altargumente dokumentiert abbilden | offen |
 | F21 | Updater: GitHub, JSON, XML, SHA-256, Staging | P6 | eigene Channels/Signaturvertrauen, Rollback; keine Altserver-Fallbacks | offen |
 | F22 | Windows-/Linux-Pakete, Installation/Deinstallation | P6/P7 | native Pakete, separate CLI, Nutzerdatenerhalt, Lynxnode.it-Metadaten | offen |

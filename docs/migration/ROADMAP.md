@@ -1,6 +1,6 @@
 # Mehrstufiger Upgrade-Plan
 
-Stand: 2026-10-18. Vorbereitung dieses Plans abgeschlossen; **P0-Gate am 2026-10-18 laut unten stehenden Kriterien mit Auflagen erfüllt** (MIG-001/002/003 lokal integriert; Rechtefragen getrennt geführt, aber ungeklärt: [RIGHTS_QUESTIONS](../tasks/RIGHTS_QUESTIONS.md); vollständiger Linux-Generatorlauf bestanden; MIG-010 integriert). Aufwand nicht in Kalendertage umrechnen, bevor Datenformat- und GUI-Prototypen vermessen sind. Jede Phase liefert ausführbare bzw. überprüfbare Ergebnisse mit einem klaren Gate. Kein automatisches Release am Phasenende.
+Stand: 2026-10-18. Vorbereitung dieses Plans abgeschlossen; **P1: MIG-010 bis MIG-012 lokal integriert, GUI-/Accessibility-Gate offen (NVDA/Orca fehlen), MIG-013 offen.** **P0-Gate am 2026-10-18 laut unten stehenden Kriterien mit Auflagen erfüllt** (MIG-001/002/003 lokal integriert; Rechtefragen getrennt geführt, aber ungeklärt: [RIGHTS_QUESTIONS](../tasks/RIGHTS_QUESTIONS.md); vollständiger Linux-Generatorlauf bestanden; MIG-010 integriert). Aufwand nicht in Kalendertage umrechnen, bevor Datenformat- und GUI-Prototypen vermessen sind. Jede Phase liefert ausführbare bzw. überprüfbare Ergebnisse mit einem klaren Gate. Kein automatisches Release am Phasenende.
 
 ## P0 — Ausgangsstand, Formate und Rechte absichern
 

@@ -1,11 +1,11 @@
 # Letzte integrierte Änderung
 
-**2026-10-18 · MIG-011 · Claude · Kernverträge und In-Memory-Use-Case**
+**2026-10-18 · MIG-012 · Claude · GUI-Prototyp (egui/eframe mit AccessKit)**
 
-Lokal nach `development` integriert (Merge `03d9d3c`, nicht gepusht). Neu: Verträge in `armasync-core` (RelativePath, Manifest, SyncPlan, Fehler, Events, JobState, Ports), `sync::plan`/`sync::apply` in `armasync-application`, SHA-256 und In-Memory-Adapter in `armasync-adapters`, [ADR-0004](../adr/0004-core-contracts.md). Die CLI ist unverändert (nur `version`); es gibt noch keinen echten Dateisystem- oder Netzwerkadapter. [Bericht](2026-10-18-MIG-011.md), [Handoff](../handoffs/MIG-011.md), [aktueller Stand](../migration/STATUS.md).
+Lokal nach `development` integriert (Merge `67557f3`, nicht gepusht). Neu: Crate `crates/armasync-gui` mit Binary `armasync-gui` (View-Model, Zeichencode, 29 Tests), [Prüfprotokoll](../migration/GUI_PROTOTYPE_EVIDENCE.md) mit Screenshots und Abhängigkeitsliste, Ergebnisabschnitt in [ADR-0002](../adr/0002-gui-toolkit.md). Die Daten im Prototyp sind simuliert; es gibt weiterhin keinen echten Sync. [Bericht](2026-10-18-MIG-012.md), [Handoff](../handoffs/MIG-012.md), [aktueller Stand](../migration/STATUS.md).
 
-Prüfung am zusammengesetzten Stand (Windows 11): `cargo fmt --check`, `clippy -D warnings`, `cargo test --workspace --locked` (52 Tests), MSRV 1.85, MIG-001 `run.ps1`/`verify.py`, MIG-003-Selbsttest, `git diff --check`. Linux (WSL2): Cargo-Checks und Tests im LF-Clone des Task-Branches.
+Prüfung (Windows 11): fmt, clippy `-D warnings`, 81 Tests, MSRV 1.85 ohne GUI-Crate, Live-Abfrage der laufenden GUI über UI Automation. Linux (WSL2): Build, clippy und 81 Tests im LF-Clone.
 
-**Offen:** Rechtefragen RQ-01..RQ-08 (ungeklärt); echte Adapter und CLI-Sync (P3); CI (MIG-013); GUI-Prototyp (MIG-012, Screenreader-Nachweis); macOS/BSD, Hardlinks; `cargo audit/deny` nicht ausgeführt.
+**Offen:** NVDA und Orca nicht ausgeführt, Prototyp startet unter WSLg nicht – das P1-GUI-/Accessibility-Gate ist **nicht erfüllt**, ADR-0002 „vorläufig gewählt“. Außerdem: MIG-013 (CI), Rechtefragen RQ-01..RQ-08 (ungeklärt), echte Adapter (P3), macOS/BSD, Hardlinks, FTP/FTPS/SFTP/TLS-Tests.
 
-Vorherige Integrationen am selben Tag: [MIG-010](2026-10-18-MIG-010.md), [MIG-002](2026-10-18-MIG-002.md), [MIG-003](2026-10-18-MIG-003.md), [MIG-001](2026-10-18-MIG-001.md).
+Vorherige Integrationen am selben Tag: [MIG-011](2026-10-18-MIG-011.md), [MIG-010](2026-10-18-MIG-010.md), [MIG-002](2026-10-18-MIG-002.md), [MIG-003](2026-10-18-MIG-003.md), [MIG-001](2026-10-18-MIG-001.md).
