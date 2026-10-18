@@ -1,6 +1,6 @@
 # ADR-0002 — Native GUI mit nachgewiesener Accessibility
 
-Datum: 2026-10-18. Status: **vorgeschlagen**, Auswahl durch P1-Prototyp; keine bereits erfolgte Framework-Freigabe.
+Datum: 2026-10-18. Status: **vorläufig gewählt (egui/eframe mit AccessKit)**, Annahme erst nach Screenreader-Nachweis (NVDA und Orca); P1-Prototyp MIG-012 vorhanden, Gate offen.
 
 ## Kontext
 
@@ -21,3 +21,10 @@ Repositoryliste mit 10.000 synthetischen Zeilen und langen Namen, sortier-/filte
 Gate: Alle Kernaktionen erreichbar und verständlich angesagt; keine blockierende I/O; Lizenzen/Systembedarf dokumentiert; CLI bleibt unabhängig. Bei Scheitern zuerst Ursache/Backend prüfen, dann Alternative testen und Entscheidung dokumentieren. Keine reine Renderlösung freigeben, die das Gate nicht erfüllt. Auswahlstatus danach auf angenommen setzen und konkrete Version/Backend/Belege hinzufügen.
 
 Primärquellen, recherchiert 2026-10-18: [egui Accessibility](https://github.com/emilk/egui/blob/main/docs/accessibility.md), [eframe](https://docs.rs/eframe/latest/eframe/), [Slint](https://slint.dev/), [Tauri-Systemabhängigkeiten](https://v2.tauri.app/start/prerequisites/). Bibliothekslizenzen und aktuelle Fähigkeiten in P1 erneut prüfen.
+
+## Ergebnis des P1-Prototyps (MIG-012, 2026-10-18)
+
+* **Vorläufige Wahl:** egui/eframe 0.37 mit AccessKit (`crates/armasync-gui`). Der Prototyp erfüllt die technischen Teile des Gates: nativ unter Windows 11 gestartet; Linux baut und besteht alle Tests; Repositoryliste mit 10.000 Zeilen virtualisiert (ca. 3 ms/Frame headless), Dialog mit Feldfehlern, Fortschritt/Abbruch, Fehlerzustand, Theme und Skalierung; keine blockierende I/O im UI-Thread; CLI bleibt GUI-frei. Der Zugänglichkeitsbaum wurde per AccessKit-Harness und live per Windows UI Automation geprüft.
+* **Nicht erfüllt:** Screenreader-Nachweis mit NVDA und Orca (nicht installiert; unter WSLg startet der Prototyp zudem nicht). Deshalb ist die Entscheidung nicht auf „angenommen“ gesetzt. Belege, Lücken und manuelle Prüfschritte: [GUI_PROTOTYPE_EVIDENCE](../migration/GUI_PROTOTYPE_EVIDENCE.md).
+* **Bekannte Schwächen von egui:** keine Tabellenrollen (Liste als Listbox ausgezeichnet), Standardschrift ohne viele Symbole, Standardfarben mit zu geringem Kontrast (korrigiert über `themed_visuals`), Mindest-Rust 1.95 nur für das GUI-Crate.
+* **Alternativen** (Slint, Iced, Tauri) wurden nicht prototypisiert; sie werden nur geprüft, wenn der Screenreader-Nachweis scheitert.
