@@ -9,6 +9,23 @@ cd "$(dirname "$0")/../.."
 ROOT="$(pwd -P)"
 OUT="${1:-fixtures/legacy-formats/generated}"
 case "$OUT" in /*) ABS="$OUT" ;; *) ABS="$ROOT/$OUT" ;; esac
+# No component below the repository root may be a symlink (checked before anything is deleted).
+assert_plain() {
+  _cur="$ROOT"; _rest="${1#"$ROOT"/}"
+  while [ -n "$_rest" ]; do
+    _part="${_rest%%/*}"; case "$_rest" in */*) _rest="${_rest#*/}" ;; *) _rest="" ;; esac
+    _cur="$_cur/$_part"
+    if [ -L "$_cur" ]; then echo "refusing path '$1': '$_cur' is a symlink" >&2; exit 1; fi
+    if [ -e "$_cur" ] && [ ! -d "$_cur" ]; then echo "refusing path '$1': '$_cur' is not a directory" >&2; exit 1; fi
+  done
+}
+case "$ABS" in
+  */..|*/../*|*/.|*/./*|*//*) echo "refusing output '$ABS': relative or empty path component" >&2; exit 1 ;;
+  "$ROOT/fixtures/legacy-formats/"?*) ;;
+  *) echo "refusing output '$ABS': must be below $ROOT/fixtures/legacy-formats/" >&2; exit 1 ;;
+esac
+assert_plain "$ABS"
+assert_plain "$ROOT/build/fixture-generator"
 PARENT="$(dirname "$ABS")"
 [ -d "$PARENT" ] || { echo "parent of output does not exist: $PARENT" >&2; exit 1; }
 TARGET="$(cd "$PARENT" && pwd -P)/$(basename "$ABS")"
