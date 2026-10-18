@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+[package]
+name = "armasync-cli"
+description = "ArmaSync command line interface (headless; no GUI dependencies)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "armasync_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "armasync"
+path = "src/main.rs"
+
+[dependencies]
+armasync-application.workspace = true
+armasync-adapters.workspace = true
+clap = { version = "4", default-features = false, features = ["std", "derive", "help", "usage", "error-context", "suggestions"] }
+serde_json = "1"
+
+[lints]
+workspace = true
