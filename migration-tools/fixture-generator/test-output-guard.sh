@@ -31,7 +31,20 @@ expect_refusal() {  # name, out-arg ("" = default)
   if [ "$rc" -ne 0 ] && printf '%s' "$out" | grep -q "refusing" && intact; then echo "PASS  $1"
   else echo "FAIL  $1 (exit=$rc, intact=$(intact && echo yes || echo no))"; printf '%s\n' "$out" | sed 's/^/      /'; failures=$((failures+1)); fi
 }
+expect_allowed() {  # name, out-arg: must pass every guard (it may only fail later, at the baseline/build steps)
+  out="$(sh "$R/migration-tools/fixture-generator/run.sh" "$1" 2>&1)" && rc=0 || rc=$?
+  if printf '%s' "$out" | grep -q "refusing\|could not be evaluated\|Permission denied\|not found"; then
+    echo "FAIL  $2 (guard refused a mount-free target)"; printf '%s
+' "$out" | sed 's/^/      /'; failures=$((failures+1))
+  elif printf '%s' "$out" | grep -q "differ from the baseline commit"; then echo "PASS  $2"   # reached the step after all guards
+  else echo "FAIL  $2 (did not reach the post-guard baseline check; exit=$rc)"; printf '%s
+' "$out" | sed 's/^/      /'; failures=$((failures+1)); fi
+}
 L=fixtures/legacy-formats
+# positive cases: ordinary mount-free targets must NOT be refused by any guard
+expect_allowed "$L/generated" "allowed: plain mount-free default target"
+mkdir -p "$R/$L/plain dir"
+expect_allowed "$L/plain dir/generated" "allowed: plain mount-free target with space"
 fresh_foreign
 mkdir "$R/$L/bind"; mount --bind "$F" "$R/$L/bind"
 expect_refusal "bind mount: existing target below mount" "$L/bind/generated"

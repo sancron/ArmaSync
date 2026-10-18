@@ -30,7 +30,8 @@ assert_no_mount() {
       return o }
     BEGIN { root = ENVIRON["MIG_ROOT"]; p = ENVIRON["MIG_P"] }   # ENVIRON: awk -v would process backslash escapes in paths
     { m = dec($5)
-      if (index(m, root) == 1 && (m == p || index(p, m "/") == 1 || index(m, p "/") == 1)) { print m; exit } }' /proc/self/mountinfo)" \n    || { echo "refusing '$1': mount table could not be evaluated" >&2; exit 1; }
+      if (index(m, root) == 1 && (m == p || index(p, m "/") == 1 || index(m, p "/") == 1)) { print m; exit } }' /proc/self/mountinfo)" \
+    || { echo "refusing '$1': mount table could not be evaluated" >&2; exit 1; }
   if [ -n "$_hit" ]; then echo "refusing path '$1': mountpoint '$_hit' is, contains or is a parent of it" >&2; exit 1; fi
 }
 case "$ABS" in
