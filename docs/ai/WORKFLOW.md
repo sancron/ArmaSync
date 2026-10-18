@@ -15,6 +15,8 @@ Aktueller Nutzerauftrag → `AGENTS.md`/`PRODUCT.md` → angenommene ADRs → zu
 
 ## Zuweisung ohne Schreibkollision
 
+**Rollenregel (Projektverantwortlicher, 2026-10-18):** Claude ist standardmäßig Hauptbearbeiter und Integrator. Codex übernimmt Tasks bei ausdrücklicher Anforderung oder wenn Claude wegen Nutzungslimit bzw. fehlendem Systemzugang nicht verfügbar ist. Eine Übergabe wird einmal in der Taskdatei dokumentiert (Eigentümer, Datum, Anlass; bisherige Commits bleiben in der Historie) und soll keine wiederholten Wechsel auslösen; kein routinemäßiges Hin- und Herreichen zwischen den Systemen.
+
 Ein menschlicher oder ausdrücklich benannter KI-Integrator verwaltet je Batch das [Task-Board](../tasks/README.md). Vor parallelem Start erstellt/committet er pro Task eine separate Datei mit **einem** Eigentümer und disjunktem Schreibbereich auf der gemeinsamen Basis. Erst nach diesem Commit gelten Aufgaben als reserviert. Zwei Systeme dürfen nicht gleichzeitig durch lokale Änderungen derselben Boarddatei „Locks“ beanspruchen: Git-Merges sind kein verteilter Lockdienst.
 
 Unzugewiesene Aufgaben bleiben unzugewiesen. Ein einzelnes gestartetes System kann den ersten freien Task plus Integratorrolle übernehmen und diese Reservierung vor weiterer paralleler Arbeit committen. Falls bereits ein Integrator arbeitet, bei dessen Zuweisung bleiben. Übergabe/Entzug nur als explizite dokumentierte Koordination; keine automatische Lease-Übernahme allein aufgrund Zeitablauf.

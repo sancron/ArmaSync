@@ -1,6 +1,6 @@
 # Mehrstufiger Upgrade-Plan
 
-Stand: 2026-10-18. Vorbereitung dieses Plans abgeschlossen; **P0 ist insgesamt noch offen**. Aufwand nicht in Kalendertage umrechnen, bevor Datenformat- und GUI-Prototypen vermessen sind. Jede Phase liefert ausführbare bzw. überprüfbare Ergebnisse mit einem klaren Gate. Kein automatisches Release am Phasenende.
+Stand: 2026-10-18. Vorbereitung dieses Plans abgeschlossen; **P0-Gate am 2026-10-18 laut unten stehenden Kriterien mit Auflagen erfüllt** (MIG-001/002/003 lokal integriert; Rechtefragen getrennt geführt, aber ungeklärt: [RIGHTS_QUESTIONS](../tasks/RIGHTS_QUESTIONS.md); vollständiger Linux-Generatorlauf offen). Aufwand nicht in Kalendertage umrechnen, bevor Datenformat- und GUI-Prototypen vermessen sind. Jede Phase liefert ausführbare bzw. überprüfbare Ergebnisse mit einem klaren Gate. Kein automatisches Release am Phasenende.
 
 ## P0 — Ausgangsstand, Formate und Rechte absichern
 
