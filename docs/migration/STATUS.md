@@ -12,6 +12,7 @@ Aktualisiert: **2026-10-18**, Europe/Berlin. Diesen globalen Stand nur durch den
 - MIG-003 (Transportmatrix und Loopback-Testserver, [TRANSPORT_MATRIX](TRANSPORT_MATRIX.md)): lokal integriert (Merge `0fd7418`, nicht gepusht). Integrationsreview fand einen Auth-Bypass über kodierte `/auth`-Pfade; korrigiert, Selbsttest 31 Checks. Unter Windows 11 (Python 3.15.0) und WSL2-Ubuntu (Python 3.12.3) ausgeführt; `run.ps1`/`run.sh` kurz gestartet und geprüft. FTP/FTPS, SFTP, TLS, Proxy, Last und ein echter Java-DAO-Lauf gegen den Server sind **nicht** getestet.
 - MIG-001-Nachtrag: vollständiger Linux-Generatorlauf (WSL2 Ubuntu, OpenJDK 25.0.4.1, Python 3.12.3, Gradle 9.4.1, LF-Clone) Exit 0, 0 Probleme, zweiter Lauf identisch, Fixture-Bytes identisch zu Windows (nur `generated_with_java` im Manifest unterscheidet sich). Dafür `run.sh`/`run.ps1` auf `gradle :compileJava` umgestellt (Merge `b29787f`).
 - MIG-010 ([RUST_TOOLCHAIN](RUST_TOOLCHAIN.md)): lokal integriert (Merge `86203b7`, nicht gepusht). Cargo-Workspace `armasync-core`/`-application`/`-adapters`/`-cli`, Rust 1.99.1 gepinnt, MSRV 1.85 (geprüft), `Cargo.lock`, CLI `armasync version [--json]` mit Exitcode-Typ nach CLI_CONTRACT. fmt, clippy `-D warnings`, 13 Tests, Release-Build auf Windows 11; fmt/clippy/Tests/Build auf Linux (WSL2). Kein GUI-Crate (MIG-012). Keine Bestandsquellen/Assets übernommen; Abhängigkeiten: clap, serde_json (+ transitive).
+- MIG-011 ([ADR-0004](../adr/0004-core-contracts.md)): lokal integriert (Merge `03d9d3c`, nicht gepusht). Kernverträge als getestete Typen: sichere `RelativePath`, `Manifest`, `SyncPlan`, typisierte Fehler (= Exitcode-Kategorien), versionierte Events, `JobState`, Ports; Use-Cases `sync::plan`/`sync::apply` mit Revalidierung, Hash-Verifikation vor dem Schreiben und Abbruch; In-Memory-Adapter und SHA-256 (sha2 0.11.0). 52 Tests; fmt/clippy/MSRV 1.85 auf Windows, gleiche Checks auf Linux (WSL2). **Keine** echten Dateisystem-/Netzwerk-Adapter und keine Sync-Befehle in der CLI – es wird noch nichts Reales synchronisiert.
 - Rollenregel: Claude ist Standard-Hauptbearbeiter/Integrator, Codex Fallback ([WORKFLOW](../ai/WORKFLOW.md)); MIG-002/003 wurden einmalig von Codex übertragen.
 - AGPLv3-Referenztext für neue Komponenten aufgenommen; vorhandene GPL-Lizenz nicht ersetzt.
 
@@ -21,7 +22,9 @@ P0-Gate nach den Kriterien in [ROADMAP](ROADMAP.md) bewertet (Fixtures mit Herku
 
 ## Nächster sinnvoller Schritt
 
-MIG-011: gemeinsame Modelle, Ports, Fehler, Events und Jobzustände anhand eines kleinen In-Memory-Use-Cases fixieren (Prüffälle zuerst aus fachlichen Beispielen). Danach MIG-012 (GUI-Prototyp, ADR-0002) und MIG-013 (CI). Offen bleiben die Rechtefragen RQ-01..RQ-08 und die Plattformlücken (macOS/BSD, Hardlinks, FTP/FTPS/SFTP/TLS-Tests).
+* MIG-013 (CI Windows/Linux, CLI ohne GUI-Abhängigkeiten): Workflow-Dateien lassen sich lokal vorbereiten, laufen aber erst nach einem Push; Branch-/Statuschecks und Release-Umgebung sind GitHub-Einstellungen und brauchen eine eigene Freigabe (nach außen wirksam).
+* MIG-012 (GUI-Prototyp, ADR-0002): braucht eine Toolkit-Entscheidung mit Screenreader-Nachweis (NVDA unter Windows, Orca unter Linux); dieser Nachweis erfordert Zugriff auf diese Hilfstechnologien.
+* Parallel/danach (P3): echter Dateisystem-Adapter mit Konformitätstest gegen `sync_cases`, danach CLI `sync plan`/`sync run`. Offen bleiben die Rechtefragen RQ-01..RQ-08 und die Plattformlücken (macOS/BSD, Hardlinks, FTP/FTPS/SFTP/TLS-Tests).
 
 Aktive parallele Implementierungsaufträge: keine. Zuweisungen: [Task-Board](../tasks/README.md). Letzte integrierte Änderung: [LAST_CHANGE.md](../changes/LAST_CHANGE.md). Ausführlicher Übergabestand: [MIG-000](../handoffs/MIG-000.md).
 
