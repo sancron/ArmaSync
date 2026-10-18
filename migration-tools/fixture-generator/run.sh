@@ -21,15 +21,16 @@ assert_plain() {
 }
 # No mountpoint may be, contain or lie beneath the paths we create or delete below. Uses the kernel's mount table
 # (/proc/self/mountinfo) instead of device ids, so bind mounts of the same filesystem are detected as well.
-# Fails closed when the table is unavailable. Escapes (  etc.) in mountinfo are decoded before comparing.
+# Fails closed when the table is unavailable. Octal escapes in mountinfo are decoded; the paths are passed via ENVIRON, not `awk -v`, so literal backslashes in names stay intact.
 assert_no_mount() {
   [ -r /proc/self/mountinfo ] || { echo "refusing '$1': cannot verify mountpoints (/proc/self/mountinfo unreadable)" >&2; exit 1; }
-  _hit="$(awk -v root="$ROOT/" -v p="$1" '
+  _hit="$(MIG_ROOT="$ROOT/" MIG_P="$1" awk '
     function dec(s,   o, i, c) { o = ""; for (i = 1; i <= length(s); i++) { c = substr(s, i, 1)
       if (c == "\\" && substr(s, i + 1, 3) ~ /^[0-7][0-7][0-7]$/) { o = o sprintf("%c", substr(s, i + 1, 1) * 64 + substr(s, i + 2, 1) * 8 + substr(s, i + 3, 1)); i += 3 } else o = o c }
       return o }
+    BEGIN { root = ENVIRON["MIG_ROOT"]; p = ENVIRON["MIG_P"] }   # ENVIRON: awk -v would process backslash escapes in paths
     { m = dec($5)
-      if (index(m, root) == 1 && (m == p || index(p, m "/") == 1 || index(m, p "/") == 1)) { print m; exit } }' /proc/self/mountinfo)"     || { echo "refusing '$1': mount table could not be evaluated" >&2; exit 1; }
+      if (index(m, root) == 1 && (m == p || index(p, m "/") == 1 || index(m, p "/") == 1)) { print m; exit } }' /proc/self/mountinfo)" \n    || { echo "refusing '$1': mount table could not be evaluated" >&2; exit 1; }
   if [ -n "$_hit" ]; then echo "refusing path '$1': mountpoint '$_hit' is, contains or is a parent of it" >&2; exit 1; fi
 }
 case "$ABS" in

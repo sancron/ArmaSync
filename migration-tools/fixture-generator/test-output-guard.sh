@@ -7,7 +7,9 @@
 set -eu
 if [ "${MIG001_GUARD_NS:-}" != 1 ]; then
   command -v unshare >/dev/null 2>&1 || { echo "SKIP: unshare not available" >&2; exit 2; }
-  MIG001_GUARD_NS=1 exec unshare -m -- sh "$0" "$@" || { echo "SKIP: cannot create mount namespace (need root)" >&2; exit 2; }
+  # Probe first: exec would replace this shell, so a failing unshare could not be turned into a skip afterwards.
+  unshare -m -- true >/dev/null 2>&1 || { echo "SKIP: cannot create a mount namespace (need root / CAP_SYS_ADMIN)" >&2; exit 2; }
+  MIG001_GUARD_NS=1 exec unshare -m -- sh "$0" "$@"
 fi
 mount --make-rprivate / 2>/dev/null || true
 SRC="$(cd "$(dirname "$0")" && pwd -P)"
@@ -60,6 +62,11 @@ umount "$R/build/fixture-generator/sub"
 fresh_foreign; mkdir -p "$R/$L/with space"; mount --bind "$F" "$R/$L/with space"
 expect_refusal "mountpoint name containing a space" "$L/with space/generated"
 umount "$R/$L/with space"
+
+# literal backslash-octal sequence in a directory name (must not be decoded or altered by the guard)
+fresh_foreign; mkdir -p "$R/$L/back\040slash"; mount --bind "$F" "$R/$L/back\040slash"
+expect_refusal "mountpoint name with literal backslash-octal sequence" "$L/back\040slash/generated"
+umount "$R/$L/back\040slash"
 
 # symlinks (regression for the earlier -L checks)
 fresh_foreign; ln -s "$F" "$R/$L/lnk"
