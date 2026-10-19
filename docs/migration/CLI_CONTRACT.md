@@ -43,6 +43,15 @@ armasync repository import <autoconfig-datei> [--apply] [--on-conflict keep-both
 
 Legt ein Repository aus der von einem Server veröffentlichten Verbindungsbeschreibung (`.a3s/autoconfig`, **lokale Datei**, kein Download) an: nur Name und Adresse, nie Kennwörter; verschlüsselte Repositorydateien, Einstellungen und Addon-Listen sind nicht betroffen. Ohne `--apply` nur Vorschau. Exitcodes wie `import`, zusätzlich 8 für einen Transport, der kein Repository-Transport ist (z. B. Proxy). `--json`: `command` = `repository-import`. Siehe [SERVER_METADATA_IMPORT](SERVER_METADATA_IMPORT.md).
 
+## Umgesetzt: `repository list`, `profile list` (MIG-023)
+
+```text
+armasync repository list [--config <dir>] [--json] [--quiet]
+armasync profile list    [--config <dir>] [--json] [--quiet]
+```
+
+Zeigen den Bestand aus `library.json` rein lesend (nichts wird geschrieben oder angelegt; fehlende Bibliothek = leer, beschädigte = Exitcode 7 ohne Änderung). Pro Repository `id`, `name`, `url`, `unencrypted`, `credentials_required` (nie Zugangsdaten), pro Profil `id`, `name`, `repositories` (geordnete IDs). JSON: `command` = `repository-list` bzw. `profile-list`. Damit ist der CLI-Teil des P2-Gates („importierte Repositories anzeigen“) erfüllt; die GUI-Anzeige folgt mit MIG-031.
+
 ## Ausgabevertrag
 
 Menschenlesbare Fortschritte/Diagnosen nach stderr, strukturiertes Ergebnis nach stdout. `--json`: versionierter Ergebnis-Envelope mit `schema_version`, `operation_id`, `status`, `result` oder typisiertem `error`; niemals Secrets. Für lange Events optional separat dokumentiertes NDJSON-Format, nicht still mehrere JSON-Dokumente in eine Ausgabe mischen. Lokalisierte Meldungen dürfen stabile Fehlercodes nicht verändern.

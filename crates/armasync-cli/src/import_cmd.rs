@@ -208,7 +208,7 @@ fn plan_text(plan: &ImportPlan, out: &mut String) {
     }
 }
 
-fn config_dir(config: Option<&Path>) -> Result<PathBuf, Error> {
+pub(crate) fn config_dir(config: Option<&Path>) -> Result<PathBuf, Error> {
     match config {
         Some(dir) => Ok(dir.to_owned()),
         None => Ok(DataRoots::for_current_process(&PathMode::Standard)?
