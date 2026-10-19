@@ -23,5 +23,9 @@ armasync-adapters.workspace = true
 clap = { version = "4", default-features = false, features = ["std", "derive", "help", "usage", "error-context", "suggestions"] }
 serde_json = "1"
 
+[dev-dependencies]
+rcgen = { version = "0.14.7", default-features = false, features = ["crypto", "ring", "pem"] }
+rustls = { version = "0.23.46", default-features = false, features = ["ring", "std"] }
+
 [lints]
 workspace = true

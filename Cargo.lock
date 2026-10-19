@@ -246,6 +246,8 @@ dependencies = [
  "armasync-application",
  "armasync-core",
  "clap",
+ "rcgen",
+ "rustls",
  "serde_json",
 ]
 
