@@ -19,16 +19,31 @@
 //!   listed and therefore never touched or deleted;
 //! * error messages name the relative path, never the absolute location.
 //!
-//! Known limits: the check-then-use sequence cannot defend against another process that swaps a folder for a link
-//! while a transfer runs (the destination is assumed to be writable only by the user); free disk space is not
-//! checked up front (a full disk fails the write, and the temporary file is removed); the same destination must
-//! not be synchronised by two processes at once (no lock yet).
+//! Concurrency (MIG-030H, `docs/migration/LOCAL_FS_THREATS.md`):
+//! * **One writer per destination.** Changing operations (`begin`, `write`, `delete`) need a handle from
+//!   [`LocalDirectory::open_exclusive`], which holds an operating-system file lock (`flock`/`LockFileEx` on
+//!   `.armasync-lock` in the destination) until it is dropped; a second run fails at once with a clear error. The
+//!   lock disappears with the process, also after a crash. [`LocalDirectory::new`] is read-only (scan only).
+//! * **Folders cannot be swapped for links while in use (Windows).** Every folder on the way to a target is opened
+//!   as a handle that forbids renaming or deleting it for as long as the staged file exists, after it was verified
+//!   not to be a link or reparse point; a competing process therefore cannot replace a verified folder.
+//! * **Unix:** the standard library offers no race-free directory-relative access, so the folder check is
+//!   check-then-use there, backed by a canonical-path check before and after the temporary file is created and
+//!   before it replaces the target. A *local attacker who can write to the destination while a run is in progress*
+//!   can still win this race on Unix. This is a documented residual risk and a release blocker for any claim of
+//!   a race-free path boundary on Linux until a capability-based implementation (`openat`) has been evaluated.
+//!
+//! Known limits: free disk space is not checked up front (a full disk fails the write, and the temporary file is
+//! removed).
 
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+use fs4::FileExt;
 
 use armasync_core::{
     CancelToken, ContentHash, Digest, Error, ErrorKind, HashAlgorithm, Hasher, LocalFile,
@@ -42,6 +57,9 @@ pub const STAGING_PREFIX: &str = ".armasync-";
 const STAGING_SUFFIX: &str = ".tmp";
 /// Staging leftovers older than this are removed by a scan (a live transfer is never that old).
 pub const STALE_STAGING_AGE: Duration = Duration::from_secs(60 * 60);
+
+/// Name of the lock file in the destination (reserved prefix, never listed).
+const LOCK_NAME: &str = ".armasync-lock";
 
 static COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -83,10 +101,16 @@ fn is_link(metadata: &fs::Metadata) -> bool {
 #[derive(Debug, Clone)]
 pub struct LocalDirectory {
     root: PathBuf,
+    /// The held exclusive lock (`None` for a read-only handle). Released when the last clone is dropped.
+    lock: Option<Arc<File>>,
 }
 
+/// Handles that keep verified folders from being renamed or deleted (Windows); empty elsewhere.
+type Pins = Vec<File>;
+
 impl LocalDirectory {
-    /// The destination folder `root`, which must exist and be a real folder (not a link).
+    /// A **read-only** handle: [`LocalStore::list`] works, changing operations are refused. The destination
+    /// folder `root` must exist and be a real folder (not a link).
     ///
     /// # Errors
     /// [`ErrorKind::FileSystem`] if it does not exist or is not a folder.
@@ -110,7 +134,68 @@ impl LocalDirectory {
                 format!("the destination folder cannot be resolved: {e}"),
             )
         })?;
-        Ok(Self { root })
+        Ok(Self { root, lock: None })
+    }
+
+    /// A handle that may change the destination and holds the exclusive lock until it is dropped. Use it for the
+    /// whole run (planning, transfers and deletions).
+    ///
+    /// # Errors
+    /// [`ErrorKind::Config`] if another run already holds the lock; [`ErrorKind::FileSystem`] if the destination is
+    /// unusable or the lock file cannot be created.
+    pub fn open_exclusive(root: impl AsRef<Path>) -> Result<Self, Error> {
+        let mut directory = Self::new(root)?;
+        let lock_path = directory.root.join(LOCK_NAME);
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&lock_path)
+            .map_err(|e| {
+                Error::new(
+                    ErrorKind::FileSystem,
+                    format!("cannot create the lock file in the destination: {e}"),
+                )
+            })?;
+        if let Ok(metadata) = fs::symlink_metadata(&lock_path) {
+            if is_link(&metadata) || !metadata.is_file() {
+                return Err(refused(LOCK_NAME, "the lock file is not a regular file"));
+            }
+        }
+        FileExt::try_lock(&file).map_err(|_| {
+            Error::new(
+                ErrorKind::Config,
+                "another ArmaSync run is using this destination folder; wait for it to finish",
+            )
+        })?;
+        directory.lock = Some(Arc::new(file));
+        Ok(directory)
+    }
+
+    fn require_lock(&self) -> Result<(), Error> {
+        if self.lock.is_some() {
+            Ok(())
+        } else {
+            Err(Error::new(
+                ErrorKind::Config,
+                "the destination was opened read-only; changes need an exclusive handle",
+            ))
+        }
+    }
+
+    /// The folder must still resolve to a place inside the root (guards against links that were swapped in).
+    fn ensure_inside(&self, directory: &Path, relative: &str) -> Result<(), Error> {
+        let resolved = fs::canonicalize(directory)
+            .map_err(|e| fs_error("resolve the folder of", relative, &e))?;
+        if resolved.starts_with(&self.root) {
+            Ok(())
+        } else {
+            Err(refused(
+                relative,
+                "the folder resolves to a place outside the destination",
+            ))
+        }
     }
 
     fn join(&self, path: &RelativePath) -> PathBuf {
@@ -123,9 +208,11 @@ impl LocalDirectory {
 
     /// Checks that every existing folder on the way to `path` is a real folder and that `path` itself, if it
     /// exists, is a regular file. Creates missing parent folders when `create` is set (one at a time, re-checked).
-    fn secure_target(&self, path: &RelativePath, create: bool) -> Result<PathBuf, Error> {
+    fn secure_target(&self, path: &RelativePath, create: bool) -> Result<(PathBuf, Pins), Error> {
         let relative = path.as_str();
         let mut current = self.root.clone();
+        let mut pins: Pins = Vec::new();
+        pin_folder(&current, relative, &mut pins)?;
         let parts: Vec<&str> = relative.split('/').collect();
         for part in &parts[..parts.len() - 1] {
             current.push(part);
@@ -150,6 +237,9 @@ impl LocalDirectory {
                 Err(e) if e.kind() == io::ErrorKind::NotFound => {}
                 Err(e) => return Err(fs_error("inspect", relative, &e)),
             }
+            if current.exists() {
+                pin_folder(&current, relative, &mut pins)?;
+            }
         }
         let target = self.join(path);
         if let Ok(metadata) = fs::symlink_metadata(&target) {
@@ -160,7 +250,12 @@ impl LocalDirectory {
                 return Err(refused(relative, "it is not a regular file"));
             }
         }
-        Ok(target)
+        if let Some(parent) = target.parent() {
+            if parent.exists() {
+                self.ensure_inside(parent, relative)?;
+            }
+        }
+        Ok((target, pins))
     }
 
     fn scan(
@@ -191,7 +286,17 @@ impl LocalDirectory {
                 continue;
             };
             if is_staging_name(name) {
-                remove_if_stale(&entry.path(), &metadata);
+                if self.lock.is_some() {
+                    // We hold the exclusive lock, so no other run can own this file: it is a leftover.
+                    if metadata.is_file() {
+                        let _ = fs::remove_file(entry.path());
+                    }
+                } else {
+                    remove_if_stale(&entry.path(), &metadata);
+                }
+                continue;
+            }
+            if name.starts_with(STAGING_PREFIX) {
                 continue;
             }
             if is_link(&metadata) {
@@ -220,6 +325,36 @@ impl LocalDirectory {
         }
         Ok(())
     }
+}
+
+/// Verifies that `directory` is a real folder (not a link or reparse point) and, on Windows, keeps it open in a way
+/// that forbids renaming or deleting it until the handle is dropped. A no-op check elsewhere (see the module notes).
+#[cfg(windows)]
+fn pin_folder(directory: &Path, relative: &str, pins: &mut Pins) -> Result<(), Error> {
+    use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
+    const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+    const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
+    const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+    const SHARE_READ_WRITE: u32 = 0x1 | 0x2; // not FILE_SHARE_DELETE
+    let handle = OpenOptions::new()
+        .read(true)
+        .share_mode(SHARE_READ_WRITE)
+        .custom_flags(FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT)
+        .open(directory)
+        .map_err(|e| fs_error("pin a folder of", relative, &e))?;
+    let metadata = handle
+        .metadata()
+        .map_err(|e| fs_error("inspect a folder of", relative, &e))?;
+    if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 || !metadata.is_dir() {
+        return Err(refused(relative, "a parent folder is a link"));
+    }
+    pins.push(handle);
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn pin_folder(_directory: &Path, _relative: &str, _pins: &mut Pins) -> Result<(), Error> {
+    Ok(())
 }
 
 fn remove_if_stale(path: &Path, metadata: &fs::Metadata) {
@@ -274,13 +409,14 @@ impl LocalStore for LocalDirectory {
         _expected_size: u64,
     ) -> Result<Box<dyn StagedFile + 'a>, Error> {
         let relative = path.as_str();
-        if relative.split('/').any(is_staging_name) {
-            return Err(refused(
-                relative,
-                "the name is reserved for temporary files",
-            ));
+        self.require_lock()?;
+        if relative
+            .split('/')
+            .any(|part| part.starts_with(STAGING_PREFIX))
+        {
+            return Err(refused(relative, "the name is reserved for the adapter"));
         }
-        let target = self.secure_target(path, true)?;
+        let (target, pins) = self.secure_target(path, true)?;
         let directory = target
             .parent()
             .map(Path::to_path_buf)
@@ -298,6 +434,11 @@ impl LocalStore for LocalDirectory {
             .create_new(true)
             .open(&staging)
             .map_err(|e| fs_error("create a temporary file for", relative, &e))?;
+        if let Err(error) = self.ensure_inside(&directory, relative) {
+            drop(file);
+            let _ = fs::remove_file(&staging);
+            return Err(error);
+        }
         Ok(Box::new(Staged {
             store: self,
             relative: relative.to_owned(),
@@ -306,6 +447,7 @@ impl LocalStore for LocalDirectory {
             target,
             file: Some(file),
             done: false,
+            _pins: pins,
         }))
     }
 
@@ -319,7 +461,8 @@ impl LocalStore for LocalDirectory {
 
     fn delete(&mut self, path: &RelativePath) -> Result<(), Error> {
         let relative = path.as_str();
-        let target = self.secure_target(path, false)?;
+        self.require_lock()?;
+        let (target, _pins) = self.secure_target(path, false)?;
         match fs::symlink_metadata(&target) {
             Ok(_) => fs::remove_file(&target).map_err(|e| fs_error("delete", relative, &e)),
             Err(e) => Err(fs_error("delete", relative, &e)),
@@ -336,6 +479,8 @@ struct Staged<'a> {
     target: PathBuf,
     file: Option<File>,
     done: bool,
+    /// Keeps the verified folders in place until the staged file is committed or dropped.
+    _pins: Pins,
 }
 
 impl Write for Staged<'_> {
@@ -365,7 +510,7 @@ impl StagedFile for Staged<'_> {
             .map_err(|e| fs_error("flush to disk", &relative, &e))?;
         drop(file);
         // Re-check right before the swap: the target must still be a regular file (or absent) in a real folder.
-        self.store.secure_target(&self.path, false)?;
+        let (_, _recheck_pins) = self.store.secure_target(&self.path, false)?;
         fs::rename(&self.staging, &self.target).map_err(|e| fs_error("replace", &relative, &e))?;
         self.done = true;
         #[cfg(unix)]
