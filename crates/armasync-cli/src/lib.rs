@@ -12,6 +12,7 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand};
 
 mod import_cmd;
+mod list_cmd;
 
 /// Version of the JSON envelope schema.
 pub const JSON_SCHEMA_VERSION: u32 = 1;
@@ -87,6 +88,8 @@ enum Command {
     Import(ImportArgs),
     /// Work with repositories.
     Repository(RepositoryArgs),
+    /// Work with profiles.
+    Profile(ProfileArgs),
 }
 
 #[derive(Debug, Args)]
@@ -95,8 +98,29 @@ struct RepositoryArgs {
     command: RepositoryCommand,
 }
 
+#[derive(Debug, Args)]
+struct ProfileArgs {
+    #[command(subcommand)]
+    command: ProfileCommand,
+}
+
+#[derive(Debug, Subcommand)]
+enum ProfileCommand {
+    /// List the profiles in the library (read-only).
+    List(ListArgs),
+}
+
+#[derive(Debug, Args)]
+struct ListArgs {
+    /// Config directory holding `library.json` (default: the platform's ArmaSync config directory).
+    #[arg(long, value_name = "DIR")]
+    config: Option<PathBuf>,
+}
+
 #[derive(Debug, Subcommand)]
 enum RepositoryCommand {
+    /// List the repositories in the library (read-only; never shows credentials).
+    List(ListArgs),
     /// Import a repository from the settings its server publishes (`.a3s/autoconfig`). Reads only a local file
     /// (no download), only the name and address, never passwords; preview unless --apply is given. This does not
     /// replace your own repository files and imports no settings or addon lists.
@@ -145,6 +169,26 @@ where
         Command::Import(args) => run_import(
             import_cmd::SourceKind::Neutral,
             args,
+            cli.json,
+            cli.quiet,
+            stdout,
+            stderr,
+        ),
+        Command::Repository(RepositoryArgs {
+            command: RepositoryCommand::List(args),
+        }) => list_cmd::run(
+            list_cmd::Kind::Repositories,
+            args.config.as_ref(),
+            cli.json,
+            cli.quiet,
+            stdout,
+            stderr,
+        ),
+        Command::Profile(ProfileArgs {
+            command: ProfileCommand::List(args),
+        }) => list_cmd::run(
+            list_cmd::Kind::Profiles,
+            args.config.as_ref(),
             cli.json,
             cli.quiet,
             stdout,
