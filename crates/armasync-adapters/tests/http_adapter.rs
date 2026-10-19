@@ -459,6 +459,24 @@ fn a_failing_sink_is_a_file_system_error() {
     assert_eq!(error.kind(), ErrorKind::FileSystem);
 }
 
+/// A server that owns its port for the whole test and closes every connection at once. (Binding a port, freeing it
+/// and then connecting is not deterministic: another test's server can be handed the same port in between.)
+fn hang_up_server() -> (SocketAddr, Arc<AtomicBool>) {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
+    let stop = Arc::new(AtomicBool::new(false));
+    let stop2 = stop.clone();
+    thread::spawn(move || {
+        for incoming in listener.incoming() {
+            if stop2.load(Ordering::SeqCst) {
+                break;
+            }
+            drop(incoming);
+        }
+    });
+    (addr, stop)
+}
+
 #[test]
 fn other_schemes_and_unreachable_servers_are_clear_errors() {
     for base in ["ftp://h/r", "sftp://h/r", "file:///x", "h/r"] {
@@ -470,13 +488,13 @@ fn other_schemes_and_unreachable_servers_are_clear_errors() {
             "{base}"
         );
     }
-    let unused = TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = unused.local_addr().unwrap();
-    drop(unused);
+    let (addr, stop) = hang_up_server();
     let repo = HttpRepository::new(&format!("http://{addr}/repo"), HttpConfig::default()).unwrap();
     let (result, _) = fetch(&repo, "data/ok.bin", 1);
     assert_eq!(result.unwrap_err().kind(), ErrorKind::Network);
     assert_eq!(repo.manifest().unwrap_err().kind(), ErrorKind::Network);
+    stop.store(true, Ordering::SeqCst);
+    let _ = TcpStream::connect(addr);
 }
 
 #[test]

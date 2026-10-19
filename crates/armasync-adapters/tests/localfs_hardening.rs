@@ -20,8 +20,16 @@ fn scratch(name: &str) -> PathBuf {
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |d| d.as_nanos())
     ));
-    fs::create_dir_all(&dir).unwrap();
-    dir
+    // Unique even if the clock is coarse (two tests can read the same timestamp): `create_dir` fails when the
+    // name exists, then the next suffix is tried.
+    let mut candidate = dir.clone();
+    let mut attempt = 0u32;
+    while fs::create_dir(&candidate).is_err() {
+        attempt += 1;
+        assert!(attempt < 1000, "cannot create a unique scratch folder");
+        candidate = PathBuf::from(format!("{}-{attempt}", dir.display()));
+    }
+    candidate
 }
 
 fn path(text: &str) -> RelativePath {
@@ -176,7 +184,7 @@ mod windows_swap {
     use super::*;
     use std::io::Write;
     use std::sync::Arc;
-    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicBool, Ordering};
     use std::thread;
     use std::time::Duration;
 
@@ -209,16 +217,19 @@ mod windows_swap {
     }
 
     /// An attacker repeatedly tries to replace `@m` by a junction to an outside folder while 400 files are written.
+    /// The attacker reports every successful swap over a channel, so the test synchronises explicitly instead of
+    /// sleeping: it first waits for the attacker's **first** successful swap on the unpinned folder (control: the
+    /// attack works), and only then starts writing.
     #[test]
     fn a_racing_attacker_never_gets_a_file_written_outside_the_destination() {
+        use std::sync::mpsc;
         let root = scratch("race-root");
         let outside = scratch("race-outside");
         fs::create_dir_all(root.join("@m")).unwrap();
         let stop = Arc::new(AtomicBool::new(false));
-        let swaps = Arc::new(AtomicUsize::new(0));
+        let (swap_tx, swap_rx) = mpsc::channel::<()>();
         let attacker = {
-            let (root, outside, stop, swaps) =
-                (root.clone(), outside.clone(), stop.clone(), swaps.clone());
+            let (root, outside, stop) = (root.clone(), outside.clone(), stop.clone());
             thread::spawn(move || {
                 while !stop.load(Ordering::SeqCst) {
                     if fs::rename(root.join("@m"), root.join("@m_away")).is_ok() {
@@ -229,7 +240,7 @@ mod windows_swap {
                             .output()
                             .is_ok_and(|o| o.status.success());
                         if linked {
-                            swaps.fetch_add(1, Ordering::SeqCst);
+                            let _ = swap_tx.send(());
                             thread::sleep(Duration::from_millis(5));
                             let _ = fs::remove_dir(root.join("@m"));
                         }
@@ -239,17 +250,10 @@ mod windows_swap {
                 }
             })
         };
-        // Control: with nothing pinned the attacker does succeed, so the test is sensitive to the attack. Wait for
-        // the first successful swap (it needs a helper process, so allow time on a busy machine).
-        let waited = std::time::Instant::now();
-        while swaps.load(Ordering::SeqCst) == 0 && waited.elapsed() < Duration::from_secs(30) {
-            thread::sleep(Duration::from_millis(50));
-        }
-        assert!(
-            swaps.load(Ordering::SeqCst) > 0,
-            "the attacker must be able to swap an unpinned folder"
-        );
-        let swaps_before = swaps.load(Ordering::SeqCst);
+        // Control (explicit handshake): the attacker must be able to swap the unpinned folder.
+        swap_rx
+            .recv_timeout(Duration::from_secs(60))
+            .expect("the attacker must be able to swap an unpinned folder");
         let mut store = LocalDirectory::open_exclusive(&root).unwrap();
         let (mut committed, mut refused) = (0, 0);
         for i in 0..400 {
@@ -274,10 +278,8 @@ mod windows_swap {
             outside_files.is_empty(),
             "a file was written through the swapped link: {outside_files:?}"
         );
-        println!(
-            "control swaps {swaps_before}, committed {committed}, refused {refused}, swaps during the run {}",
-            swaps.load(Ordering::SeqCst) - swaps_before
-        );
+        let swaps_during = swap_rx.try_iter().count();
+        println!("committed {committed}, refused {refused}, swaps during the run {swaps_during}");
         assert!(committed + refused > 0);
         let _ = fs::remove_dir_all(root);
         fs::remove_dir_all(outside).unwrap();

@@ -276,9 +276,18 @@ fn env_for(base: &str, needs_credentials: bool) -> Env {
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |d| d.as_nanos())
     ));
+    // Unique even if the clock is coarse: two tests may read the same timestamp (this was a real source of
+    // flaky failures when many tests ran at once), so the folder is created exclusively and suffixed on a clash.
+    let mut root = root;
+    let base_name = root.clone();
+    let mut attempt = 0u32;
+    while fs::create_dir(&root).is_err() {
+        attempt += 1;
+        assert!(attempt < 1000, "cannot create a unique scratch folder");
+        root = PathBuf::from(format!("{}-{attempt}", base_name.display()));
+    }
     let (config, dest) = (root.join("config"), root.join("dest"));
     fs::create_dir_all(&dest).unwrap();
-    fs::create_dir_all(&root).unwrap();
     let import = root.join("import.json");
     fs::write(
         &import,
@@ -369,6 +378,24 @@ fn no_temporary_files(env: &Env) {
             "temporary file left behind: {name}"
         );
     }
+}
+
+/// A server that owns its port for the whole test and closes every connection at once. (Binding a port, freeing it
+/// and then connecting is not deterministic: another test's server can be handed the same port in between.)
+fn hang_up_server() -> (SocketAddr, Arc<AtomicBool>) {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
+    let stop = Arc::new(AtomicBool::new(false));
+    let stop2 = stop.clone();
+    thread::spawn(move || {
+        for incoming in listener.incoming() {
+            if stop2.load(Ordering::SeqCst) {
+                break;
+            }
+            drop(incoming);
+        }
+    });
+    (addr, stop)
 }
 
 // ---- tests ----------------------------------------------------------------------------------------------------
@@ -696,11 +723,11 @@ fn http_errors_and_dropped_connections_are_network_failures_without_damage() {
 
 #[test]
 fn an_unreachable_server_is_a_network_failure() {
-    let unused = TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = unused.local_addr().unwrap();
-    drop(unused);
+    let (addr, stop) = hang_up_server();
     let env = env_for(&format!("http://{addr}/repo"), false);
     let out = sync(&env, "plan", &[]);
+    stop.store(true, Ordering::SeqCst);
+    let _ = TcpStream::connect(addr);
     assert_eq!(out.status.code(), Some(4), "{}", text(&out.stderr));
     assert!(files(&env.dest).is_empty());
 }

@@ -19,8 +19,16 @@ fn scratch(name: &str) -> PathBuf {
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |d| d.as_nanos())
     ));
-    fs::create_dir_all(&dir).unwrap();
-    dir
+    // Unique even if the clock is coarse (two tests can read the same timestamp): `create_dir` fails when the
+    // name exists, then the next suffix is tried.
+    let mut candidate = dir.clone();
+    let mut attempt = 0u32;
+    while fs::create_dir(&candidate).is_err() {
+        attempt += 1;
+        assert!(attempt < 1000, "cannot create a unique scratch folder");
+        candidate = PathBuf::from(format!("{}-{attempt}", dir.display()));
+    }
+    candidate
 }
 
 fn path(text: &str) -> RelativePath {
