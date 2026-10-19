@@ -126,17 +126,7 @@ fn structure(detail: &'static str) -> ParseError {
 pub fn parse_autoconfig(bytes: &[u8], limits: &Limits) -> Result<ServerAutoConfig, ParseError> {
     let raw = gunzip(bytes, limits)?;
     let document = read_stream(&raw, limits)?;
-    for class in &document.classes {
-        if !KNOWN_CLASSES
-            .iter()
-            .any(|(name, suid)| *name == class.name && *suid == class.suid_bits())
-        {
-            return Err(ParseError::new(
-                ParseErrorKind::UnknownClass,
-                "the file uses a class or class version that is not supported",
-            ));
-        }
-    }
+    document.ensure_only(&KNOWN_CLASSES)?;
     let top = document
         .object(&document.top)
         .filter(|o| document.class_of(o).name == AUTOCONFIG_CLASS)

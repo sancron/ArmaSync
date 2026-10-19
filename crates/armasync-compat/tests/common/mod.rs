@@ -96,7 +96,7 @@ impl W {
         w
     }
 
-    fn u8(&mut self, v: u8) {
+    pub fn u8(&mut self, v: u8) {
         self.bytes.push(v);
     }
 
@@ -281,4 +281,158 @@ pub fn autoconfig_stream(params: &Params) -> Vec<u8> {
 
 pub fn autoconfig_file(params: &Params) -> Vec<u8> {
     gzip(&autoconfig_stream(params))
+}
+
+// ---- file tree (`.a3s/sync`) builder ---------------------------------------------------------------------------
+
+pub const TREE_DIRECTORY: (&str, u64) = (
+    "fr.soe.a3s.domain.repository.SyncTreeDirectory",
+    0xd85f_eb3c_784f_59f8,
+);
+pub const TREE_FILE: (&str, u64) = (
+    "fr.soe.a3s.domain.repository.SyncTreeLeaf",
+    0x7ace_d84d_2427_12d7,
+);
+
+#[derive(Clone)]
+pub struct TestFile {
+    pub name: String,
+    pub sha1: Text,
+    pub size: i64,
+    pub compressed: bool,
+    pub compressed_size: i64,
+}
+
+impl TestFile {
+    pub fn new(name: &str, size: i64) -> Self {
+        Self {
+            name: name.to_owned(),
+            sha1: "0123456789abcdef0123456789abcdef01234567".into(),
+            size,
+            compressed: false,
+            compressed_size: 0,
+        }
+    }
+}
+
+#[derive(Clone)]
+pub enum Item {
+    Dir(TestDir),
+    File(TestFile),
+    Raw(Vec<u8>),
+}
+
+#[derive(Clone)]
+pub struct TestDir {
+    pub name: String,
+    pub hidden: bool,
+    pub addon: bool,
+    pub items: Vec<Item>,
+}
+
+impl TestDir {
+    pub fn new(name: &str, items: Vec<Item>) -> Self {
+        Self {
+            name: name.to_owned(),
+            hidden: false,
+            addon: false,
+            items,
+        }
+    }
+}
+
+impl W {
+    fn i64(&mut self, v: i64) {
+        self.bytes.extend_from_slice(&v.to_be_bytes());
+    }
+
+    fn tree_file(&mut self, f: &TestFile) {
+        self.u8(0x73);
+        self.class_desc(
+            TREE_FILE,
+            0x02,
+            &[
+                (b'Z', "compressed", ""),
+                (b'Z', "deleted", ""),
+                (b'Z', "updated", ""),
+                (b'J', "compressedSize", ""),
+                (b'J', "size", ""),
+                (b'L', "name", "Ljava/lang/String;"),
+                (
+                    b'L',
+                    "parent",
+                    "Lfr/soe/a3s/domain/repository/SyncTreeDirectory;",
+                ),
+                (b'L', "sha1", "Ljava/lang/String;"),
+            ],
+            None,
+        );
+        self.u8(u8::from(f.compressed));
+        self.u8(0);
+        self.u8(0);
+        self.i64(f.compressed_size);
+        self.i64(f.size);
+        self.string(&f.name);
+        self.null();
+        self.text(&f.sha1);
+    }
+
+    pub fn tree_dir(&mut self, d: &TestDir) {
+        self.u8(0x73);
+        self.class_desc(
+            TREE_DIRECTORY,
+            0x02,
+            &[
+                (b'Z', "deleted", ""),
+                (b'Z', "hidden", ""),
+                (b'Z', "markAsAddon", ""),
+                (b'Z', "updated", ""),
+                (b'L', "list", "Ljava/util/ArrayList;"),
+                (b'L', "name", "Ljava/lang/String;"),
+                (
+                    b'L',
+                    "parent",
+                    "Lfr/soe/a3s/domain/repository/SyncTreeDirectory;",
+                ),
+            ],
+            None,
+        );
+        self.u8(0);
+        self.u8(u8::from(d.hidden));
+        self.u8(u8::from(d.addon));
+        self.u8(0);
+        self.u8(0x73);
+        self.class_desc(
+            ("java.util.ArrayList", 0x7881_d21d_99c7_619d),
+            0x03,
+            &[(b'I', "size", "")],
+            None,
+        );
+        let count = i32::try_from(d.items.len()).unwrap();
+        self.bytes.extend_from_slice(&count.to_be_bytes());
+        self.u8(0x77);
+        self.u8(4);
+        self.bytes.extend_from_slice(&count.to_be_bytes());
+        for item in &d.items {
+            match item {
+                Item::Dir(child) => self.tree_dir(child),
+                Item::File(file) => self.tree_file(file),
+                Item::Raw(raw) => self.bytes.extend_from_slice(raw),
+            }
+        }
+        self.u8(0x78);
+        self.string(&d.name);
+        self.null();
+    }
+}
+
+/// An uncompressed `.a3s/sync` stream for `root`.
+pub fn tree_stream(root: &TestDir) -> Vec<u8> {
+    let mut w = W::new();
+    w.tree_dir(root);
+    w.bytes
+}
+
+pub fn tree_file(root: &TestDir) -> Vec<u8> {
+    gzip(&tree_stream(root))
 }

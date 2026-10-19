@@ -52,6 +52,16 @@ impl Limits {
         max_depth: 100,
         max_handles: 50_000,
     };
+
+    /// Limits for a repository's file tree (`.a3s/sync`) and `.a3s/serverinfo`. The tree grows with the number
+    /// of files (roughly three handles per file); the values allow a few hundred thousand files and are **not
+    /// yet measured** against large real repositories (`docs/migration/SYNC_METADATA.md`).
+    pub const SYNC: Self = Self {
+        max_compressed: 32 * 1024 * 1024,
+        max_decompressed: 128 * 1024 * 1024,
+        max_depth: 100,
+        max_handles: 1_000_000,
+    };
 }
 
 /// Whether a field name marks its string value as a secret that must not be kept.
@@ -132,6 +142,23 @@ impl Document {
 
     pub fn class_of(&self, object: &Object) -> &ClassDesc {
         &self.classes[object.class]
+    }
+
+    /// Rejects the stream if it names any class or class version outside `known` (name, version bits).
+    pub fn ensure_only(&self, known: &[(&str, u64)]) -> Result<(), ParseError> {
+        let all_known = self.classes.iter().all(|class| {
+            known
+                .iter()
+                .any(|(name, suid)| *name == class.name && *suid == class.suid_bits())
+        });
+        if all_known {
+            Ok(())
+        } else {
+            Err(ParseError::new(
+                ParseErrorKind::UnknownClass,
+                "the file uses a class or class version that is not supported",
+            ))
+        }
     }
 }
 

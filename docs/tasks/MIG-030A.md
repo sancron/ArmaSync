@@ -1,7 +1,7 @@
 # MIG-030A — Sync-Metadaten-Leser, SHA-1 und Manifest-Abbildung
 
 - Status: in Arbeit (2026-10-19). Eigentümer und Integrator: Claude.
-- Basis: `development`, Basis-SHA wird beim Anlegen des Branches im Reservierungscommit festgehalten (Ausgangspunkt: Stand nach Integration der Vorprüfung auf `4831fa1`).
+- Basis: `development`, `729d6818755add721d04ee59d5e7d986871cfd39` (Stand nach Integration der Vorprüfung; Vorgänger `4831fa1` mit grüner CI).
 - Branch/Worktree: `claude/mig-030a-sync-metadata`, `../ArmaSync-claude-mig-030a`.
 - Verträge: [ADR-0006](../adr/0006-sync-metadata-and-http-transport.md), [SYNC_METADATA](../migration/SYNC_METADATA.md), [ADR-0003](../adr/0003-legacy-formats.md).
 - Schreibbereich: `crates/armasync-compat/**`, `crates/armasync-core/src/hash.rs` (nur additiv: `Sha1`), `crates/armasync-adapters/src/sync_meta/**` (neu) plus additive Zeile in `adapters/src/lib.rs`, `crates/armasync-adapters/Cargo.toml` (nur `sha1`), Root-`Cargo.lock` (nur die dafür nötigen Einträge), diese Datei, Bericht, Handoff.
