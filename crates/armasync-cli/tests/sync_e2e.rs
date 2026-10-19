@@ -123,10 +123,8 @@ fn sync(env: &Env, sub: &str, extra: &[&str]) -> Output {
         path(&env.config),
     ];
     args.extend_from_slice(extra);
-    if sub == "run" {
-        if cfg!(feature = "unreleased-platform-override") {
-            args.push(UNRELEASED);
-        }
+    if sub == "run" && cfg!(feature = "unreleased-platform-override") {
+        args.push(UNRELEASED);
     }
     armasync(&args)
 }
@@ -143,10 +141,8 @@ fn sync_json(env: &Env, sub: &str, extra: &[&str]) -> (Output, serde_json::Value
         path(&env.config),
     ];
     args.extend_from_slice(extra);
-    if sub == "run" {
-        if cfg!(feature = "unreleased-platform-override") {
-            args.push(UNRELEASED);
-        }
+    if sub == "run" && cfg!(feature = "unreleased-platform-override") {
+        args.push(UNRELEASED);
     }
     let out = armasync(&args);
     let value = serde_json::from_str(&text(&out.stdout)).unwrap_or(serde_json::Value::Null);
