@@ -2,6 +2,7 @@
 //! End-to-end tests of `armasync sync plan` and `armasync sync run`: the real binary, the real HTTP adapter, the
 //! real local file-system adapter and a loopback repository server that publishes the MIG-001 `small` metadata with
 //! payloads regenerated from the documented generator. No public server, no user data, temporary folders only.
+#![cfg(any(windows, feature = "unreleased-platform-override"))]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::fs;
@@ -97,9 +98,19 @@ fn http_env(server: &Server) -> Env {
     env_for(&format!("http://{}/repo", server.addr), false)
 }
 
-/// Validation runs on platforms whose synchronisation is not released need the explicit override (no effect on
-/// Windows, where the flag is accepted and ignored).
+/// The validation override exists only in builds with the `unreleased-platform-override` feature (never in a
+/// normal build). On Windows the synchronisation is released and needs no override; elsewhere these tests run only
+/// when the feature is on (see the `cfg` at the top of this file).
 const UNRELEASED: &str = "--allow-unreleased-platform";
+
+/// Appends the override flag to a `sync run` command line if (and only if) this build has the feature.
+fn ov<'a>(args: &[&'a str]) -> Vec<&'a str> {
+    let mut all = args.to_vec();
+    if cfg!(feature = "unreleased-platform-override") {
+        all.push(UNRELEASED);
+    }
+    all
+}
 
 fn sync(env: &Env, sub: &str, extra: &[&str]) -> Output {
     let mut args = vec![
@@ -112,7 +123,7 @@ fn sync(env: &Env, sub: &str, extra: &[&str]) -> Output {
         path(&env.config),
     ];
     args.extend_from_slice(extra);
-    if sub == "run" {
+    if sub == "run" && cfg!(feature = "unreleased-platform-override") {
         args.push(UNRELEASED);
     }
     armasync(&args)
@@ -130,7 +141,7 @@ fn sync_json(env: &Env, sub: &str, extra: &[&str]) -> (Output, serde_json::Value
         path(&env.config),
     ];
     args.extend_from_slice(extra);
-    if sub == "run" {
+    if sub == "run" && cfg!(feature = "unreleased-platform-override") {
         args.push(UNRELEASED);
     }
     let out = armasync(&args);
@@ -255,7 +266,7 @@ fn text_output_and_quiet_mode() {
         "{stdout}"
     );
     let env2 = http_env(&server);
-    let out = armasync(&[
+    let out = armasync(&ov(&[
         "--quiet",
         "sync",
         "run",
@@ -264,8 +275,7 @@ fn text_output_and_quiet_mode() {
         path(&env2.dest),
         "--config",
         path(&env2.config),
-        UNRELEASED,
-    ]);
+    ]));
     assert_eq!(out.status.code(), Some(0));
     assert!(out.stdout.is_empty());
     assert_eq!(read(&env2, PBO), pbo());
@@ -393,7 +403,7 @@ fn bad_arguments_are_usage_or_file_system_errors() {
     ]);
     assert_eq!(out.status.code(), Some(2));
     let missing = env.root.join("missing");
-    let out = armasync(&[
+    let out = armasync(&ov(&[
         "sync",
         "run",
         "example",
@@ -401,8 +411,7 @@ fn bad_arguments_are_usage_or_file_system_errors() {
         path(&missing),
         "--config",
         path(&env.config),
-        UNRELEASED,
-    ]);
+    ]));
     assert_eq!(out.status.code(), Some(5));
     assert!(
         !missing.exists(),
@@ -552,7 +561,7 @@ fn wait_for(condition: impl Fn() -> bool, what: &str) {
 }
 
 fn spawn_run(env: &Env) -> Child {
-    armasync_command(&[
+    armasync_command(&ov(&[
         "sync",
         "run",
         "example",
@@ -560,8 +569,7 @@ fn spawn_run(env: &Env) -> Child {
         path(&env.dest),
         "--config",
         path(&env.config),
-        UNRELEASED,
-    ])
+    ]))
     .stdout(Stdio::null())
     .stderr(Stdio::null())
     .spawn()
@@ -605,7 +613,7 @@ fn a_second_run_is_refused_and_a_killed_run_leaves_the_old_file_and_is_recovered
     // the next run (against a healthy server) recovers: lock free, leftover removed, files installed
     let healthy = serve();
     let env2 = env_for(&format!("http://{}/repo", healthy.addr), false);
-    let recovery = armasync(&[
+    let recovery = armasync(&ov(&[
         "sync",
         "run",
         "example",
@@ -613,8 +621,7 @@ fn a_second_run_is_refused_and_a_killed_run_leaves_the_old_file_and_is_recovered
         path(&env.dest),
         "--config",
         path(&env2.config),
-        UNRELEASED,
-    ]);
+    ]));
     assert_eq!(
         recovery.status.code(),
         Some(0),

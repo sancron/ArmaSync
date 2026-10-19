@@ -230,7 +230,8 @@ pub fn platform_status() -> PlatformStatus {
 }
 
 /// Refuses to change anything on a platform that is not released, unless the caller explicitly overrides (the
-/// command line offers `--allow-unreleased-platform` for validation runs).
+/// command line offers `--allow-unreleased-platform` **only in validation builds** made with the feature
+/// `unreleased-platform-override`; a normal or release build always passes `false`).
 ///
 /// # Errors
 /// [`ErrorKind::Unsupported`].

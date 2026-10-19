@@ -16,6 +16,11 @@ path = "src/lib.rs"
 name = "armasync"
 path = "src/main.rs"
 
+[features]
+# Validation builds only: adds `sync run --allow-unreleased-platform` (see docs/migration/RELEASE_BLOCKERS.md, RB-01).
+# Never enabled by default and never part of a release build.
+unreleased-platform-override = []
+
 [dependencies]
 armasync-application.workspace = true
 armasync-core.workspace = true
