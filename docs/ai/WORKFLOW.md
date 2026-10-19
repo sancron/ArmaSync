@@ -53,8 +53,8 @@ Vorgabe des Projektverantwortlichen (2026-10-19):
 1. **Lokal Windows:** Entwicklungs- und Testläufe (fmt, clippy, Tests, MSRV, Skripte) laufen primär unter Windows.
 2. **Keine lokalen WSL-/Linux-Prüfungen bis zum Abschluss des Programms.** Sie erfolgen erst in der abschließenden Plattformvalidierung. Bis dahin sind sie in jedem Bericht und Handoff ausdrücklich als **offen/zurückgestellt** zu führen.
 3. **Keine Linux-Validierung aus älteren Läufen behaupten.** Frühere WSL-Ergebnisse (bis einschließlich MIG-022) sind historisch und gelten nicht für spätere Stände.
-4. **Ubuntu-CI** (`rust (ubuntu-latest)`, `msrv`, `fixtures` in GitHub Actions) läuft unverändert weiter. Ihr tatsächliches Ergebnis (Run, Commit, Jobs) wird getrennt von lokalen Läufen festgehalten; ohne Zugriff steht „nicht geprüft“. Die CI-Plattformen werden wegen dieser Regel nicht geändert.
-5. Integration nach `development` erst nach grünen Windows-Prüfungen und erfolgreicher CI des vorherigen Stands; Push nur als normaler Fast-Forward.
+4. **GitHub-CI pausiert (PROC-002, seit 2026-10-19):** Der Workflow `ci.yml` hat keine automatischen Trigger mehr (nur `workflow_dispatch`, während der Pause nicht zu starten); Release-/WinGet-Automation ist unverändert. Bis zur Wiederaktivierung ([CI](../migration/CI.md), Abschnitt „GitHub-Prüfungen pausiert“) sind die **lokalen Windows-Prüfungen maßgeblich**; Berichte nennen „GitHub-CI: pausiert“ statt eines Ergebnisses. Die CI-Plattformen bleiben im Workflow unverändert.
+5. Integration nach `development` nach grünen lokalen Windows-Prüfungen (während der Pause die alleinige Freigabegrundlage; sonst zusätzlich erfolgreiche CI); Push nur als normaler Fast-Forward.
 
 ## Commit- und Änderungsnachweis
 

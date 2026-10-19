@@ -2,12 +2,25 @@
 
 Stand: 2026-10-18. **Erster GitHub-Lauf am 2026-10-18** (Push von `development`, [Run 39164378010](https://github.com/sancron/ArmaSync/actions/runs/39164378010), Commit `6b1f261`): die Jobs `Rust (windows-latest)`, `Rust (ubuntu-latest)`, `MSRV 1.85 (without GUI crate)` und `Fixtures and test server` waren **erfolgreich**; `Branch flow` wurde übersprungen, weil er nur bei Pull Requests läuft und damit noch **nie ausgeführt** wurde. Weiterhin gilt: kein `actionlint`, Actions nicht auf Commit-SHAs gepinnt, nicht als Required Check eingetragen, keine Rulesets. Lokale Läufe unten beziehen sich auf dieselben Befehle unter Windows 11 und WSL2.
 
+## GitHub-Prüfungen pausiert (PROC-002, seit 2026-10-19)
+
+Wegen des knappen Free-Limits von GitHub Actions laufen **keine automatischen GitHub-Prüfungen**. Maßgeblich sind bis auf Widerruf die **lokalen Windows-Prüfungen** (fmt, clippy `-D warnings`, Workspace-Tests, MSRV 1.85, `cli-gui-free.sh`, gezielte Tests, `git diff --check`).
+
+| Workflow | Art | Zustand |
+| --- | --- | --- |
+| `.github/workflows/ci.yml` („CI“: Jobs `branch-policy`, `rust`, `msrv`, `fixtures`) | Build-, Test- und Branch-Policy-Prüfung | **pausiert**: `push` und `pull_request` entfernt (als Kommentar im Kopf der Datei erhalten), nur `workflow_dispatch` bleibt; während der Pause **nicht starten** |
+| `.github/workflows/publish-winget.yml` | Veröffentlichung (WinGet) | **unverändert** (Release-Trigger und manueller Trigger), kein Testworkflow |
+
+Keine GitHub-Einstellungen, Rulesets oder Required Checks wurden geändert; kein Workflow wurde gelöscht oder umbenannt. Konsequenz: Ein Pull Request oder Push löst keine Prüfung aus, auch `Branch flow` läuft nicht; Fast-Forward-Pushes nach `development` stützen sich auf die lokalen Windows-Prüfungen im Bericht. Die letzte grüne GitHub-CI gehört zu `15b7a32`; spätere Stände haben **keine** CI-Aussage. Die Ubuntu-Jobs laufen nicht; das ändert nichts an der zurückgestellten WSL-/Linux-Abschlussvalidierung.
+
+**Wiederherstellung:** In `.github/workflows/ci.yml` den Block `on:` durch die im Kommentar stehenden ursprünglichen Trigger ergänzen (`pull_request` mit Branches `development, testing, master, legacy`; `push` mit Branches `development, testing, master`; `workflow_dispatch` beibehalten), den Pausenhinweis entfernen, per YAML-Prüfung kontrollieren, in einem eigenen Commit nach `development` bringen und den ersten Lauf auf dem Push dokumentieren (Run, Commit, Jobs). Erst danach gelten Aussagen zur GitHub-CI wieder.
+
 ## Prüfebenen und Prüfregel (seit 2026-10-19)
 
 | Ebene | Wo | Wann | Status in Berichten |
 | --- | --- | --- | --- |
 | Lokale Entwicklungs- und Testläufe | Windows 11 | laufend, vor jeder Integration | Befehle und Ergebnisse nennen |
-| Automatisierte CI | GitHub Actions: `windows-latest` und `ubuntu-latest` (Jobs unten), unverändert | nach jedem Push/PR | Run, Commit und Jobergebnis getrennt festhalten; ohne Zugriff „nicht geprüft“ |
+| Automatisierte CI | GitHub Actions: `windows-latest` und `ubuntu-latest` (Jobs unten); **derzeit pausiert** (siehe oben) | nach jedem Push/PR, solange nicht pausiert | Run, Commit und Jobergebnis getrennt festhalten; während der Pause „pausiert, nicht geprüft“ |
 | Lokale WSL-/Linux-Prüfung | WSL2 Ubuntu | **erst in der abschließenden Plattformvalidierung**; bis dahin keine Läufe | als **offen** kennzeichnen; keine Aussage aus älteren Läufen |
 
 Die Ubuntu-CI ist **keine** lokale Linux-Prüfung und ersetzt die Abschlussvalidierung nicht; sie wird deshalb auch nicht als solche ausgegeben. Der Abschnitt „Lokal ausgeführt“ unten ist **historisch** (2026-10-18, einschließlich WSL2) und beschreibt nicht den aktuellen Stand. Die CI-Plattformen bleiben unverändert.
