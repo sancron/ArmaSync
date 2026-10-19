@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Content hashes. Only SHA-256 is defined so far; legacy hashes (SHA-1, zsync/MD4) arrive with the compatibility
-//! layer and are subject to the rights conditions for Jazsync/MD4 (RQ-02).
+//! Content hashes: SHA-256 and, for existing repositories, SHA-1. SHA-1 is the checksum those servers publish; it
+//! is accepted **only as an integrity check of the old protocol** (detecting damaged transfers), never as proof of
+//! authenticity or collision resistance (ADR-0006). zsync/MD4 hashes are not defined here and stay subject to the
+//! rights conditions for Jazsync/MD4 (RQ-02).
 
 use std::fmt;
 
@@ -9,6 +11,8 @@ use std::fmt;
 pub enum HashAlgorithm {
     /// SHA-256 (64 hex digits).
     Sha256,
+    /// SHA-1 (40 hex digits). Legacy integrity check of existing repositories only; see the module documentation.
+    Sha1,
 }
 
 impl HashAlgorithm {
@@ -17,6 +21,7 @@ impl HashAlgorithm {
     pub const fn hex_len(self) -> usize {
         match self {
             Self::Sha256 => 64,
+            Self::Sha1 => 40,
         }
     }
 
@@ -25,6 +30,7 @@ impl HashAlgorithm {
     pub const fn name(self) -> &'static str {
         match self {
             Self::Sha256 => "sha256",
+            Self::Sha1 => "sha1",
         }
     }
 }
@@ -103,6 +109,21 @@ impl ContentHash {
         }
     }
 
+    /// Builds a SHA-1 hash from a raw 20-byte digest (infallible); see the module documentation for its use.
+    #[must_use]
+    pub fn from_sha1_digest(digest: [u8; 20]) -> Self {
+        use fmt::Write as _;
+        let mut hex = String::with_capacity(40);
+        for byte in digest {
+            // Writing to a String cannot fail.
+            let _ = write!(hex, "{byte:02x}");
+        }
+        Self {
+            algorithm: HashAlgorithm::Sha1,
+            hex,
+        }
+    }
+
     /// The algorithm.
     #[must_use]
     pub const fn algorithm(&self) -> HashAlgorithm {
@@ -133,6 +154,22 @@ mod tests {
         let hash = ContentHash::new(HashAlgorithm::Sha256, &EMPTY.to_uppercase()).unwrap();
         assert_eq!(hash.hex(), EMPTY);
         assert_eq!(hash.to_string(), format!("sha256:{EMPTY}"));
+    }
+
+    #[test]
+    fn sha1_has_its_own_length_and_name() {
+        let abc = "a9993e364706816aba3e25717850c26c9cd0d89d";
+        let hash = ContentHash::new(HashAlgorithm::Sha1, abc).unwrap();
+        assert_eq!(hash.to_string(), format!("sha1:{abc}"));
+        assert_eq!(
+            ContentHash::new(HashAlgorithm::Sha1, EMPTY).unwrap_err(),
+            HashError::WrongLength
+        );
+        // The same digits under another algorithm are a different hash.
+        assert_ne!(
+            ContentHash::new(HashAlgorithm::Sha1, abc).unwrap(),
+            ContentHash::new(HashAlgorithm::Sha256, &abc.repeat(2)[..64]).unwrap()
+        );
     }
 
     #[test]

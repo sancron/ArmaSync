@@ -10,9 +10,11 @@ use armasync_core::{
     ContentHash, Error, ErrorKind, EventSink, FileEntry, HashAlgorithm, Hasher, LocalFile,
     LocalStore, Manifest, OperationEvent, RelativePath, RepositorySource,
 };
+use sha1::Sha1;
 use sha2::{Digest, Sha256};
 
-/// SHA-256 implementation of the [`Hasher`] port.
+/// Implementation of the [`Hasher`] port. The name is historical: it computes SHA-256 and, for the integrity check
+/// of existing repositories (ADR-0006), SHA-1.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Sha256Hasher;
 
@@ -20,6 +22,7 @@ impl Hasher for Sha256Hasher {
     fn hash(&self, algorithm: HashAlgorithm, data: &[u8]) -> ContentHash {
         match algorithm {
             HashAlgorithm::Sha256 => ContentHash::from_sha256_digest(Sha256::digest(data).into()),
+            HashAlgorithm::Sha1 => ContentHash::from_sha1_digest(Sha1::digest(data).into()),
         }
     }
 }

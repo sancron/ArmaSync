@@ -6,14 +6,17 @@
 //! credentials (secret fields are skipped while reading), and its errors never contain input data. Class names and
 //! version numbers of the existing wire format appear only in the narrow table documented in the `autoconfig` module.
 //!
-//! Scope today: the repository auto-configuration (`.a3s/autoconfig`). It is public server metadata, not the
+//! Scope today: the repository auto-configuration (`.a3s/autoconfig`), the published file tree (`.a3s/sync`)
+//! and the server information (`.a3s/serverinfo`). It is public server metadata, not the
 //! encrypted per-user repository definition and not a source of settings or addon lists.
 
 mod autoconfig;
 mod error;
 mod gzip;
 mod stream;
+mod sync;
 
 pub use autoconfig::{ServerAutoConfig, ServerProtocol, parse_autoconfig};
 pub use error::{ParseError, ParseErrorKind};
 pub use stream::{Limits, is_secret_field};
+pub use sync::{ServerInfo, SyncDirectory, SyncFile, SyncTree, parse_serverinfo, parse_sync_tree};
