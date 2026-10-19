@@ -4,11 +4,17 @@
 # the workflow for required checks.
 name: CI
 
+# PAUSED (PROC-002, 2026-10-19): the free GitHub Actions allowance is scarce, so the automatic triggers are
+# switched off; only the manual trigger remains and is not to be started during the pause. Local Windows checks
+# are authoritative meanwhile. To restore the checks, uncomment the original triggers below and remove the pause
+# note (see docs/migration/CI.md, "GitHub-Prüfungen pausiert").
+#
+# Original triggers (restore verbatim):
+#   pull_request:
+#     branches: [development, testing, master, legacy]
+#   push:
+#     branches: [development, testing, master]
 on:
-  pull_request:
-    branches: [development, testing, master, legacy]
-  push:
-    branches: [development, testing, master]
   workflow_dispatch:
 
 permissions:
