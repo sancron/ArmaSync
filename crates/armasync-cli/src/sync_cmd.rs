@@ -14,15 +14,15 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use armasync_adapters::http::{HttpConfig, HttpRepository};
-use armasync_adapters::localfs::LocalDirectory;
+use armasync_adapters::LibraryStore;
+use armasync_adapters::http::HttpConfig;
 use armasync_adapters::sync_meta::SyncWarning;
-use armasync_adapters::{LibraryStore, Sha256Hasher};
-use armasync_application::sync::{ApplyReport, SyncContext, apply, plan};
+use armasync_application::sync::ApplyReport;
 use armasync_core::{
-    CancelToken, Error, ErrorKind, EventSink, OperationEvent, OperationId, Phase, PlanOptions,
-    PlanWarning, RelativePath, RepositoryId, SyncPlan, SyncStep,
+    CancelToken, Error, ErrorKind, EventSink, OperationEvent, OperationId, Phase, PlanWarning,
+    RelativePath, RepositoryId, SyncPlan, SyncStep,
 };
+use armasync_workflow::{SyncRequest, execute as execute_sync, prepare};
 use serde_json::{Value, json};
 
 use crate::import_cmd::{config_dir, status_for};
@@ -37,6 +37,7 @@ pub(crate) struct SyncArgs {
     pub delete_extra: bool,
     pub managed_roots: Vec<String>,
     pub dry_run: bool,
+    pub allow_unreleased_platform: bool,
     pub config: Option<PathBuf>,
 }
 
@@ -126,17 +127,7 @@ fn parse_roots(args: &SyncArgs) -> Result<Vec<RelativePath>, Error> {
             "--managed-root only makes sense together with --delete-extra",
         ));
     }
-    args.managed_roots
-        .iter()
-        .map(|root| {
-            RelativePath::parse(root).map_err(|e| {
-                Error::new(
-                    ErrorKind::Usage,
-                    format!("--managed-root must be a safe relative folder ({e})"),
-                )
-            })
-        })
-        .collect()
+    armasync_workflow::parse_managed_roots(&args.managed_roots, args.delete_extra)
 }
 
 fn step_json(step: &SyncStep) -> Value {
@@ -266,46 +257,47 @@ fn execute(
 ) -> Result<Outcome, Error> {
     let roots = parse_roots(args)?;
     let (id, url, needs_credentials) = load_repository_url(args)?;
-    let repository = HttpRepository::new(&url, HttpConfig::default())?;
-    let snapshot = repository.snapshot()?;
-    let metadata = snapshot.metadata();
-    // The protected and unsupported paths are always part of the options.
-    let options: PlanOptions = metadata.plan_options(args.delete_extra, roots);
     let changes = args.run && !args.dry_run;
-    let mut store = if changes {
-        LocalDirectory::open_exclusive(&args.destination)?
-    } else {
-        LocalDirectory::new(&args.destination)?
+    if changes {
+        let status = armasync_workflow::platform_status();
+        armasync_workflow::require_run_allowed(status, args.allow_unreleased_platform)?;
+        if !status.run_allowed() {
+            let _ = writeln!(
+                stderr,
+                "warning: continuing on a platform that is not released (--allow-unreleased-platform): {}",
+                status.message()
+            );
+        }
+    }
+    let request = SyncRequest {
+        repository_url: url,
+        destination: args.destination.clone(),
+        delete_extra: args.delete_extra,
+        managed_roots: roots,
+        http: HttpConfig::default(),
     };
-    let planned = plan(&snapshot, &store, &options)?;
+    let cancel = CancelToken::new();
+    let prepared = prepare(&request, &cancel)?;
     let report = if changes {
-        let cancel = CancelToken::new();
         let mut printer = ProgressPrinter {
             stderr,
             enabled: !json_output && !quiet,
             last: None,
         };
-        let hasher = Sha256Hasher;
-        let mut context = SyncContext {
-            source: &snapshot,
-            store: &mut store,
-            hasher: &hasher,
-            sink: &mut printer,
-            cancel: &cancel,
-        };
-        Some(apply(
+        Some(execute_sync(
+            &prepared,
             OperationId::new(1),
-            &planned,
-            &options,
-            &mut context,
+            &mut printer,
+            &cancel,
         )?)
     } else {
         None
     };
+    let metadata = prepared.metadata();
     Ok(Outcome {
         repository: id,
-        revision: planned.revision.clone(),
-        plan: planned,
+        revision: prepared.plan().revision.clone(),
+        plan: prepared.plan().clone(),
         warnings: metadata.warnings.clone(),
         unsupported: metadata.unsupported.clone(),
         protected: metadata.protected.clone(),

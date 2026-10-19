@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+[package]
+name = "armasync-testkit"
+description = "Test support for ArmaSync (loopback repository server). Not shipped."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+rcgen = { version = "0.14.7", default-features = false, features = ["crypto", "ring", "pem"] }
+rustls = { version = "0.23.46", default-features = false, features = ["ring", "std"] }
+
+[lints]
+workspace = true

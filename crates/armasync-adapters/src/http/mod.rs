@@ -308,9 +308,9 @@ impl HttpRepository {
 
 /// A repository together with **one** reading of its published metadata. Planning and applying work on this
 /// snapshot, so a command sees one consistent revision; every file is still verified against its checksum.
-#[derive(Debug)]
-pub struct HttpSnapshot<'a> {
-    repository: &'a HttpRepository,
+#[derive(Debug, Clone)]
+pub struct HttpSnapshot {
+    repository: HttpRepository,
     metadata: SyncMetadata,
 }
 
@@ -319,15 +319,15 @@ impl HttpRepository {
     ///
     /// # Errors
     /// As [`HttpRepository::metadata`].
-    pub fn snapshot(&self) -> Result<HttpSnapshot<'_>, Error> {
+    pub fn snapshot(&self) -> Result<HttpSnapshot, Error> {
         Ok(HttpSnapshot {
-            repository: self,
+            repository: self.clone(),
             metadata: self.metadata()?,
         })
     }
 }
 
-impl HttpSnapshot<'_> {
+impl HttpSnapshot {
     /// What was read: the manifest, warnings, protected and unsupported paths.
     #[must_use]
     pub fn metadata(&self) -> &SyncMetadata {
@@ -335,7 +335,7 @@ impl HttpSnapshot<'_> {
     }
 }
 
-impl RepositorySource for HttpSnapshot<'_> {
+impl RepositorySource for HttpSnapshot {
     fn manifest(&self) -> Result<Manifest, Error> {
         Ok(self.metadata.manifest.clone())
     }

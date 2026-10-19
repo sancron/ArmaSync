@@ -245,9 +245,9 @@ dependencies = [
  "armasync-adapters",
  "armasync-application",
  "armasync-core",
+ "armasync-testkit",
+ "armasync-workflow",
  "clap",
- "rcgen",
- "rustls",
  "serde_json",
 ]
 
@@ -272,6 +272,24 @@ dependencies = [
  "eframe",
  "egui_extras",
  "egui_kittest",
+]
+
+[[package]]
+name = "armasync-testkit"
+version = "0.0.0"
+dependencies = [
+ "rcgen",
+ "rustls",
+]
+
+[[package]]
+name = "armasync-workflow"
+version = "0.0.0"
+dependencies = [
+ "armasync-adapters",
+ "armasync-application",
+ "armasync-core",
+ "armasync-testkit",
 ]
 
 [[package]]

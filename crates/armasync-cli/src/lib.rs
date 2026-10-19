@@ -154,6 +154,10 @@ struct SyncRunOptions {
     /// Compute and show the plan only; change nothing.
     #[arg(long)]
     dry_run: bool,
+    /// Allow changes on a platform whose synchronisation is not released yet (Linux: the path boundary against
+    /// concurrent processes is not secured). For validation runs only.
+    #[arg(long)]
+    allow_unreleased_platform: bool,
 }
 
 #[derive(Debug, Args)]
@@ -231,9 +235,14 @@ where
             stderr,
         ),
         Command::Sync(SyncCommandArgs { command }) => {
-            let (run, dry_run, options) = match command {
-                SyncCommand::Plan(options) => (false, false, options),
-                SyncCommand::Run(run_options) => (true, run_options.dry_run, run_options.options),
+            let (run, dry_run, allow_unreleased_platform, options) = match command {
+                SyncCommand::Plan(options) => (false, false, false, options),
+                SyncCommand::Run(run_options) => (
+                    true,
+                    run_options.dry_run,
+                    run_options.allow_unreleased_platform,
+                    run_options.options,
+                ),
             };
             let args = sync_cmd::SyncArgs {
                 run,
@@ -242,6 +251,7 @@ where
                 delete_extra: options.delete_extra,
                 managed_roots: options.managed_root,
                 dry_run,
+                allow_unreleased_platform,
                 config: options.config,
             };
             sync_cmd::run(&args, cli.json, cli.quiet, stdout, stderr)
