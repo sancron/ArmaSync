@@ -294,3 +294,123 @@ fn the_platform_gate_names_what_is_verified_and_blocks_what_is_not() {
     );
     require_run_allowed(windows, false).unwrap();
 }
+
+// ---- error cases of P3 / MIG-032 (part 1): the destination and the repository change under the run ----------------
+
+#[test]
+fn a_file_that_changes_on_the_server_after_planning_is_refused_and_the_old_file_stays() {
+    let server = serve();
+    let dest = scratch("changed-remote");
+    fs::create_dir_all(dest.join("@example_core/addons")).unwrap();
+    fs::write(dest.join(PBO), b"previous").unwrap();
+    let prepared = prepare(&request(&server, &dest), &CancelToken::new()).unwrap();
+    // the server now serves different bytes than the file list announced
+    server.behavior.lock().unwrap().corrupt_pbo = true;
+    let error = execute(
+        &prepared,
+        OperationId::new(1),
+        &mut MemoryEventSink::default(),
+        &CancelToken::new(),
+    )
+    .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::Integrity);
+    assert_eq!(fs::read(dest.join(PBO)).unwrap(), b"previous");
+    assert_eq!(names(&dest), [PBO]);
+    fs::remove_dir_all(dest).unwrap();
+}
+
+#[test]
+fn a_local_change_between_planning_and_running_makes_the_plan_stale() {
+    let server = serve();
+    let dest = scratch("stale");
+    let prepared = prepare(&request(&server, &dest), &CancelToken::new()).unwrap();
+    // someone installs one of the files meanwhile: the plan no longer matches the destination
+    fs::create_dir_all(dest.join("@example_core/keys")).unwrap();
+    fs::write(dest.join(BIKEY), bikey()).unwrap();
+    let error = execute(
+        &prepared,
+        OperationId::new(1),
+        &mut MemoryEventSink::default(),
+        &CancelToken::new(),
+    )
+    .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::Integrity);
+    assert!(error.message().contains("stale"), "{error}");
+    assert!(
+        !dest.join(PBO).exists(),
+        "nothing was installed from a stale plan"
+    );
+    fs::remove_dir_all(dest).unwrap();
+}
+
+#[test]
+fn a_folder_where_a_file_belongs_and_a_file_where_a_folder_belongs_are_path_conflicts() {
+    for (name, conflict_path, is_dir) in [
+        ("dir-for-file", PBO, true),
+        ("file-for-dir", "@example_core", false),
+    ] {
+        let server = serve();
+        let dest = scratch(name);
+        let conflict = dest.join(conflict_path);
+        if is_dir {
+            fs::create_dir_all(&conflict).unwrap();
+            fs::write(conflict.join("keep.txt"), b"mine").unwrap();
+        } else {
+            fs::write(&conflict, b"i am a file").unwrap();
+        }
+        let prepared = prepare(&request(&server, &dest), &CancelToken::new()).unwrap();
+        let error = execute(
+            &prepared,
+            OperationId::new(1),
+            &mut MemoryEventSink::default(),
+            &CancelToken::new(),
+        )
+        .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::FileSystem, "{name}: {error}");
+        if is_dir {
+            assert_eq!(
+                fs::read(conflict.join("keep.txt")).unwrap(),
+                b"mine",
+                "{name}"
+            );
+        } else {
+            assert_eq!(fs::read(&conflict).unwrap(), b"i am a file", "{name}");
+        }
+        assert!(
+            !names(&dest).iter().any(|n| n.contains(".armasync-")),
+            "{name}: no temporary file"
+        );
+        fs::remove_dir_all(dest).unwrap();
+    }
+}
+
+#[test]
+fn a_read_only_target_file_is_not_replaced_and_nothing_is_left_behind() {
+    let server = serve();
+    let dest = scratch("readonly");
+    fs::create_dir_all(dest.join("@example_core/addons")).unwrap();
+    let target = dest.join(PBO);
+    fs::write(&target, b"protected by the file system").unwrap();
+    let mut permissions = fs::metadata(&target).unwrap().permissions();
+    permissions.set_readonly(true);
+    fs::set_permissions(&target, permissions).unwrap();
+    let prepared = prepare(&request(&server, &dest), &CancelToken::new()).unwrap();
+    let outcome = execute(
+        &prepared,
+        OperationId::new(1),
+        &mut MemoryEventSink::default(),
+        &CancelToken::new(),
+    );
+    // Windows refuses to replace a read-only file; the behaviour on other systems depends on the folder rights
+    // (a read-only file in a writable folder can be replaced there) and is part of the deferred platform checks.
+    if cfg!(windows) {
+        assert_eq!(outcome.unwrap_err().kind(), ErrorKind::FileSystem);
+        assert_eq!(fs::read(&target).unwrap(), b"protected by the file system");
+        assert!(!names(&dest).iter().any(|n| n.contains(".armasync-")));
+    }
+    let mut permissions = fs::metadata(&target).unwrap().permissions();
+    #[allow(clippy::permissions_set_readonly_false)]
+    permissions.set_readonly(false);
+    fs::set_permissions(&target, permissions).unwrap();
+    fs::remove_dir_all(dest).unwrap();
+}

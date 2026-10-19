@@ -254,6 +254,7 @@ fn execute(
     json_output: bool,
     quiet: bool,
     stderr: &mut dyn Write,
+    cancel: &CancelToken,
 ) -> Result<Outcome, Error> {
     let roots = parse_roots(args)?;
     let (id, url, needs_credentials) = load_repository_url(args)?;
@@ -276,8 +277,7 @@ fn execute(
         managed_roots: roots,
         http: HttpConfig::default(),
     };
-    let cancel = CancelToken::new();
-    let prepared = prepare(&request, &cancel)?;
+    let prepared = prepare(&request, cancel)?;
     let report = if changes {
         let mut printer = ProgressPrinter {
             stderr,
@@ -288,7 +288,7 @@ fn execute(
             &prepared,
             OperationId::new(1),
             &mut printer,
-            &cancel,
+            cancel,
         )?)
     } else {
         None
@@ -384,8 +384,9 @@ pub(crate) fn run(
     quiet: bool,
     stdout: &mut dyn Write,
     stderr: &mut dyn Write,
+    cancel: &CancelToken,
 ) -> ExitStatus {
-    let outcome = match execute(args, json_output, quiet, stderr) {
+    let outcome = match execute(args, json_output, quiet, stderr, cancel) {
         Ok(outcome) => outcome,
         Err(error) => return fail(args, &error, json_output, stdout, stderr),
     };
