@@ -21,11 +21,13 @@
 - `development` bis `734a20b` (inkl. MIG-012A, MIG-020) gepusht; CI grün.
 - MIG-021 integriert: neutrales Importformat `armasync.import`, Rust-Importer mit Vorschau, Backup, Abbruch und Journal, `armasync import`, Offline-Exporter für unverschlüsselte Profile; verschlüsselte Repositorydateien (ADR-0003/RQ-01 offen) nicht importiert; [IMPORT_SCHEMA](docs/migration/IMPORT_SCHEMA.md).
 - MIG-022 integriert: Crate `armasync-compat` (begrenzter Parser für `.a3s/autoconfig`, ohne JVM, ohne Klassenladen, ohne I/O), `armasync repository import` (lokale Datei, kein Netzwerkabruf; nur Name und Adresse, nie Kennwörter) und verständliche Umfangs-Hinweise für beide begrenzten Importwege (deutsch/englisch, `scope_notices` in JSON). Löst weder die fehlende Entschlüsselung lokaler Repositorydateien noch Einstellungen oder Addon-Listen; [SERVER_METADATA_IMPORT](docs/migration/SERVER_METADATA_IMPORT.md).
+- Prüfregel (PROC-001): lokale Läufe primär unter Windows, WSL/Linux erst in der Abschlussvalidierung (bis dahin offen), Ubuntu-CI unverändert und getrennt dokumentiert.
+- MIG-023 integriert: `armasync repository list` und `armasync profile list` (rein lesend, `--json`, nie Zugangsdaten); [CLI_CONTRACT](docs/migration/CLI_CONTRACT.md).
 - MIG-001: vollständiger Linux-Generatorlauf bestanden; `run.sh`/`run.ps1` bauen nur das Root-Gradle-Projekt.
 - `.gitattributes`: Shell-Skripte mit LF.
 - Noch keine Rust-Portierung oder Änderung am bestehenden Laufzeitcode.
 
-Technische Berichte: [MIG-000](docs/changes/2026-10-18-MIG-000.md), [MIG-001](docs/changes/2026-10-18-MIG-001.md), [MIG-002](docs/changes/2026-10-18-MIG-002.md), [MIG-003](docs/changes/2026-10-18-MIG-003.md), [MIG-010](docs/changes/2026-10-18-MIG-010.md), [MIG-011](docs/changes/2026-10-18-MIG-011.md), [MIG-012](docs/changes/2026-10-18-MIG-012.md), [MIG-013](docs/changes/2026-10-18-MIG-013.md), [MIG-021](docs/changes/2026-10-18-MIG-021.md), [MIG-022](docs/changes/2026-10-19-MIG-022.md). Aktuelle letzte Integration: [LAST_CHANGE.md](docs/changes/LAST_CHANGE.md).
+Technische Berichte: [MIG-000](docs/changes/2026-10-18-MIG-000.md), [MIG-001](docs/changes/2026-10-18-MIG-001.md), [MIG-002](docs/changes/2026-10-18-MIG-002.md), [MIG-003](docs/changes/2026-10-18-MIG-003.md), [MIG-010](docs/changes/2026-10-18-MIG-010.md), [MIG-011](docs/changes/2026-10-18-MIG-011.md), [MIG-012](docs/changes/2026-10-18-MIG-012.md), [MIG-013](docs/changes/2026-10-18-MIG-013.md), [MIG-021](docs/changes/2026-10-18-MIG-021.md), [MIG-022](docs/changes/2026-10-19-MIG-022.md), [PROC-001](docs/changes/2026-10-19-PROC-001.md), [MIG-023](docs/changes/2026-10-19-MIG-023.md). Aktuelle letzte Integration: [LAST_CHANGE.md](docs/changes/LAST_CHANGE.md).
 
 ## Historischer Java-Änderungsverlauf
 
