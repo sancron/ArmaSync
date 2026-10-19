@@ -21,11 +21,11 @@ Altverzeichnis ──(1) export.py, nur lesend──▶ export.json (armasync.im
 | Favoritenserver, Kennwörter, Logins, URLs mit Zugangsdaten | **nie**; Favoritenserver nur als Zähler (`skipped-favorite-servers`) |
 | `a3s.cfg`, `a3s.prefs` | nein, nur Zähler `skipped-settings` (keine Abbildung auf `settings.toml`; Lookandfeel, Frequenzen u. ä. sind keine ArmaSync-Einstellungen) |
 | Profilinhalte (Startoptionen, Addon-Listen, Prioritäten, Pfade) | nein; MIG-050 |
-| Server-Metadaten (`.a3s/*`) | nein; MIG-022 |
+| Server-Metadaten (`.a3s/*`) | nicht über diesen Weg; getrennter Weg `armasync repository import` für `.a3s/autoconfig` (nur Name und Adresse), siehe [SERVER_METADATA_IMPORT](SERVER_METADATA_IMPORT.md) (MIG-022) |
 
 Der Exporter lehnt Streams ab, deren Klassenversion (`serialVersionUID`) für `Profile`, `TreeDirectory`, `TreeLeaf` von der Tabelle in `export.py` (aus FORMAT_INVENTORY, Abschnitt 3) abweicht; unlesbare, zu große, falsch typisierte oder beschädigte Dateien werden mit einem Hinweis übersprungen und brechen den Lauf nicht ab. Die alten Klassen- und Feldnamen sind **Wire-Daten der eingefrorenen Baseline** und bleiben im Exporter; sie erscheinen nicht im neutralen Dokument. Profile mit Namen, die nicht dem Anzeigenamen-Format entsprechen (leer, > 120 Zeichen, Steuerzeichen), werden übersprungen (`skipped-invalid-profile-name`).
 
-Eine Folge: Der Export aus einem echten Altverzeichnis enthält heute **Profile ohne Repository-Definitionen**. Die Repositories kommen später aus einer der beiden offenen Quellen (Entschlüsselung des lokalen Bestands oder MIG-022: Autoconfig der Server) oder werden von Hand ergänzt; der Import ist darauf ausgelegt (siehe „Wiederholung“).
+Eine Folge: Der Export aus einem echten Altverzeichnis enthält heute **Profile ohne Repository-Definitionen**. Die Repositories kommen aus einer der beiden Quellen (Entschlüsselung des lokalen Bestands: weiterhin offen; oder MIG-022: Autoconfig der Server, liefert nur Name und Adresse und ersetzt die lokalen Dateien nicht) oder werden von Hand ergänzt; der Import ist darauf ausgelegt (siehe „Wiederholung“).
 
 ## Schema `armasync.import`, Version 1
 
@@ -72,7 +72,9 @@ Die Planung ist eine reine Funktion (bestehende Bibliothek, Dokument, Richtlinie
 
 `armasync import <datei> [--apply] [--on-conflict keep-both|fail|replace] [--config <verzeichnis>] [--json] [--quiet]`. Standardverzeichnis: ArmaSync-Config-Root der Plattform ([DATA_MODEL](DATA_MODEL.md)). Exitcodes: 0 Erfolg (auch Vorschau); 2 Aufruf (fehlende Datei, ungültiger Wert); 3 Konfiguration/Konflikt unter `fail`; 5 Dateisystem; 7 ungültige Importdatei oder beschädigte Bibliothek; 130 reserviert. `--json` liefert den versionierten Envelope (`status` `ok` oder `error`, Zähler, Einzelergebnisse, Warnungen, Notizen, SHA-256, `mode`, `changed`, `backup_file`), nie Geheimnisse.
 
-Die Vertragsbefehle `repository import` und `profile import` ([CLI_CONTRACT](CLI_CONTRACT.md)) bleiben für den Direktimport aus Autoconfig/Server (MIG-022) vorgesehen; `armasync import` ist der Weg für das neutrale Format.
+Der Vertragsbefehl `repository import` ([CLI_CONTRACT](CLI_CONTRACT.md)) ist seit MIG-022 für die Autoconfig eines Servers umgesetzt ([SERVER_METADATA_IMPORT](SERVER_METADATA_IMPORT.md)); `profile import` bleibt offen. `armasync import` ist der Weg für das neutrale Format.
+
+**Hinweise zum Umfang (seit MIG-022):** `armasync import` druckt nach der Vorschau/dem Ergebnis, was dieser Import **nicht** enthält (Text unter „What this import covers:“; in `--json` additiv `scope_notices` mit `code`, `severity`, `text`, `text_de`). Für Dokumente der Quelle `legacy-local-files` sind das `local-import-scope`, bei übersprungenen verschlüsselten Repositorydateien `encrypted-repositories-not-read` und bei ausgelassenen Profilverweisen `profile-repositories-missing`. Die Liste mit Texten und die GUI-Vorgaben stehen in [SERVER_METADATA_IMPORT](SERVER_METADATA_IMPORT.md), Abschnitt „Hinweise zum Umfang“.
 
 ## Nicht geprüft / offen
 

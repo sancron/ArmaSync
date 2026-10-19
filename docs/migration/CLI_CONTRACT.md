@@ -33,7 +33,15 @@ Global: `--config <path>`, `--portable`, `--json`, `--no-input`, `--verbose`, `-
 armasync import <neutral-export> [--apply] [--on-conflict keep-both|fail|replace] [--config <dir>] [--json] [--quiet]
 ```
 
-Importiert Repositories und Profile aus dem neutralen Format (`armasync.import`, [IMPORT_SCHEMA](IMPORT_SCHEMA.md)). Ohne `--apply` nur Vorschau, ohne Schreibzugriff. Wartet nie auf Eingaben; kein Geheimnis in Ein- oder Ausgabe. Exitcodes laut Tabelle unten (2 Aufruf, 3 Konflikt unter `fail`, 5 Dateisystem, 7 Format). Die Zeilen `repository import` und `profile import` oben bleiben für den Direktimport aus Autoconfig/Server (MIG-022) vorgesehen.
+Importiert Repositories und Profile aus dem neutralen Format (`armasync.import`, [IMPORT_SCHEMA](IMPORT_SCHEMA.md)). Ohne `--apply` nur Vorschau, ohne Schreibzugriff. Wartet nie auf Eingaben; kein Geheimnis in Ein- oder Ausgabe. Exitcodes laut Tabelle unten (2 Aufruf, 3 Konflikt unter `fail`, 5 Dateisystem, 7 Format). Die Zeile `profile import` oben bleibt offen. Nach dem Import erklärt die Ausgabe in „What this import covers:“ (und in `--json` als `scope_notices`), was nicht enthalten ist ([SERVER_METADATA_IMPORT](SERVER_METADATA_IMPORT.md)).
+
+## Umgesetzt: `armasync repository import` (MIG-022)
+
+```text
+armasync repository import <autoconfig-datei> [--apply] [--on-conflict keep-both|fail|replace] [--config <dir>] [--json] [--quiet]
+```
+
+Legt ein Repository aus der von einem Server veröffentlichten Verbindungsbeschreibung (`.a3s/autoconfig`, **lokale Datei**, kein Download) an: nur Name und Adresse, nie Kennwörter; verschlüsselte Repositorydateien, Einstellungen und Addon-Listen sind nicht betroffen. Ohne `--apply` nur Vorschau. Exitcodes wie `import`, zusätzlich 8 für einen Transport, der kein Repository-Transport ist (z. B. Proxy). `--json`: `command` = `repository-import`. Siehe [SERVER_METADATA_IMPORT](SERVER_METADATA_IMPORT.md).
 
 ## Ausgabevertrag
 
