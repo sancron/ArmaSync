@@ -2,6 +2,18 @@
 
 Stand: 2026-10-18. **Erster GitHub-Lauf am 2026-10-18** (Push von `development`, [Run 39164378010](https://github.com/sancron/ArmaSync/actions/runs/39164378010), Commit `6b1f261`): die Jobs `Rust (windows-latest)`, `Rust (ubuntu-latest)`, `MSRV 1.85 (without GUI crate)` und `Fixtures and test server` waren **erfolgreich**; `Branch flow` wurde übersprungen, weil er nur bei Pull Requests läuft und damit noch **nie ausgeführt** wurde. Weiterhin gilt: kein `actionlint`, Actions nicht auf Commit-SHAs gepinnt, nicht als Required Check eingetragen, keine Rulesets. Lokale Läufe unten beziehen sich auf dieselben Befehle unter Windows 11 und WSL2.
 
+## Prüfebenen und Prüfregel (seit 2026-10-19)
+
+| Ebene | Wo | Wann | Status in Berichten |
+| --- | --- | --- | --- |
+| Lokale Entwicklungs- und Testläufe | Windows 11 | laufend, vor jeder Integration | Befehle und Ergebnisse nennen |
+| Automatisierte CI | GitHub Actions: `windows-latest` und `ubuntu-latest` (Jobs unten), unverändert | nach jedem Push/PR | Run, Commit und Jobergebnis getrennt festhalten; ohne Zugriff „nicht geprüft“ |
+| Lokale WSL-/Linux-Prüfung | WSL2 Ubuntu | **erst in der abschließenden Plattformvalidierung**; bis dahin keine Läufe | als **offen** kennzeichnen; keine Aussage aus älteren Läufen |
+
+Die Ubuntu-CI ist **keine** lokale Linux-Prüfung und ersetzt die Abschlussvalidierung nicht; sie wird deshalb auch nicht als solche ausgegeben. Der Abschnitt „Lokal ausgeführt“ unten ist **historisch** (2026-10-18, einschließlich WSL2) und beschreibt nicht den aktuellen Stand. Die CI-Plattformen bleiben unverändert.
+
+**CI-Stand `8e3b25d` (2026-10-19, per `gh run view` geprüft, [Run 39255913370](https://github.com/sancron/ArmaSync/actions/runs/39255913370)):** `Rust (windows-latest)`, `Rust (ubuntu-latest)`, `MSRV 1.85 (without GUI crate)` und `Fixtures and test server` erfolgreich; `Branch flow` übersprungen (nur Pull Requests).
+
 ## Dateien
 
 | Datei | Zweck |

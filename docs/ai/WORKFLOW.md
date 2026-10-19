@@ -40,11 +40,21 @@ Jedes System arbeitet ausschließlich in seinem zugewiesenen Worktree. Separate 
 `geplant → zugewiesen → in Arbeit → reviewbereit → integriert`. `blockiert` mit konkreter Ursache, fehlender Information und unabhängiger Restarbeit dokumentieren. Ein Selbstbericht „fertig“ bedeutet zunächst reviewbereit, keine automatische Integration oder Releasefreigabe.
 
 1. Vertrag und Abnahmekriterien prüfen, kleinsten abgeschlossenen Schritt implementieren.
-2. Passende Tests/Checks ausführen; Befehle, OS, Toolchain und Resultate festhalten. Nicht ausgeführte Checks ausdrücklich nennen.
+2. Passende Tests/Checks ausführen; Befehle, OS, Toolchain und Resultate festhalten. Nicht ausgeführte Checks ausdrücklich nennen. Es gilt die **Prüfregel** unten.
 3. Eigene Änderungen als kleine sachliche Commits mit Task-ID committen. Keine falschen Testergebnisse oder zusammengesuchten Fremd-SHAs.
 4. Eigenen Report `docs/changes/YYYY-MM-DD-MIG-NNN.md` und Handoff `docs/handoffs/MIG-NNN.md` aktualisieren. Report referenziert Codecommit(s); der Dokumentationscommit muss nicht seinen eigenen Hash enthalten.
 5. Integrator prüft Diff und Verträge, übernimmt in Abhängigkeitsreihenfolge über PR oder nachvollziehbaren Merge nach `development`. Tests am **zusammengesetzten** Zustand ausführen; Tests aus isolierten Worktrees reichen nicht.
 6. Nur der Integrator aktualisiert globalen Status, letzte Änderung, Changelog und Feature-Gates. Bei Konflikten fachliche Ursache klären, nicht blind `ours`/`theirs` wählen. Veraltete Tasks auf neue Basis bringen, ohne fremde Arbeit umzuschreiben.
+
+## Prüfregel: Windows lokal, Ubuntu-CI getrennt, WSL zum Schluss
+
+Vorgabe des Projektverantwortlichen (2026-10-19):
+
+1. **Lokal Windows:** Entwicklungs- und Testläufe (fmt, clippy, Tests, MSRV, Skripte) laufen primär unter Windows.
+2. **Keine lokalen WSL-/Linux-Prüfungen bis zum Abschluss des Programms.** Sie erfolgen erst in der abschließenden Plattformvalidierung. Bis dahin sind sie in jedem Bericht und Handoff ausdrücklich als **offen/zurückgestellt** zu führen.
+3. **Keine Linux-Validierung aus älteren Läufen behaupten.** Frühere WSL-Ergebnisse (bis einschließlich MIG-022) sind historisch und gelten nicht für spätere Stände.
+4. **Ubuntu-CI** (`rust (ubuntu-latest)`, `msrv`, `fixtures` in GitHub Actions) läuft unverändert weiter. Ihr tatsächliches Ergebnis (Run, Commit, Jobs) wird getrennt von lokalen Läufen festgehalten; ohne Zugriff steht „nicht geprüft“. Die CI-Plattformen werden wegen dieser Regel nicht geändert.
+5. Integration nach `development` erst nach grünen Windows-Prüfungen und erfolgreicher CI des vorherigen Stands; Push nur als normaler Fast-Forward.
 
 ## Commit- und Änderungsnachweis
 

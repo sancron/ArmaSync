@@ -38,6 +38,7 @@ Prüfe Git-Status, Branch, HEAD und vorhandene Änderungen. Nenne Task-ID, Basis
 - CLI mit stabilen Exitcodes, `--json`, `--no-input` und verständlicher Hilfe; destruktive Aktionen mit expliziter Auswahl und Vorschau.
 - Neue Abhängigkeiten auf Wartung, Lizenz, Systembedarf und Features prüfen; Versionen bei Implementierung verifizieren und pinnen. `Cargo.lock` für die Anwendung einchecken.
 - Java: `gradle test :updater:test --console=plain`. Nach Erstellung des Rust-Workspace: `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --locked`. CLI zusätzlich isoliert ohne GUI bauen. Nicht verfügbare Plattform-/GUI-Prüfungen offen benennen.
+- **Prüfregel (Projektverantwortlicher, 2026-10-19):** Lokale Entwicklungs- und Testläufe laufen primär unter Windows. Bis zum Abschluss des Programms keine lokalen WSL-/Linux-Prüfungen; sie erfolgen erst in der abschließenden Plattformvalidierung und stehen bis dahin als **offen** in Bericht und Handoff. Keine Linux-Validierung aus älteren Läufen behaupten. Die automatisierte Ubuntu-CI läuft weiter, ihr tatsächliches Ergebnis wird getrennt dokumentiert; CI-Plattformen werden wegen dieser Regel nicht geändert. Details: [WORKFLOW](docs/ai/WORKFLOW.md), [CI](docs/migration/CI.md).
 - Tests nach Risiko: Datenintegrität, Parser, Pfadgrenzen, Netzwerkfehler, Zustandswechsel und GUI-/CLI-Parität. Dokumentation auf Links, Widersprüche und mit `git diff --check` prüfen.
 
 ## Jede Übergabe enthält

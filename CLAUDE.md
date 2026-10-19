@@ -6,4 +6,4 @@ Lies **`AGENTS.md` vollständig** und befolge die dortige Lesereihenfolge. `AGEN
 
 Der ausführbare Bestand ist noch Java. Starte mit dem nächsten freigegebenen Roadmap-Task und prüfe den tatsächlichen Stand. Bei paralleler Arbeit eigenen Worktree und `claude/<task-id>-<thema>` verwenden. Tasks werden durch den gemeinsamen Integrator zugewiesen.
 
-Vollständiger Startauftrag: `docs/ai/CLAUDE_START_PROMPT.md`. Aktueller Stand: `docs/migration/STATUS.md`. Letzte Integration: `docs/changes/LAST_CHANGE.md`. Ein Prompt oder alter Handoff ersetzt keine Zustandsprüfung.
+Vollständiger Startauftrag: `docs/ai/CLAUDE_START_PROMPT.md`. Aktueller Stand: `docs/migration/STATUS.md`. Letzte Integration: `docs/changes/LAST_CHANGE.md`. Ein Prompt oder alter Handoff ersetzt keine Zustandsprüfung. Prüfregel (lokal Windows, WSL/Linux erst in der Abschlussvalidierung, Ubuntu-CI getrennt): siehe `AGENTS.md`.
