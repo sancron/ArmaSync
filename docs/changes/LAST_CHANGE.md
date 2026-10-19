@@ -1,15 +1,14 @@
 # Letzte integrierte Änderung
 
-**2026-10-19 · MIG-030A · Claude · Sync-Metadaten-Leser, SHA-1 im Core, Manifest-Abbildung** (nach der MIG-030-Vorprüfung)
+**2026-10-19 · MIG-030P · Claude · Vertrag für Streaming, Staging und Schutzpfade** (nach PROC-002, GitHub-CI pausiert)
 
-Nach `development` integriert (Merge `460e4ac`; Basis `729d681`, davor `4831fa1` mit grüner GitHub-CI). Push und CI-Ergebnis dieses Stands stehen in der Antwort an den Projektverantwortlichen; diese Datei behauptet kein CI-Ergebnis für ihn.
+Nach `development` integriert (Merge `b040c02`). **GitHub-CI ist pausiert** ([CI](../migration/CI.md)): es gibt für diesen Stand keine CI-Aussage; Freigabegrundlage sind die lokalen Windows-Prüfungen. Die letzte grüne CI gehört zu `15b7a32`.
 
-* **Neu:** begrenzte Leser für `.a3s/sync` und `.a3s/serverinfo` (`armasync-compat`), `HashAlgorithm::Sha1` (nur Integrität des Altprotokolls), Adapter `sync_meta` (Dateiliste → `Manifest`, unsichere Namen mit Warnung weggelassen, komprimierte Blätter als nicht unterstützt geführt), SHA-1-Verifikation in `apply`. [Bericht](2026-10-19-MIG-030A.md), [Handoff](../handoffs/MIG-030A.md), [Vorprüfung](2026-10-19-MIG-030-preliminary.md), [ADR-0006](../adr/0006-sync-metadata-and-http-transport.md), [SYNC_METADATA](../migration/SYNC_METADATA.md).
-* **Es wird weiterhin nichts Reales synchronisiert:** kein Netzwerk-, kein Dateisystemadapter, keine CLI-Synchronisation. HTTP-Client `ureq` ist gewählt und erprobt, aber noch nicht eingebunden (MIG-030B).
-* **Neue Abhängigkeit:** `sha1` 0.11.0; MSRV bleibt 1.85.
+* **Neu:** Ports `RepositorySource::fetch` (Chunk-Streaming, Fortschritt, Abbruch, Größenwächter), `LocalStore::begin`/`StagedFile::commit` (Staging, atomare Übernahme), `LocalStore::list(algorithm, cancel)`, `Hasher::digest`, `PlanOptions::protected_paths`; `apply` streamt und verifiziert beim Empfang; SHA-1 nur als Altprotokoll-Integrität. [ADR-0007](../adr/0007-transfer-ports.md), [Bericht](2026-10-19-MIG-030P.md), [Handoff](../handoffs/MIG-030P.md).
+* **Nur gegen die In-Memory-Referenz belegt:** HTTP- und Dateisystemadapter fehlen (MIG-030B/C); es wird nichts Reales synchronisiert.
 
-Prüfung (Windows 11, Rust 1.99.1, am zusammengesetzten Stand): fmt, clippy `-D warnings`, 206 Tests, MSRV 1.85 177 Tests, GUI-freier CLI-Baum, `git diff --check`. **Lokale WSL-/Linux-Prüfung: offen (zurückgestellt gemäß Prüfregel); keine Linux-Aussage aus älteren Läufen.** Ubuntu-CI wird getrennt dokumentiert.
+Prüfung (Windows 11, Rust 1.99.1, lokal): fmt, clippy `-D warnings`, 225 Tests, MSRV 1.85 196 Tests (fand und behob einen 1.86-only-Fehler), GUI-freier Baum, `git diff --check`. **WSL/Linux lokal: offen (zurückgestellt).**
 
-**Offen:** **P1-GUI-Gate: NVDA, Orca und Sichtprüfung des hellen Themes sind nicht ausgeführt – das Gate bleibt offen**; Rechtefragen RQ-01..RQ-08 alle offen; Entschlüsselungsentscheidung (ADR-0003/RQ-01) und `export.a3s.autoconfig`; MIG-030B/C/D/E; Schlüsselbund (ADR-0005); GitHub-Schritte (SHA-Pinning, Rulesets, Required Checks); große/echte Repositories ungeprüft; macOS/BSD.
+**Offen:** P1-GUI-Gate (NVDA/Orca/Sichtprüfung nicht ausgeführt), RQ-01..RQ-08, MIG-030B/C/D/E, Wiederaktivierung der GitHub-CI, Entschlüsselungsentscheidung, macOS.
 
-Vorherige Integrationen: [MIG-023](2026-10-19-MIG-023.md), [MIG-030-Vorprüfung](2026-10-19-MIG-030-preliminary.md), [MIG-022](2026-10-19-MIG-022.md), [PROC-001](2026-10-19-PROC-001.md), [MIG-021](2026-10-18-MIG-021.md), [MIG-020](2026-10-18-MIG-020.md), [MIG-012A](2026-10-18-MIG-012A.md), [MIG-013](2026-10-18-MIG-013.md), [MIG-012](2026-10-18-MIG-012.md), [MIG-011](2026-10-18-MIG-011.md), [MIG-010](2026-10-18-MIG-010.md), [MIG-002](2026-10-18-MIG-002.md), [MIG-003](2026-10-18-MIG-003.md), [MIG-001](2026-10-18-MIG-001.md).
+Vorherige Integrationen: [PROC-002](2026-10-19-PROC-002.md), [MIG-030A](2026-10-19-MIG-030A.md), [MIG-023](2026-10-19-MIG-023.md), [MIG-030-Vorprüfung](2026-10-19-MIG-030-preliminary.md), [MIG-022](2026-10-19-MIG-022.md), [PROC-001](2026-10-19-PROC-001.md), [MIG-021](2026-10-18-MIG-021.md), [MIG-020](2026-10-18-MIG-020.md), [MIG-012A](2026-10-18-MIG-012A.md), [MIG-013](2026-10-18-MIG-013.md), [MIG-012](2026-10-18-MIG-012.md), [MIG-011](2026-10-18-MIG-011.md), [MIG-010](2026-10-18-MIG-010.md), [MIG-002](2026-10-18-MIG-002.md), [MIG-003](2026-10-18-MIG-003.md), [MIG-001](2026-10-18-MIG-001.md).
