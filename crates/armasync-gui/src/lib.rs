@@ -12,4 +12,6 @@
 
 pub mod contrast;
 pub mod model;
+pub mod sync_screen;
+pub mod sync_ui;
 pub mod ui;

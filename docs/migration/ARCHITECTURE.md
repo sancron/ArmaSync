@@ -14,6 +14,10 @@ flowchart TD
   ADAPTERS --> CORE
   COMPAT[armasync-compat] --> CORE
   ADAPTERS --> COMPAT
+  WORKFLOW[armasync-workflow] --> APP
+  WORKFLOW --> ADAPTERS
+  CLI --> WORKFLOW
+  GUI --> WORKFLOW
   UPDATE[armasync-updater] --> CORE
 ```
 

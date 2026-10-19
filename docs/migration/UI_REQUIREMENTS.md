@@ -14,6 +14,8 @@ Folgerungen für jeden GUI-Task (MIG-012 und alle späteren, insbesondere MIG-03
 - **Keine Übernahme von Altmarken, Classnames, Team-/Länderpräfixen oder ungeklärten Grafiken, Icons und Texten** (RQ-04, [BRANDING](BRANDING.md)). Vertraut heißt Ablauf und Struktur, nicht Optik oder Quelltext der Baseline. Die Baseline dient nur als Verhaltens- und Strukturquelle; Wortlaut und Oberflächentexte werden neu formuliert.
 - Der Abgleich neuer Ansichten mit der Baseline erfolgt anhand des Verhaltens (Quellcode, Fixtures, Screenshots eigener Testläufe), nicht aus alter Dokumentation.
 
+Stand MIG-031: Die Synchronisationsansicht (Repository, Zielordner, Plan, Bestätigung von Löschungen, Fortschritt, Abbruch, Ergebnis) ist umgesetzt und automatisiert sowie einmal über UI Automation geprüft; **NVDA, Orca und Sichtprüfung stehen aus**. Prüfprotokoll: [GUI_SYNC_EVIDENCE](GUI_SYNC_EVIDENCE.md); Blocker: [RELEASE_BLOCKERS](RELEASE_BLOCKERS.md).
+
 ## Aufgaben und Informationsarchitektur
 
 Die Hauptaufgabe ist ein verifizierter synchroner Modbestand mit nachvollziehbaren Änderungen. Hauptnavigation: **Repositories**, **Synchronisation**, **Profile & Start** unter Windows beziehungsweise **Profile** unter Linux, **Administration**, **Einstellungen**, **Hilfe & Lizenzen**. Administrationsoptionen nicht in jeden Einsteigerablauf mischen; Fähigkeiten über denselben Core anbieten.

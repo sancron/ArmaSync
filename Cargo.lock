@@ -269,6 +269,8 @@ dependencies = [
  "armasync-adapters",
  "armasync-application",
  "armasync-core",
+ "armasync-testkit",
+ "armasync-workflow",
  "eframe",
  "egui_extras",
  "egui_kittest",
