@@ -4,17 +4,24 @@
 //! Safety rules enforced here (ARCHITECTURE, "Gemeinsame Verträge"):
 //! * a plan is **revalidated** against the current repository revision and the current local state before
 //!   anything is changed; a stale plan is rejected,
-//! * downloaded bytes are verified (size and hash) **before** they are written, so a corrupted transfer never
-//!   replaces a good file,
+//! * files are streamed into a **staging file**, verified (size and hash) while they arrive, and only then
+//!   committed atomically; a corrupted, short, cancelled or failed transfer never touches the existing file
+//!   (ADR-0007),
 //! * deletions run last and only if the plan contains them,
 //! * cancellation is checked between files and yields the `Cancelled` state, never success,
 //! * every state change is reported as a typed [`OperationEvent`].
 
+use std::io::{self, Write};
+
 use armasync_core::{
-    CancelToken, EVENT_SCHEMA_VERSION, Error, ErrorKind, EventSink, Hasher, JobState, LocalStore,
-    OperationEvent, OperationId, Phase, PlanOptions, Progress, RepositorySource, SyncPlan,
-    SyncStep, plan_sync,
+    CancelToken, Digest, EVENT_SCHEMA_VERSION, Error, ErrorKind, EventSink, FileEntry,
+    HashAlgorithm, Hasher, JobState, LocalStore, Manifest, OperationEvent, OperationId, Phase,
+    PlanOptions, Progress, RelativePath, RepositorySource, StagedFile, SyncPlan, SyncStep,
+    plan_sync,
 };
+
+/// Progress events during a transfer are emitted at most once per this many bytes (and at the end of each file).
+const PROGRESS_STEP: u64 = 256 * 1024;
 
 /// Computes a plan for the current repository revision and local state without changing anything.
 ///
@@ -25,9 +32,104 @@ pub fn plan(
     store: &dyn LocalStore,
     options: &PlanOptions,
 ) -> Result<SyncPlan, Error> {
+    plan_cancellable(source, store, options, &CancelToken::new())
+}
+
+/// Like [`plan`], but the scan of the local files (which hashes them) can be cancelled.
+///
+/// # Errors
+/// As [`plan`], plus [`ErrorKind::Cancelled`].
+pub fn plan_cancellable(
+    source: &dyn RepositorySource,
+    store: &dyn LocalStore,
+    options: &PlanOptions,
+    cancel: &CancelToken,
+) -> Result<SyncPlan, Error> {
     let manifest = source.manifest()?;
-    let local = store.list()?;
+    let local = store.list(algorithm_of(&manifest), cancel)?;
     Ok(plan_sync(&manifest, &local, options))
+}
+
+/// The hash algorithm of a manifest (all entries of a revision share one). An empty manifest needs no hashes.
+fn algorithm_of(manifest: &Manifest) -> HashAlgorithm {
+    manifest
+        .entries()
+        .first()
+        .map_or(HashAlgorithm::Sha256, |entry| entry.hash.algorithm())
+}
+
+/// Forwards received bytes to the staging file and the digest, and refuses more than the announced size.
+struct Tee<'a> {
+    stage: &'a mut dyn StagedFile,
+    digest: &'a mut dyn Digest,
+    written: u64,
+    limit: u64,
+    overflow: bool,
+}
+
+impl Write for Tee<'_> {
+    fn write(&mut self, data: &[u8]) -> io::Result<usize> {
+        if self.written + data.len() as u64 > self.limit {
+            self.overflow = true;
+            return Err(io::Error::other("more data than announced"));
+        }
+        self.stage.write_all(data)?;
+        self.digest.update(data);
+        self.written += data.len() as u64;
+        Ok(data.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.stage.flush()
+    }
+}
+
+/// Streams one file into staging, verifies size and hash, and commits it atomically.
+///
+/// Any failure (network, cancellation, wrong size or hash, full disk, failed commit) drops the staging file and
+/// leaves an existing target untouched.
+fn install(
+    source: &dyn RepositorySource,
+    store: &mut dyn LocalStore,
+    hasher: &dyn Hasher,
+    cancel: &CancelToken,
+    path: &RelativePath,
+    entry: &FileEntry,
+    on_bytes: &mut dyn FnMut(u64),
+) -> Result<(), Error> {
+    let mut stage = store.begin(path, entry.size)?;
+    let mut digest = hasher.digest(entry.hash.algorithm());
+    let (fetched, written, overflow) = {
+        let mut tee = Tee {
+            stage: &mut *stage,
+            digest: &mut *digest,
+            written: 0,
+            limit: entry.size,
+            overflow: false,
+        };
+        let fetched = source.fetch(path, entry.size, &mut tee, cancel, on_bytes);
+        (fetched, tee.written, tee.overflow)
+    };
+    let integrity = |what: &str| {
+        Error::new(
+            ErrorKind::Integrity,
+            format!("verification failed for {path} ({what}); file left unchanged"),
+        )
+    };
+    if let Err(error) = fetched {
+        return Err(if overflow {
+            integrity("longer than announced")
+        } else {
+            error
+        });
+    }
+    if written != entry.size {
+        return Err(integrity("size differs"));
+    }
+    if digest.finish() != entry.hash {
+        return Err(integrity("checksum differs"));
+    }
+    stage.commit()
 }
 
 /// Everything [`apply`] needs from the outside world.
@@ -147,7 +249,7 @@ pub fn apply(
         Ok(manifest) => manifest,
         Err(error) => return Err(reporter.finish_with(progress, error)),
     };
-    let local = match context.store.list() {
+    let local = match context.store.list(algorithm_of(&manifest), context.cancel) {
         Ok(local) => local,
         Err(error) => return Err(reporter.finish_with(progress, error)),
     };
@@ -198,24 +300,31 @@ pub fn apply(
             );
             return Err(reporter.finish_with(progress, error));
         };
-        let data = match context.source.read(path) {
-            Ok(data) => data,
-            Err(error) => return Err(reporter.finish_with(progress, error)),
-        };
-        if data.len() as u64 != entry.size
-            || context.hasher.hash(entry.hash.algorithm(), &data) != entry.hash
-        {
-            let error = Error::new(
-                ErrorKind::Integrity,
-                format!("verification failed for {path}; file left unchanged"),
-            );
-            return Err(reporter.finish_with(progress, error));
-        }
-        if let Err(error) = context.store.write(path, &data) {
+        let mut file_bytes: u64 = 0;
+        let mut since_emit: u64 = 0;
+        let installed = install(
+            context.source,
+            &mut *context.store,
+            context.hasher,
+            context.cancel,
+            path,
+            entry,
+            &mut |bytes| {
+                file_bytes += bytes;
+                since_emit += bytes;
+                progress.bytes_done += bytes;
+                if since_emit >= PROGRESS_STEP {
+                    since_emit = 0;
+                    reporter.emit(Phase::Transferring, progress, None);
+                }
+            },
+        );
+        if let Err(error) = installed {
+            // Bytes of the unfinished file do not count as completed.
+            progress.bytes_done -= file_bytes;
             return Err(reporter.finish_with(progress, error));
         }
         progress.files_done += 1;
-        progress.bytes_done += entry.size;
         report.bytes += entry.size;
         if is_replace {
             report.replaced += 1;

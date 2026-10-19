@@ -5,10 +5,12 @@
 //! deterministically. They are test and prototype adapters, not a persistence layer.
 
 use std::collections::BTreeMap;
+use std::io::{self, Write};
 
 use armasync_core::{
-    ContentHash, Error, ErrorKind, EventSink, FileEntry, HashAlgorithm, Hasher, LocalFile,
-    LocalStore, Manifest, OperationEvent, RelativePath, RepositorySource,
+    CancelToken, ContentHash, Digest as CoreDigest, Error, ErrorKind, EventSink, FileEntry,
+    HashAlgorithm, Hasher, LocalFile, LocalStore, Manifest, OperationEvent, RelativePath,
+    RepositorySource, StagedFile, copy_in_chunks,
 };
 use sha1::Sha1;
 use sha2::{Digest, Sha256};
@@ -18,11 +20,35 @@ use sha2::{Digest, Sha256};
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Sha256Hasher;
 
+struct Sha256State(Sha256);
+
+impl CoreDigest for Sha256State {
+    fn update(&mut self, data: &[u8]) {
+        Digest::update(&mut self.0, data);
+    }
+
+    fn finish(self: Box<Self>) -> ContentHash {
+        ContentHash::from_sha256_digest(self.0.finalize().into())
+    }
+}
+
+struct Sha1State(Sha1);
+
+impl CoreDigest for Sha1State {
+    fn update(&mut self, data: &[u8]) {
+        Digest::update(&mut self.0, data);
+    }
+
+    fn finish(self: Box<Self>) -> ContentHash {
+        ContentHash::from_sha1_digest(self.0.finalize().into())
+    }
+}
+
 impl Hasher for Sha256Hasher {
-    fn hash(&self, algorithm: HashAlgorithm, data: &[u8]) -> ContentHash {
+    fn digest(&self, algorithm: HashAlgorithm) -> Box<dyn CoreDigest> {
         match algorithm {
-            HashAlgorithm::Sha256 => ContentHash::from_sha256_digest(Sha256::digest(data).into()),
-            HashAlgorithm::Sha1 => ContentHash::from_sha1_digest(Sha1::digest(data).into()),
+            HashAlgorithm::Sha256 => Box::new(Sha256State(Sha256::new())),
+            HashAlgorithm::Sha1 => Box::new(Sha1State(Sha1::new())),
         }
     }
 }
@@ -34,6 +60,8 @@ pub struct InMemoryRepository {
     revision: String,
     files: BTreeMap<RelativePath, Vec<u8>>,
     served_override: BTreeMap<RelativePath, Vec<u8>>,
+    truncated: BTreeMap<RelativePath, usize>,
+    algorithm: HashAlgorithm,
     unreachable: bool,
 }
 
@@ -56,8 +84,23 @@ impl InMemoryRepository {
             revision: revision.to_owned(),
             files: map,
             served_override: BTreeMap::new(),
+            truncated: BTreeMap::new(),
+            algorithm: HashAlgorithm::Sha256,
             unreachable: false,
         })
+    }
+
+    /// Advertises the manifest with `algorithm` hashes (SHA-1 simulates an existing repository).
+    #[must_use]
+    pub fn with_algorithm(mut self, algorithm: HashAlgorithm) -> Self {
+        self.algorithm = algorithm;
+        self
+    }
+
+    /// Makes `fetch` of `path` deliver only the first `bytes` bytes and then fail with a network error
+    /// (simulates a connection that drops mid-transfer).
+    pub fn truncate_transfer(&mut self, path: &RelativePath, bytes: usize) {
+        self.truncated.insert(path.clone(), bytes);
     }
 
     /// Publishes a new revision with different file content (replaces the file set).
@@ -90,7 +133,7 @@ impl RepositorySource for InMemoryRepository {
             .map(|(path, data)| FileEntry {
                 path: path.clone(),
                 size: data.len() as u64,
-                hash: hasher.hash(HashAlgorithm::Sha256, data),
+                hash: hasher.hash(self.algorithm, data),
             })
             .collect();
         Manifest::new(self.revision.clone(), entries)
@@ -109,6 +152,34 @@ impl RepositorySource for InMemoryRepository {
             .cloned()
             .ok_or_else(|| Error::new(ErrorKind::Network, format!("not found: {path}")))
     }
+
+    fn fetch(
+        &self,
+        path: &RelativePath,
+        expected_size: u64,
+        out: &mut dyn Write,
+        cancel: &CancelToken,
+        progress: &mut dyn FnMut(u64),
+    ) -> Result<u64, Error> {
+        if cancel.is_cancelled() {
+            return Err(Error::new(ErrorKind::Cancelled, "cancelled"));
+        }
+        let data = self.read(path)?;
+        if let Some(limit) = self.truncated.get(path) {
+            let prefix = &data[..(*limit).min(data.len())];
+            // The prefix is delivered; the connection then drops.
+            match copy_in_chunks(prefix, prefix.len() as u64, out, cancel, progress) {
+                Ok(_) => {
+                    return Err(Error::new(
+                        ErrorKind::Network,
+                        "connection lost during the transfer",
+                    ));
+                }
+                Err(error) => return Err(error),
+            }
+        }
+        copy_in_chunks(&data, expected_size, out, cancel, progress)
+    }
 }
 
 /// A local destination held in memory with atomic writes.
@@ -116,6 +187,7 @@ impl RepositorySource for InMemoryRepository {
 pub struct InMemoryStore {
     files: BTreeMap<RelativePath, Vec<u8>>,
     fail_writes_to: Option<RelativePath>,
+    fail_staging_after: Option<usize>,
 }
 
 impl InMemoryStore {
@@ -141,6 +213,12 @@ impl InMemoryStore {
         self.fail_writes_to = Some(path.clone());
     }
 
+    /// Makes writing into a staging file fail after `bytes` bytes with a file-system error (simulates a full disk
+    /// during a transfer).
+    pub fn fail_staging_after(&mut self, bytes: usize) {
+        self.fail_staging_after = Some(bytes);
+    }
+
     /// The content of `path`, if present.
     #[must_use]
     pub fn content(&self, path: &str) -> Option<&[u8]> {
@@ -158,17 +236,38 @@ impl InMemoryStore {
 }
 
 impl LocalStore for InMemoryStore {
-    fn list(&self) -> Result<Vec<LocalFile>, Error> {
+    fn list(
+        &self,
+        algorithm: HashAlgorithm,
+        cancel: &CancelToken,
+    ) -> Result<Vec<LocalFile>, Error> {
         let hasher = Sha256Hasher;
-        Ok(self
-            .files
-            .iter()
-            .map(|(path, data)| LocalFile {
+        let mut listed = Vec::with_capacity(self.files.len());
+        for (path, data) in &self.files {
+            if cancel.is_cancelled() {
+                return Err(Error::new(ErrorKind::Cancelled, "cancelled"));
+            }
+            listed.push(LocalFile {
                 path: path.clone(),
                 size: data.len() as u64,
-                hash: Some(hasher.hash(HashAlgorithm::Sha256, data)),
-            })
-            .collect())
+                hash: Some(hasher.hash(algorithm, data)),
+            });
+        }
+        Ok(listed)
+    }
+
+    fn begin<'a>(
+        &'a mut self,
+        path: &RelativePath,
+        _expected_size: u64,
+    ) -> Result<Box<dyn StagedFile + 'a>, Error> {
+        let fail_after = self.fail_staging_after;
+        Ok(Box::new(InMemoryStaged {
+            store: self,
+            path: path.clone(),
+            buffer: Vec::new(),
+            fail_after,
+        }))
     }
 
     fn write(&mut self, path: &RelativePath, data: &[u8]) -> Result<(), Error> {
@@ -191,6 +290,38 @@ impl LocalStore for InMemoryStore {
     }
 }
 
+/// A staged file of the in-memory store: bytes collect in a private buffer; only `commit` changes the store, and
+/// dropping the handle discards everything.
+struct InMemoryStaged<'a> {
+    store: &'a mut InMemoryStore,
+    path: RelativePath,
+    buffer: Vec<u8>,
+    fail_after: Option<usize>,
+}
+
+impl Write for InMemoryStaged<'_> {
+    fn write(&mut self, data: &[u8]) -> io::Result<usize> {
+        if let Some(limit) = self.fail_after {
+            if self.buffer.len() + data.len() > limit {
+                return Err(io::Error::other("no space left"));
+            }
+        }
+        self.buffer.extend_from_slice(data);
+        Ok(data.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+impl StagedFile for InMemoryStaged<'_> {
+    fn commit(self: Box<Self>) -> Result<(), Error> {
+        let this = *self;
+        this.store.write(&this.path, &this.buffer)
+    }
+}
+
 /// Collects events in memory.
 #[derive(Debug, Clone, Default)]
 pub struct MemoryEventSink {
@@ -208,7 +339,7 @@ impl EventSink for MemoryEventSink {
 mod tests {
     use super::{InMemoryRepository, InMemoryStore, Sha256Hasher};
     use armasync_core::{
-        ErrorKind, HashAlgorithm, Hasher, LocalStore, RelativePath, RepositorySource,
+        CancelToken, ErrorKind, HashAlgorithm, Hasher, LocalStore, RelativePath, RepositorySource,
     };
 
     #[test]
@@ -244,7 +375,14 @@ mod tests {
     #[test]
     fn store_lists_hashes_and_failed_write_keeps_old_content() {
         let mut store = InMemoryStore::new().with_file("a.pbo", b"old").unwrap();
-        assert_eq!(store.list().unwrap()[0].size, 3);
+        let listed = store
+            .list(HashAlgorithm::Sha1, &CancelToken::new())
+            .unwrap();
+        assert_eq!(listed[0].size, 3);
+        assert_eq!(
+            listed[0].hash.as_ref().unwrap().algorithm(),
+            HashAlgorithm::Sha1
+        );
         let path = RelativePath::parse("a.pbo").unwrap();
         store.fail_writes_to(&path);
         assert_eq!(
