@@ -11,9 +11,9 @@
 //! * every state change is reported as a typed [`OperationEvent`].
 
 use armasync_core::{
-    CancelToken, EVENT_SCHEMA_VERSION, Error, ErrorKind, EventSink, HashAlgorithm, Hasher,
-    JobState, LocalStore, OperationEvent, OperationId, Phase, PlanOptions, Progress,
-    RepositorySource, SyncPlan, SyncStep, plan_sync,
+    CancelToken, EVENT_SCHEMA_VERSION, Error, ErrorKind, EventSink, Hasher, JobState, LocalStore,
+    OperationEvent, OperationId, Phase, PlanOptions, Progress, RepositorySource, SyncPlan,
+    SyncStep, plan_sync,
 };
 
 /// Computes a plan for the current repository revision and local state without changing anything.
@@ -203,7 +203,7 @@ pub fn apply(
             Err(error) => return Err(reporter.finish_with(progress, error)),
         };
         if data.len() as u64 != entry.size
-            || context.hasher.hash(HashAlgorithm::Sha256, &data) != entry.hash
+            || context.hasher.hash(entry.hash.algorithm(), &data) != entry.hash
         {
             let error = Error::new(
                 ErrorKind::Integrity,
