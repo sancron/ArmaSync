@@ -155,9 +155,26 @@ struct SyncRunOptions {
     #[arg(long)]
     dry_run: bool,
     /// Allow changes on a platform whose synchronisation is not released yet (Linux: the path boundary against
-    /// concurrent processes is not secured). For validation runs only.
+    /// concurrent processes is not secured, RB-01). **Exists only in builds made with the cargo feature
+    /// `unreleased-platform-override`** (validation builds); a normal build, in particular the release build, does
+    /// not know this option.
+    #[cfg(feature = "unreleased-platform-override")]
     #[arg(long)]
     allow_unreleased_platform: bool,
+}
+
+impl SyncRunOptions {
+    /// The override: always `false` in a normal build.
+    const fn unreleased_platform_override(&self) -> bool {
+        #[cfg(feature = "unreleased-platform-override")]
+        {
+            self.allow_unreleased_platform
+        }
+        #[cfg(not(feature = "unreleased-platform-override"))]
+        {
+            false
+        }
+    }
 }
 
 #[derive(Debug, Args)]
@@ -240,7 +257,7 @@ where
                 SyncCommand::Run(run_options) => (
                     true,
                     run_options.dry_run,
-                    run_options.allow_unreleased_platform,
+                    run_options.unreleased_platform_override(),
                     run_options.options,
                 ),
             };

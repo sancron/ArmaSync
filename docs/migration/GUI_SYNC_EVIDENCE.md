@@ -2,7 +2,7 @@
 
 Stand: 2026-10-19. Gegenstand: die Synchronisationsansicht der GUI (`crates/armasync-gui`: `sync_screen.rs` Modell, `sync_ui.rs` Darstellung) auf Basis des gemeinsamen Ablaufs `armasync-workflow`. Rahmen: [UI_REQUIREMENTS](UI_REQUIREMENTS.md) (Leitvorgabe, Zugänglichkeitskriterien), [GUI_PROTOTYPE_EVIDENCE](GUI_PROTOTYPE_EVIDENCE.md), [RELEASE_BLOCKERS](RELEASE_BLOCKERS.md).
 
-**Kurzfassung:** Der Ablauf Repository wählen → Zielordner → Plan → (Löschungen bestätigen) → Synchronisation mit Fortschritt/Abbruch → Ergebnis ist unter Windows gegen einen lokalen Loopback-Server automatisiert (Modell- und AccessKit-Tests) und einmal live über Windows UI Automation am laufenden Fenster belegt. **NVDA und Orca wurden nicht ausgeführt, eine Sichtprüfung (Layout, helles Theme, Skalierung am Bildschirm) wurde nicht durchgeführt. Das P1-GUI-/Accessibility-Gate ist weiterhin offen.** Linux: die GUI zeigt dort nur den Plan, sie ändert nichts.
+**Kurzfassung:** Der Ablauf Repository wählen → Zielordner → Plan → (Löschungen bestätigen) → Synchronisation mit Fortschritt/Abbruch → Ergebnis ist unter Windows gegen einen lokalen Loopback-Server automatisiert (Modell- und AccessKit-Tests) und einmal live über Windows UI Automation am laufenden Fenster belegt. **NVDA und Orca wurden nicht ausgeführt, eine Sichtprüfung (Layout, helles Theme, Skalierung am Bildschirm) wurde nicht durchgeführt. Das P1-GUI-/Accessibility-Gate ist weiterhin offen.** Linux: die GUI zeigt dort nur den Plan, sie ändert nichts und bietet keinen Override.
 
 ## Ablauf und Entwurfsentscheidungen
 
