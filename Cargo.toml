@@ -6,6 +6,8 @@ members = [
     "crates/armasync-application",
     "crates/armasync-adapters",
     "crates/armasync-compat",
+    "crates/armasync-testkit",
+    "crates/armasync-workflow",
     "crates/armasync-cli",
     "crates/armasync-gui",
 ]
@@ -25,6 +27,8 @@ armasync-core = { path = "crates/armasync-core" }
 armasync-application = { path = "crates/armasync-application" }
 armasync-adapters = { path = "crates/armasync-adapters" }
 armasync-compat = { path = "crates/armasync-compat" }
+armasync-testkit = { path = "crates/armasync-testkit" }
+armasync-workflow = { path = "crates/armasync-workflow" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

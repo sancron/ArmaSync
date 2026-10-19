@@ -12,6 +12,8 @@ use egui_extras::{Column, TableBuilder};
 use armasync_core::{JobState, Phase};
 
 use crate::model::{Model, SortDirection, SortKey, synthetic_repositories};
+use crate::sync_screen::SyncScreen;
+use crate::sync_ui::show_sync;
 
 /// Colour theme choice persisted by the user (not yet persisted to disk in the prototype).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -116,25 +118,43 @@ const ADD_BUTTON_LABEL: &str = "Repository hinzufügen…";
 const ADD_DIALOG_TITLE: &str = "Repository hinzufügen";
 const ROW_HEIGHT: f32 = 26.0;
 
+/// Which view is shown.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AppView {
+    /// The synchronisation of a real repository (MIG-031).
+    Sync,
+    /// The list prototype with simulated data (MIG-012).
+    Prototype,
+}
+
 /// Application state for eframe.
 #[derive(Debug)]
 pub struct ArmaSyncApp {
     model: Model,
+    screen: SyncScreen,
+    view: AppView,
     settings: ViewSettings,
     applied: Option<ViewSettings>,
     focus_add_button: bool,
 }
 
 impl ArmaSyncApp {
-    /// Creates the app with 10,000 synthetic repositories (ADR-0002 prototype list).
+    /// Creates the app: the synchronisation view on the user's library, and the simulated list prototype
+    /// (10,000 synthetic repositories, ADR-0002) as a second view.
     #[must_use]
     pub fn new(ctx: &egui::Context) -> Self {
         let repaint = ctx.clone();
         let model = Model::new(synthetic_repositories(10_000), move || {
             repaint.request_repaint()
         });
+        let repaint = ctx.clone();
+        let screen = SyncScreen::new(None, armasync_workflow::platform_status(), move || {
+            repaint.request_repaint()
+        });
         Self {
             model,
+            screen,
+            view: AppView::Sync,
             settings: ViewSettings::default(),
             applied: None,
             focus_add_button: false,
@@ -145,14 +165,29 @@ impl ArmaSyncApp {
 impl eframe::App for ArmaSyncApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         self.model.poll();
+        self.screen.poll();
         apply_view_settings(ui.ctx(), &self.settings, &mut self.applied);
-        show(
-            &mut self.model,
-            &mut self.settings,
-            &mut self.focus_add_button,
-            ui,
-        );
-        if self.model.is_busy() {
+        egui::Panel::top("navigation").show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label("Ansicht:");
+                ui.selectable_value(&mut self.view, AppView::Sync, "Synchronisation");
+                ui.selectable_value(
+                    &mut self.view,
+                    AppView::Prototype,
+                    "Repository-Liste (Prototyp, simuliert)",
+                );
+            });
+        });
+        match self.view {
+            AppView::Sync => show_sync(&mut self.screen, &mut self.settings, ui),
+            AppView::Prototype => show(
+                &mut self.model,
+                &mut self.settings,
+                &mut self.focus_add_button,
+                ui,
+            ),
+        }
+        if self.model.is_busy() || self.screen.is_busy() {
             ui.ctx()
                 .request_repaint_after(std::time::Duration::from_millis(100));
         }
@@ -193,6 +228,34 @@ fn phase_text(phase: Phase) -> &'static str {
     }
 }
 
+/// The theme and scale selectors (shared by every view's toolbar).
+pub fn settings_controls(ui: &mut egui::Ui, settings: &mut ViewSettings) {
+    let label = ui.label("Darstellung:");
+    egui::ComboBox::from_id_salt("theme")
+        .selected_text(settings.theme.label())
+        .show_ui(ui, |ui| {
+            for choice in [ThemeChoice::System, ThemeChoice::Light, ThemeChoice::Dark] {
+                ui.selectable_value(&mut settings.theme, choice, choice.label());
+            }
+        })
+        .response
+        .labelled_by(label.id);
+    let label = ui.label("Skalierung:");
+    egui::ComboBox::from_id_salt("scale")
+        .selected_text(format!("{} %", (settings.scale * 100.0).round()))
+        .show_ui(ui, |ui| {
+            for scale in [1.0_f32, 1.25, 1.5, 2.0] {
+                ui.selectable_value(
+                    &mut settings.scale,
+                    scale,
+                    format!("{} %", (scale * 100.0).round()),
+                );
+            }
+        })
+        .response
+        .labelled_by(label.id);
+}
+
 /// Draws the whole window content.
 pub fn show(
     model: &mut Model,
@@ -225,26 +288,7 @@ pub fn show(
                 model.cancel_sync();
             }
             ui.separator();
-            let label = ui.label("Darstellung:");
-            egui::ComboBox::from_id_salt("theme")
-                .selected_text(settings.theme.label())
-                .show_ui(ui, |ui| {
-                    for choice in [ThemeChoice::System, ThemeChoice::Light, ThemeChoice::Dark] {
-                        ui.selectable_value(&mut settings.theme, choice, choice.label());
-                    }
-                })
-                .response
-                .labelled_by(label.id);
-            let label = ui.label("Skalierung:");
-            egui::ComboBox::from_id_salt("scale")
-                .selected_text(format!("{} %", (settings.scale * 100.0).round()))
-                .show_ui(ui, |ui| {
-                    for scale in [1.0_f32, 1.25, 1.5, 2.0] {
-                        ui.selectable_value(&mut settings.scale, scale, format!("{} %", (scale * 100.0).round()));
-                    }
-                })
-                .response
-                .labelled_by(label.id);
+            settings_controls(ui, settings);
         });
         ui.label("Prototyp: Alle Repositories und Übertragungen sind simuliert (Speicherdaten); es werden keine echten Server oder Dateien verwendet.");
     });

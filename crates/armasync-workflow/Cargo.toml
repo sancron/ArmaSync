@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+[package]
+name = "armasync-workflow"
+description = "ArmaSync workflows shared by the CLI and the GUI: wiring of the sync use cases to the adapters. No GUI, no terminal."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+armasync-core.workspace = true
+armasync-application.workspace = true
+armasync-adapters.workspace = true
+
+[dev-dependencies]
+armasync-testkit.workspace = true
+
+[lints]
+workspace = true

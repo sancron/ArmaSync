@@ -20,12 +20,12 @@ path = "src/main.rs"
 armasync-application.workspace = true
 armasync-core.workspace = true
 armasync-adapters.workspace = true
+armasync-workflow.workspace = true
 clap = { version = "4", default-features = false, features = ["std", "derive", "help", "usage", "error-context", "suggestions"] }
 serde_json = "1"
 
 [dev-dependencies]
-rcgen = { version = "0.14.7", default-features = false, features = ["crypto", "ring", "pem"] }
-rustls = { version = "0.23.46", default-features = false, features = ["ring", "std"] }
+armasync-testkit.workspace = true
 
 [lints]
 workspace = true

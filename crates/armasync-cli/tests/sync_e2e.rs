@@ -5,233 +5,16 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::fs;
-use std::io::{Read, Write};
-use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Output, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::Ordering;
 use std::thread;
 use std::time::{Duration, Instant};
 
-const PBO: &str = "@example_core/addons/example_core.pbo";
-const BIKEY: &str = "@example_core/keys/example.bikey";
-const ZIP: &str = "@example_core/addons/example_core.pbo.zip";
-
-/// The documented MIG-001 payload generator (`fixtures/legacy-formats/README.md`).
-fn payload(length: usize, seed: u64) -> Vec<u8> {
-    let mut x = 0x9E37_79B9_7F4A_7C15u64 ^ seed;
-    (0..length)
-        .map(|_| {
-            x = x
-                .wrapping_mul(6_364_136_223_846_793_005)
-                .wrapping_add(1_442_695_040_888_963_407);
-            (x >> 56) as u8
-        })
-        .collect()
-}
-
-fn pbo() -> Vec<u8> {
-    payload(8193, 3)
-}
-
-fn bikey() -> Vec<u8> {
-    payload(20, 5)
-}
-
-fn fixture(name: &str) -> Vec<u8> {
-    fs::read(
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../fixtures/legacy-formats/generated/valid/server/small/.a3s")
-            .join(name),
-    )
-    .unwrap()
-}
-
-#[derive(Clone, Default)]
-struct Behavior {
-    corrupt_pbo: bool,
-    pbo_status: Option<u16>,
-    short_pbo: bool,
-    slow_pbo: bool,
-}
-
-type Seen = Arc<Mutex<Vec<(String, Vec<(String, String)>)>>>;
-
-struct Server {
-    addr: SocketAddr,
-    stop: Arc<AtomicBool>,
-    behavior: Arc<Mutex<Behavior>>,
-    requests: Seen,
-}
-
-impl Drop for Server {
-    fn drop(&mut self) {
-        self.stop.store(true, Ordering::SeqCst);
-        let _ = TcpStream::connect(self.addr);
-    }
-}
-
-impl Server {
-    fn requested(&self, suffix: &str) -> usize {
-        self.requests
-            .lock()
-            .unwrap()
-            .iter()
-            .filter(|(t, _)| t.ends_with(suffix))
-            .count()
-    }
-
-    fn total(&self) -> usize {
-        self.requests.lock().unwrap().len()
-    }
-}
-
-fn read_head<S: Read>(stream: &mut S) -> Option<(String, Vec<(String, String)>)> {
-    let mut data = Vec::new();
-    let mut buf = [0u8; 1024];
-    while !data.windows(4).any(|w| w == b"\r\n\r\n") {
-        let n = stream.read(&mut buf).ok()?;
-        if n == 0 {
-            return None;
-        }
-        data.extend_from_slice(&buf[..n]);
-    }
-    let text = String::from_utf8_lossy(&data).into_owned();
-    let mut lines = text.split("\r\n");
-    let target = lines.next()?.split(' ').nth(1)?.to_owned();
-    let headers = lines
-        .take_while(|l| !l.is_empty())
-        .filter_map(|l| l.split_once(": "))
-        .map(|(k, v)| (k.to_ascii_lowercase(), v.to_owned()))
-        .collect();
-    Some((target, headers))
-}
-
-fn reply(stream: &mut impl Write, status: &str, body: &[u8]) {
-    let head = format!(
-        "HTTP/1.1 {status}\r\nConnection: close\r\nContent-Length: {}\r\n\r\n",
-        body.len()
-    );
-    let _ = stream.write_all(head.as_bytes());
-    let _ = stream.write_all(body);
-    let _ = stream.flush();
-}
-
-fn handle(stream: &mut impl Write, target: &str, behavior: &Behavior) {
-    match target {
-        "/repo/.a3s/sync" => reply(stream, "200 OK", &fixture("sync")),
-        "/repo/.a3s/serverinfo" => reply(stream, "200 OK", &fixture("serverinfo")),
-        t if t == format!("/repo/{BIKEY}") => reply(stream, "200 OK", &bikey()),
-        t if t == format!("/repo/{PBO}") => {
-            let mut body = pbo();
-            if let Some(code) = behavior.pbo_status {
-                reply(stream, &format!("{code} Error"), b"");
-            } else if behavior.slow_pbo {
-                let _ = stream.write_all(
-                    b"HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 8193\r\n\r\n",
-                );
-                let _ = stream.write_all(&body[..1000]);
-                let _ = stream.flush();
-                thread::sleep(Duration::from_secs(40));
-            } else if behavior.short_pbo {
-                let head = "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 8193\r\n\r\n";
-                let _ = stream.write_all(head.as_bytes());
-                let _ = stream.write_all(&body[..4000]);
-                let _ = stream.flush();
-            } else {
-                if behavior.corrupt_pbo {
-                    let last = body.len() - 1;
-                    body[last] ^= 0xFF;
-                }
-                reply(stream, "200 OK", &body);
-            }
-        }
-        _ => reply(stream, "404 Not Found", b""),
-    }
-}
-
-fn serve() -> Server {
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = listener.local_addr().unwrap();
-    let stop = Arc::new(AtomicBool::new(false));
-    let behavior = Arc::new(Mutex::new(Behavior::default()));
-    let requests = Arc::new(Mutex::new(Vec::new()));
-    let (stop2, behavior2, requests2) = (stop.clone(), behavior.clone(), requests.clone());
-    thread::spawn(move || {
-        for incoming in listener.incoming() {
-            if stop2.load(Ordering::SeqCst) {
-                break;
-            }
-            let Ok(mut stream) = incoming else { continue };
-            let (behavior, requests) = (behavior2.clone(), requests2.clone());
-            thread::spawn(move || {
-                if let Some((target, headers)) = read_head(&mut stream) {
-                    requests.lock().unwrap().push((target.clone(), headers));
-                    let current = behavior.lock().unwrap().clone();
-                    handle(&mut stream, &target, &current);
-                }
-            });
-        }
-    });
-    Server {
-        addr,
-        stop,
-        behavior,
-        requests,
-    }
-}
-
-fn serve_tls() -> Server {
-    use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
-    let certified = rcgen::generate_simple_self_signed(vec!["127.0.0.1".to_owned()]).unwrap();
-    let key = PrivatePkcs8KeyDer::from(certified.signing_key.serialize_der());
-    let config = rustls::ServerConfig::builder_with_provider(Arc::new(
-        rustls::crypto::ring::default_provider(),
-    ))
-    .with_safe_default_protocol_versions()
-    .unwrap()
-    .with_no_client_auth()
-    .with_single_cert(
-        vec![CertificateDer::from(certified.cert.der().to_vec())],
-        PrivateKeyDer::from(key),
-    )
-    .unwrap();
-    let config = Arc::new(config);
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = listener.local_addr().unwrap();
-    let stop = Arc::new(AtomicBool::new(false));
-    let behavior = Arc::new(Mutex::new(Behavior::default()));
-    let requests = Arc::new(Mutex::new(Vec::new()));
-    let (stop2, requests2) = (stop.clone(), requests.clone());
-    thread::spawn(move || {
-        for incoming in listener.incoming() {
-            if stop2.load(Ordering::SeqCst) {
-                break;
-            }
-            let Ok(stream) = incoming else { continue };
-            let (config, requests) = (config.clone(), requests2.clone());
-            thread::spawn(move || {
-                let Ok(connection) = rustls::ServerConnection::new(config) else {
-                    return;
-                };
-                let mut tls = rustls::StreamOwned::new(connection, stream);
-                if let Some((target, headers)) = read_head(&mut tls) {
-                    requests.lock().unwrap().push((target.clone(), headers));
-                    handle(&mut tls, &target, &Behavior::default());
-                    tls.conn.send_close_notify();
-                    let _ = tls.flush();
-                }
-            });
-        }
-    });
-    Server {
-        addr,
-        stop,
-        behavior,
-        requests,
-    }
-}
+use armasync_testkit::{
+    BIKEY, Behavior, PBO, Server, ZIP, bikey, hang_up_server, pbo, serve, serve_tls,
+};
 
 // ---- helpers --------------------------------------------------------------------------------------------------
 
@@ -314,6 +97,10 @@ fn http_env(server: &Server) -> Env {
     env_for(&format!("http://{}/repo", server.addr), false)
 }
 
+/// Validation runs on platforms whose synchronisation is not released need the explicit override (no effect on
+/// Windows, where the flag is accepted and ignored).
+const UNRELEASED: &str = "--allow-unreleased-platform";
+
 fn sync(env: &Env, sub: &str, extra: &[&str]) -> Output {
     let mut args = vec![
         "sync",
@@ -325,6 +112,9 @@ fn sync(env: &Env, sub: &str, extra: &[&str]) -> Output {
         path(&env.config),
     ];
     args.extend_from_slice(extra);
+    if sub == "run" {
+        args.push(UNRELEASED);
+    }
     armasync(&args)
 }
 
@@ -340,6 +130,9 @@ fn sync_json(env: &Env, sub: &str, extra: &[&str]) -> (Output, serde_json::Value
         path(&env.config),
     ];
     args.extend_from_slice(extra);
+    if sub == "run" {
+        args.push(UNRELEASED);
+    }
     let out = armasync(&args);
     let value = serde_json::from_str(&text(&out.stdout)).unwrap_or(serde_json::Value::Null);
     (out, value)
@@ -378,24 +171,6 @@ fn no_temporary_files(env: &Env) {
             "temporary file left behind: {name}"
         );
     }
-}
-
-/// A server that owns its port for the whole test and closes every connection at once. (Binding a port, freeing it
-/// and then connecting is not deterministic: another test's server can be handed the same port in between.)
-fn hang_up_server() -> (SocketAddr, Arc<AtomicBool>) {
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = listener.local_addr().unwrap();
-    let stop = Arc::new(AtomicBool::new(false));
-    let stop2 = stop.clone();
-    thread::spawn(move || {
-        for incoming in listener.incoming() {
-            if stop2.load(Ordering::SeqCst) {
-                break;
-            }
-            drop(incoming);
-        }
-    });
-    (addr, stop)
 }
 
 // ---- tests ----------------------------------------------------------------------------------------------------
@@ -489,6 +264,7 @@ fn text_output_and_quiet_mode() {
         path(&env2.dest),
         "--config",
         path(&env2.config),
+        UNRELEASED,
     ]);
     assert_eq!(out.status.code(), Some(0));
     assert!(out.stdout.is_empty());
@@ -625,6 +401,7 @@ fn bad_arguments_are_usage_or_file_system_errors() {
         path(&missing),
         "--config",
         path(&env.config),
+        UNRELEASED,
     ]);
     assert_eq!(out.status.code(), Some(5));
     assert!(
@@ -783,6 +560,7 @@ fn spawn_run(env: &Env) -> Child {
         path(&env.dest),
         "--config",
         path(&env.config),
+        UNRELEASED,
     ])
     .stdout(Stdio::null())
     .stderr(Stdio::null())
@@ -835,6 +613,7 @@ fn a_second_run_is_refused_and_a_killed_run_leaves_the_old_file_and_is_recovered
         path(&env.dest),
         "--config",
         path(&env2.config),
+        UNRELEASED,
     ]);
     assert_eq!(
         recovery.status.code(),

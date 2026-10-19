@@ -13,11 +13,13 @@ publish.workspace = true
 armasync-core.workspace = true
 armasync-application.workspace = true
 armasync-adapters.workspace = true
+armasync-workflow.workspace = true
 eframe = "0.37.0"
 egui_extras = "0.37.0"
 
 [dev-dependencies]
 egui_kittest = "0.37.0"
+armasync-testkit.workspace = true
 
 [lints]
 workspace = true
