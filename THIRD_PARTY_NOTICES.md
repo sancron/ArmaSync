@@ -14,4 +14,8 @@
 | Alte Logos / SVGs / Installericons | `installer/assets/`, Icon-Ressourcen | Herkunft prüfen; unabhängig erstellte Lynxnode.it-Assets vorsehen. |
 | Arma 3, DLC/CDLC und externe Tools | Spieleintegration | Sachlich erforderliche Bezeichnungen erhalten; keine Markenrechte behaupten. |
 
+## Rust-Abhängigkeiten des HTTP-Adapters (MIG-030B, Stand 2026-10-19, Prüfung nach RQ-06; keine Rechtsberatung)
+
+Aufgenommen in `armasync-adapters`: `ureq` 3.4.2 mit `rustls` und `platform-verifier`, `sha1` 0.11.0. Normalbaum (aus `cargo tree`): `ureq`, `ureq-proto`, `http`, `httparse`, `base64`, `bytes`, `log`, `percent-encoding`, `once_cell`, `getrandom`, `itoa`, `cfg-if`, `rustls-pki-types`, `rustls-platform-verifier`, `utf8-zero`, `zeroize`, `windows-link`, `windows-sys`, `sha1`: **MIT OR Apache-2.0** (bzw. MIT); `rustls`: **Apache-2.0 OR ISC OR MIT**; `rustls-webpki`, `untrusted`: **ISC**; `subtle`: **BSD-3-Clause**; **`ring` 0.17: Apache-2.0 AND ISC** (beide Lizenztexte beilegen; enthält C/Assembler); **`webpki-roots` 1.0: CDLA-Permissive-2.0** (Mozilla-Wurzelzertifikatsdaten, im Baum, aber vom Client nicht zur Prüfung genutzt, solange der Plattformverifier gewählt ist; Notice trotzdem beilegen). Nur Tests (nicht ausgeliefert): `rcgen` (MIT OR Apache-2.0) mit `time`, `yasna`, `pem`. Die vollständige Release-BOM (alle Pakete, Texte, Systembestandteile) steht noch aus (RQ-06 bleibt offen).
+
 Neue Übernahmen erhalten Original-Commit/URL, Lizenz, Rechtebeleg, Zielpfad und Prüfdatum. Vor Rust-Release vollständigen Bericht aus Cargo.lock und ausgelieferten Assets/Systembestandteilen erzeugen. Die Java-Credits stimmen nicht vollständig mit Gradle überein und sind keine verlässliche Abhängigkeitsinventur.

@@ -9,7 +9,7 @@ Stand: 2026-10-18, geführt vom Integrator. Quelle und Belege: [RIGHTS_INVENTORY
 | RQ-03 | JTattoo, junique (kein Lizenzbeleg im JAR), jshortcut (LICENSE prüfen): Herkunft und Weitergaberechte | offen | Integrator / Paketierer | Weitergabe der Java-Altversion mit diesen JARs; Rust-Ersatz für Look-and-Feel, Single-Instance, Shortcuts (F17) darf sie nicht übernehmen |
 | RQ-04 | Herkunft/Rechte der alten App-/Installer-Icons und der SVG-Icons | offen | Branding-Verantwortlicher | Wiederverwendung dieser Grafiken in GUI, Installer, Paketen; bis dahin eigene Lynxnode.it-Assets |
 | RQ-05 | Sardine-5.12-Lizenznachweis (keine Lizenzdatei im JAR) | offen | Integrator | Release-BOM der Java-Altversion; kein Einfluss auf Rust (WebDAV wird neu implementiert) |
-| RQ-06 | Rust-Crates noch nicht gewählt: Lizenz-/Notice-Inventar | offen | Rust-Architekt / Integrator | Aufnahme jeder Abhängigkeit in `Cargo.toml` ohne Lizenzprüfung; erste Release-BOM |
+| RQ-06 | Rust-Crates noch nicht gewählt: Lizenz-/Notice-Inventar | **teilweise bearbeitet** (2026-10-19): Lizenzprüfung der Abhängigkeiten des HTTP-Adapters in `THIRD_PARTY_NOTICES.md`; Release-BOM und Notice-Texte offen, nicht geschlossen | Rust-Architekt / Integrator | Aufnahme jeder Abhängigkeit in `Cargo.toml` ohne Lizenzprüfung; erste Release-BOM |
 | RQ-07 | Winget-Metadaten und NSIS-/Bootstrapper-Copyrights für neue Publisher-Identität | offen | Release-Verantwortlicher | Veröffentlichung neuer Pakete/Installer (P6) |
 | RQ-08 | `LICENCE.md` ist GPLv3-Volltext: GPL-3.0-only oder -or-later für Bestandsquellen? | offen | Projektverantwortlicher / Rechtsberatung | SPDX-Zuordnung portierter Module; Umgang mit Bestandsheadern |
 

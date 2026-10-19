@@ -10,6 +10,7 @@
 
 pub mod credentials;
 mod fsutil;
+pub mod http;
 pub mod import;
 pub mod memory;
 pub mod paths;
