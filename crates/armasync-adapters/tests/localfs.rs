@@ -38,6 +38,9 @@ fn names(root: &Path) -> Vec<String> {
         for entry in fs::read_dir(dir).unwrap() {
             let entry = entry.unwrap();
             let name = format!("{prefix}{}", entry.file_name().to_string_lossy());
+            if name == ".armasync-lock" {
+                continue;
+            }
             if entry.path().is_dir() {
                 walk(&entry.path(), &format!("{name}/"), out);
             } else {
@@ -107,7 +110,7 @@ fn scan_is_cancellable() {
 #[test]
 fn staging_creates_parents_and_commits_the_exact_content() {
     let root = scratch("commit");
-    let mut store = LocalDirectory::new(&root).unwrap();
+    let mut store = LocalDirectory::open_exclusive(&root).unwrap();
     let mut staged = store.begin(&path("@m/addons/new.pbo"), 6).unwrap();
     staged.write_all(b"abc").unwrap();
     staged.write_all(b"def").unwrap();
@@ -125,7 +128,7 @@ fn staging_creates_parents_and_commits_the_exact_content() {
 fn the_target_keeps_its_old_content_until_commit_and_is_replaced_atomically() {
     let root = scratch("replace");
     put(&root, "a.pbo", b"old content");
-    let mut store = LocalDirectory::new(&root).unwrap();
+    let mut store = LocalDirectory::open_exclusive(&root).unwrap();
     {
         let mut staged = store.begin(&path("a.pbo"), 3).unwrap();
         staged.write_all(b"new").unwrap();
@@ -149,7 +152,7 @@ fn the_target_keeps_its_old_content_until_commit_and_is_replaced_atomically() {
 fn staging_files_are_invisible_to_the_scan_and_dropping_removes_them() {
     let root = scratch("drop");
     put(&root, "a.pbo", b"old");
-    let mut store = LocalDirectory::new(&root).unwrap();
+    let mut store = LocalDirectory::open_exclusive(&root).unwrap();
     {
         let mut staged = store.begin(&path("a.pbo"), 5).unwrap();
         staged.write_all(b"partial").unwrap();
@@ -191,7 +194,7 @@ fn stale_leftovers_are_removed_by_a_scan_but_fresh_ones_are_not() {
 #[test]
 fn reserved_staging_names_cannot_be_repository_files() {
     let root = scratch("reserved");
-    let mut store = LocalDirectory::new(&root).unwrap();
+    let mut store = LocalDirectory::open_exclusive(&root).unwrap();
     let error = store
         .begin(&path("@m/.armasync-evil.tmp"), 1)
         .map(|_| ())
@@ -207,7 +210,7 @@ fn only_regular_files_are_replaced_or_deleted() {
     fs::create_dir_all(root.join("dir.pbo")).unwrap();
     put(&root, "file.pbo", b"f");
     put(&root, "parentfile", b"p");
-    let mut store = LocalDirectory::new(&root).unwrap();
+    let mut store = LocalDirectory::open_exclusive(&root).unwrap();
     // a folder where a file is expected
     assert_eq!(
         store
@@ -262,7 +265,7 @@ fn the_destination_must_be_an_existing_folder() {
 #[test]
 fn error_messages_name_the_relative_path_but_not_the_location() {
     let root = scratch("messages");
-    let mut store = LocalDirectory::new(&root).unwrap();
+    let mut store = LocalDirectory::open_exclusive(&root).unwrap();
     let error = store.delete(&path("nothing/here.pbo")).unwrap_err();
     assert!(error.message().contains("nothing/here.pbo"), "{error}");
     assert!(
@@ -300,7 +303,7 @@ fn links_never_lead_out_of_the_destination() {
         "the test needs to create a link"
     );
     put(&root, "real.pbo", b"real");
-    let mut store = LocalDirectory::new(&root).unwrap();
+    let mut store = LocalDirectory::open_exclusive(&root).unwrap();
     // the scan does not descend into the link
     let listed = list(&store, HashAlgorithm::Sha1);
     assert_eq!(
@@ -375,7 +378,7 @@ fn a_locked_target_fails_the_commit_and_keeps_the_old_file() {
     use std::os::windows::fs::OpenOptionsExt;
     let root = scratch("locked");
     put(&root, "a.pbo", b"old");
-    let mut store = LocalDirectory::new(&root).unwrap();
+    let mut store = LocalDirectory::open_exclusive(&root).unwrap();
     // another program holds the file open without sharing
     let lock = File::options()
         .read(true)
@@ -418,7 +421,7 @@ fn unusual_names_are_not_listed_and_so_never_touched() {
 #[test]
 fn write_is_a_staged_commit_for_small_files() {
     let root = scratch("write");
-    let mut store = LocalDirectory::new(&root).unwrap();
+    let mut store = LocalDirectory::open_exclusive(&root).unwrap();
     store.write(&path("a/b.pbo"), b"data").unwrap();
     store.write(&path("a/b.pbo"), b"newer").unwrap();
     assert_eq!(fs::read(root.join("a/b.pbo")).unwrap(), b"newer");

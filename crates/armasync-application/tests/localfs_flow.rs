@@ -37,6 +37,9 @@ fn files(root: &Path) -> Vec<String> {
         for entry in fs::read_dir(dir).unwrap() {
             let entry = entry.unwrap();
             let name = format!("{prefix}{}", entry.file_name().to_string_lossy());
+            if name == ".armasync-lock" {
+                continue;
+            }
             if entry.path().is_dir() {
                 walk(&entry.path(), &format!("{name}/"), out);
             } else {
@@ -57,7 +60,7 @@ fn sync(
     cancel: &CancelToken,
     sink: &mut MemoryEventSink,
 ) -> Result<armasync_application::sync::ApplyReport, Error> {
-    let mut store = LocalDirectory::new(root).unwrap();
+    let mut store = LocalDirectory::open_exclusive(root).unwrap();
     let planned = plan(source, &store, options).unwrap();
     let hasher = Sha256Hasher;
     let mut context = SyncContext {
@@ -246,7 +249,7 @@ fn cancellation_leaves_finished_files_in_place_and_nothing_partial() {
         &[("a.pbo", b"small"), ("z.pbo", big.as_slice())],
     );
     fs::write(root.join("z.pbo"), b"old z").unwrap();
-    let mut store = LocalDirectory::new(&root).unwrap();
+    let mut store = LocalDirectory::open_exclusive(&root).unwrap();
     let planned = plan(&source, &store, &PlanOptions::default()).unwrap();
     let cancel = CancelToken::new();
     let mut sink = CancelAfter {
