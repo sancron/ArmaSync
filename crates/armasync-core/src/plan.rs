@@ -28,6 +28,11 @@ pub struct PlanOptions {
     pub delete_extra: bool,
     /// Directories (or files) whose extra content may be deleted. Extras elsewhere are always kept.
     pub managed_roots: Vec<RelativePath>,
+    /// Files and directories whose extra content is **never** deleted, even inside a managed root: hidden
+    /// folders of the server and files the server holds in a form this client cannot install yet (for example
+    /// compressed ones, whose uncompressed local copy is not in the manifest). Takes precedence over
+    /// `managed_roots`.
+    pub protected_paths: Vec<RelativePath>,
 }
 
 /// One planned action.
@@ -64,6 +69,8 @@ pub enum SyncStep {
 pub enum PlanWarning {
     /// An extra local file was kept although deletion was requested, because it is outside the managed roots.
     ExtraKeptOutsideManagedRoots(RelativePath),
+    /// An extra local file was kept although deletion was requested, because it lies in a protected path.
+    ExtraKeptProtected(RelativePath),
     /// A local file exists whose name differs from the manifest only by case; the manifest spelling is fetched.
     CaseMismatch {
         /// Local spelling.
@@ -172,6 +179,16 @@ pub fn plan_sync(manifest: &Manifest, local: &[LocalFile], options: &PlanOptions
         if case_variant {
             // Reported as CaseMismatch above; deleting it would race with the download on case-insensitive systems.
             summary.extra_untouched += 1;
+            continue;
+        }
+        if options.delete_extra
+            && options
+                .protected_paths
+                .iter()
+                .any(|protected| file.path.is_within(protected))
+        {
+            summary.extra_untouched += 1;
+            warnings.push(PlanWarning::ExtraKeptProtected(file.path.clone()));
             continue;
         }
         let managed = options
@@ -309,6 +326,7 @@ mod tests {
         let options = PlanOptions {
             delete_extra: true,
             managed_roots: vec![path("mods")],
+            ..PlanOptions::default()
         };
         let plan = plan_sync(&manifest(&[("mods/@x/new.pbo", 1, 'a')]), &local, &options);
         assert_eq!(
@@ -334,6 +352,7 @@ mod tests {
         let no_flag = PlanOptions {
             delete_extra: false,
             managed_roots: vec![path("mods")],
+            ..PlanOptions::default()
         };
         let plan = plan_sync(&manifest(&[("mods/@x/new.pbo", 1, 'a')]), &local, &no_flag);
         assert_eq!(plan.summary.delete_files, 0);
@@ -344,6 +363,7 @@ mod tests {
         let options = PlanOptions {
             delete_extra: true,
             managed_roots: vec![path("a")],
+            ..PlanOptions::default()
         };
         let plan = plan_sync(
             &manifest(&[("z/new.pbo", 1, 'a')]),
@@ -358,6 +378,7 @@ mod tests {
         let options = PlanOptions {
             delete_extra: true,
             managed_roots: vec![path("mods")],
+            ..PlanOptions::default()
         };
         let plan = plan_sync(
             &manifest(&[("mods/A.pbo", 1, 'a')]),

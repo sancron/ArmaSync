@@ -323,3 +323,19 @@ fn sha1_digest_matches_the_published_test_vectors() {
         "291e9a6c66994949b57ba5e650361e98fc36b1ba"
     );
 }
+
+#[test]
+fn plan_options_protect_hidden_and_unsupported_paths() {
+    let metadata =
+        read_sync_metadata(&fixture("small", "sync"), &fixture("small", "serverinfo")).unwrap();
+    let options = metadata.plan_options(true, vec![path("@example_core")]);
+    assert!(options.delete_extra);
+    assert_eq!(
+        options.protected_paths,
+        [
+            path("@example_core/addons/example_core.pbo.zip"),
+            path("@second")
+        ]
+    );
+    assert_eq!(options.managed_roots, [path("@example_core")]);
+}

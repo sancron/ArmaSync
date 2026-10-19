@@ -8,8 +8,8 @@ use std::collections::BTreeMap;
 use armasync_adapters::{InMemoryRepository, InMemoryStore, MemoryEventSink, Sha256Hasher};
 use armasync_application::sync::{ApplyReport, SyncContext, apply, plan};
 use armasync_core::{
-    CancelToken, EVENT_SCHEMA_VERSION, ErrorKind, EventSink, JobState, LocalStore, OperationEvent,
-    OperationId, PlanOptions, RelativePath, SyncStep,
+    CancelToken, EVENT_SCHEMA_VERSION, ErrorKind, EventSink, HashAlgorithm, JobState, LocalStore,
+    OperationEvent, OperationId, PlanOptions, RelativePath, SyncStep,
 };
 
 fn path(text: &str) -> RelativePath {
@@ -172,6 +172,7 @@ fn extra_files_survive_by_default_and_are_deleted_only_when_requested_inside_man
     let options = PlanOptions {
         delete_extra: true,
         managed_roots: vec![path("@cba")],
+        ..PlanOptions::default()
     };
     let planned = plan(&source, &store, &options).unwrap();
     assert!(planned.steps.iter().any(
@@ -394,7 +395,10 @@ fn cancel_in_the_middle_leaves_only_complete_files_and_a_cancelled_state() {
         1,
         "exactly the file completed before cancellation exists"
     );
-    for stored in store.list().unwrap() {
+    for stored in store
+        .list(HashAlgorithm::Sha256, &CancelToken::new())
+        .unwrap()
+    {
         let expected = source.manifest().unwrap();
         let entry = expected.get(&stored.path).unwrap();
         assert_eq!(stored.hash.as_ref(), Some(&entry.hash), "no partial file");

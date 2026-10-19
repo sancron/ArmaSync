@@ -15,8 +15,30 @@ use armasync_compat::{
     Limits, ServerInfo, SyncDirectory, SyncTree, parse_serverinfo, parse_sync_tree,
 };
 use armasync_core::{
-    ContentHash, Error, ErrorKind, FileEntry, HashAlgorithm, Manifest, RelativePath,
+    ContentHash, Error, ErrorKind, FileEntry, HashAlgorithm, Manifest, PlanOptions, RelativePath,
 };
+
+impl SyncMetadata {
+    /// Plan options for this repository: extra-file deletion as requested within `managed_roots`, **never** in the
+    /// protected folders or at the paths of files this version cannot install (they may exist locally in
+    /// uncompressed form). Always use these options (or equivalent protection) when `delete_extra` is on.
+    #[must_use]
+    pub fn plan_options(
+        &self,
+        delete_extra: bool,
+        managed_roots: Vec<RelativePath>,
+    ) -> PlanOptions {
+        let mut protected_paths = self.protected.clone();
+        protected_paths.extend(self.unsupported.iter().cloned());
+        protected_paths.sort();
+        protected_paths.dedup();
+        PlanOptions {
+            delete_extra,
+            managed_roots,
+            protected_paths,
+        }
+    }
+}
 
 /// Something the user should know about the published metadata. Names are shortened and stripped of control
 /// characters; they are never used as paths.

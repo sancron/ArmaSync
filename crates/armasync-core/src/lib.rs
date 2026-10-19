@@ -32,4 +32,7 @@ pub use model::{
 };
 pub use path::{PathError, RelativePath};
 pub use plan::{LocalFile, PlanOptions, PlanSummary, PlanWarning, SyncPlan, SyncStep, plan_sync};
-pub use port::{CancelToken, Hasher, LocalStore, RepositorySource};
+pub use port::{
+    CancelToken, Digest, Hasher, LocalStore, RepositorySource, StagedFile, TRANSFER_CHUNK,
+    copy_in_chunks,
+};
