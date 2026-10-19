@@ -2,7 +2,7 @@
 
 Zweck: Belege für das P1-GUI-/Accessibility-Gate ([ROADMAP](ROADMAP.md), [UI_REQUIREMENTS](UI_REQUIREMENTS.md)). **Stand: nicht ausgeführt.** Die Abschnitte B, C und D sind bewusst leer; erst ausgefüllte, mit Build-SHA und Datum versehene Protokolle auf **beiden** Systemen erfüllen das Gate. Dieses Dokument ändert nichts am Gate-Status.
 
-Gegenstand ist der Prototyp aus MIG-012 (`armasync-gui`, simulierte In-Memory-Daten). Keine Aussage über spätere Ansichten.
+Gegenstand sind (1) der Prototyp aus MIG-012 (Ansicht „Repository-Liste (Prototyp, simuliert)“, Abschnitte A–D) und (2) die **Synchronisationsansicht aus MIG-031** (Abschnitt F, echter Ablauf gegen einen lokalen Testserver). **Beide sind nicht durch NVDA, Orca oder eine Sichtprüfung geprüft; ausgefüllte Ergebnisspalten gibt es nicht.**
 
 ## A. Vorbereitung
 
@@ -55,6 +55,49 @@ Die Kontrastwerte sind berechnet (Tabelle in [GUI_PROTOTYPE_EVIDENCE](GUI_PROTOT
 3. 200 %: Tabellenkopf, Status und Dateizahl nicht abgeschnitten.
 4. Optional: Windows-Kontrastdesign bzw. erzwungene Farben; Reduzierte Bewegung. Ergebnis ehrlich als „nicht unterstützt“ oder „unterstützt“ eintragen (der Prototyp wertet beides nicht gezielt aus).
 5. Screenshot ablegen unter `docs/migration/gui-evidence/` mit Dateiname `<system>-<theme>-<skalierung>-<sha>.png`.
+
+## F. Synchronisationsansicht (MIG-031): NVDA-Schritte und Sichtprüfung
+
+**Stand: nicht ausgeführt.** Automatisiert belegt sind der AccessKit-Baum (Namen, Rollen, Zustände, Live-Region) und einmal die Bedienung über Windows UI Automation ([GUI_SYNC_EVIDENCE](GUI_SYNC_EVIDENCE.md)); **was NVDA tatsächlich ansagt, ist unbelegt.** Dieser Abschnitt ist die Anleitung für die manuelle Prüfung; die Ergebnisspalten bleiben leer, bis jemand sie wirklich ausfüllt. Ihr Ausfüllen allein erfüllt das P1-Gate nicht (siehe E).
+
+### F.1 Vorbereitung (Windows, NVDA)
+
+1. Build-SHA notieren (`git rev-parse HEAD`), `cargo build -p armasync-gui -p armasync-cli` und `cargo build -p armasync-testkit --example serve` (der Beispielserver liegt in `armasync-testkit`).
+2. Testserver starten: `target\debug\examples\serve.exe` (für Schritt F14: `serve.exe trickle`, die große Datei kommt dann langsam, etwa zwei Sekunden) – er schreibt die Adresse (`http://127.0.0.1:<port>/repo`) und läuft bis zum Beenden. Er liefert die synthetischen MIG-001-Metadaten, keine echten Daten.
+3. Testbibliothek anlegen: `import.json` mit dieser Adresse (siehe Beispiel in `crates/armasync-cli/tests/sync_e2e.rs`, Funktion `env_for`) und `armasync import import.json --apply --config "%APPDATA%\Lynxnode.it\ArmaSync"`. Ein leerer Zielordner, z. B. `C:\Temp\armasync-ziel`, wird angelegt.
+4. NVDA starten (Version notieren), Sprachanzeige zum Mitschreiben aktivieren, `target\debug\armasync-gui.exe` starten.
+
+### F.2 Ablauf (NVDA; je Schritt Ansage notieren)
+
+| Nr. | Schritt | Erwartete Ansage / erwartetes Verhalten | Ergebnis (ok / Befund) | Notiz |
+| --- | --- | --- | --- | --- |
+| F1 | Start | Ansicht „Synchronisation“ ist aktiv („Ansicht:“ mit den zwei Schaltflächen); Plattformhinweis „Plattform: Windows: … mit einem lokalen Testserver geprüft … noch nicht geprüft“ ist lesbar | | |
+| F2 | Status lesen | „Status: Bereit. Repository und Zielordner wählen.“ | | |
+| F3 | Tab zu „Repository:“ | „Repository:, Auswahlfeld, Example“ (bei genau einem Repository vorgewählt); Adresse wird als Text gelesen | | |
+| F4 | Tab zu „Zielordner (muss vorhanden sein):“, Pfad eintippen | „Zielordner (muss vorhanden sein):, Eingabefeld“; Eingabe wird angesagt | | |
+| F5 | Ohne Zielordner „Änderungen prüfen“ drücken (Test der Fehlermeldung) | Fehler „Fehler: Bitte den Zielordner angeben.“ steht neben dem Feld und wird angesagt (nicht nur als Tooltip) | | |
+| F6 | „Änderungen prüfen“ mit gültigem Ordner | Status wechselt zu „Änderungen werden geprüft.“, danach „Vorschau bereit: 2 neu, 0 ersetzen, 0 löschen.“ – **als Live-Region angesagt**, ohne den Fokus zu verschieben | | |
+| F7 | Vorschau lesen (Pfeiltasten/Lesemodus) | Überschrift „3. Vorschau“; Summenzeilen („Neu laden: 2 Dateien (8.0 KiB)“ …); Tabelle mit Aktion in Worten („Neu laden“) vor jedem Pfad; Hinweis zur komprimierten Datei; „Bleibt unverändert (2)“ als auf-/zuklappbare Schaltfläche | | |
+| F8 | „Synchronisieren“ ansteuern | „Synchronisieren, Schaltfläche“ (verfügbar erst nach der Vorschau); Enter löst aus | | |
+| F9 | Während der Übertragung | Phase und Fortschritt als Fortschrittsanzeige „n von m Dateien, … – Phase“; **keine Ansage-Flut** je Datei/Byte; „Abbrechen, Schaltfläche“ erreichbar | | |
+| F10 | Ergebnis | „Status: Abgeschlossen: 2 geladen, 0 ersetzt, 0 gelöscht.“ wird angesagt; Abschnitt „Ergebnis“ mit Zahlen und Hinweis zur Prüfsummenprüfung | | |
+| F11 | „Zurück zur Auswahl“, Löschen testen: im Zielordner eine zusätzliche Datei `@example_core\\addons\\extra.pbo` anlegen; Checkbox „Zusätzliche Dateien im Zielordner löschen“ einschalten | Checkbox mit Zustand „nicht aktiviert/aktiviert“; Feld „Löschen nur in diesen Ordnern (…)“ erscheint und wird erreichbar angekündigt | | |
+| F12 | Ordner `@example_core` eintragen, „Änderungen prüfen“ | Abschnitt „Löschungen bestätigen“; „Achtung: Diese 1 Dateien werden endgültig gelöscht:“ und die Dateiliste werden gelesen; „Synchronisieren“ ist **„nicht verfügbar“** mit Hinweis „Nicht möglich: Bitte zuerst die Löschungen bestätigen.“ | | |
+| F13 | Bestätigungs-Checkbox „Ich habe die 1 Löschungen geprüft …“ aktivieren, dann „Synchronisieren“ | Schaltfläche wird verfügbar; nach dem Lauf „… 1 gelöscht“; geschützte/komprimierte Dateien bleiben (im Dateisystem prüfen) | | |
+| F14 | Abbruch: den Testserver mit `serve.exe trickle` starten, die Synchronisation beginnen und sofort „Abbrechen“ wählen | „Abbruch angefordert: …“ wird angesagt, danach „Abgebrochen“ (nicht als Erfolg); Hinweis, dass vorhandene Dateien unverändert sind | | |
+| F15 | Fehlerfall: Testserver beenden, erneut „Änderungen prüfen“ | „Fehler bei „Example“:“, Ursache und nächster Schritt werden gelesen; Fokus bleibt bedienbar; „Zurück zur Auswahl“ erreichbar | | |
+| F16 | Skalierung „200 %“ | Alle Schritte F4–F13 bleiben ohne unzugängliches Abschneiden bedienbar; lange Pfade vollständig erreichbar | | |
+
+### F.3 Linux (Orca) – nur Plan
+
+Voraussetzung: Linux-Abschlussvalidierung (RB-03). Auf Linux ist die Synchronisation absichtlich gesperrt (RB-01): geprüft wird, dass der Banner „Eingeschränkt: Linux: die Synchronisation ist noch nicht freigegeben …“ gelesen wird, „Änderungen prüfen“ den Plan zeigt, „Synchronisieren“ **„nicht verfügbar“** ist mit „Nicht möglich: Auf diesem System ist das Synchronisieren noch nicht freigegeben.“ und nichts im Zielordner geändert wird. Die übrigen Schritte F1–F10 sinngemäß mit Orca; Befunde in Abschnitt C eintragen.
+
+### F.4 Sichtprüfung der Synchronisationsansicht (offen)
+
+1. Hell und Dunkel: Überschriften, Plattformhinweis, „Achtung“-Text (Fehlerfarbe, zusätzlich als Text), deaktivierte Schaltflächen und der Fokusring der Textfelder erkennbar; die Tabelle „Aktion/Datei/Größe“ lesbar; die Statusinformation steckt in Worten, nicht nur in Farbe.
+2. 1024×720 und 1920×1080 bei 100/150/200 %: kein Verschwinden von „Änderungen prüfen“, „Synchronisieren“, „Abbrechen“ und der Fehlermeldungen; vertikales Scrollen der Ansicht funktioniert (Tastatur: Bild ab/auf bzw. Tab).
+3. Lange Pfade/Namen in Vorschau und Löschliste: nicht unzugänglich abgeschnitten.
+4. Screenshots ablegen unter `docs/migration/gui-evidence/` (`sync-<system>-<theme>-<skalierung>-<sha>.png`), mit Build-SHA im Protokollkopf (Abschnitt C).
 
 ## E. Gate-Kriterien (Erinnerung)
 
