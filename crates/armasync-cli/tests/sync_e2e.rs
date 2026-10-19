@@ -632,3 +632,131 @@ fn a_second_run_is_refused_and_a_killed_run_leaves_the_old_file_and_is_recovered
     assert_eq!(read(&env, BIKEY), bikey());
     no_temporary_files(&env);
 }
+
+/// Sends the console interrupt to the process `pid`, which must have been started with its own hidden console and
+/// its own process group. A helper PowerShell attaches to that console, ignores the signal itself and generates
+/// `CTRL_BREAK_EVENT` for the group (the interrupt a console sends for Ctrl+Break; the process handles Ctrl+C and
+/// Ctrl+Break alike, and a Ctrl+C that was disabled by an ancestor process cannot be re-enabled by a test).
+#[cfg(windows)]
+fn send_ctrl_c(pid: u32, scratch: &Path) -> bool {
+    let script = scratch.join("ctrl_c.ps1");
+    fs::write(
+        &script,
+        format!(
+            r#"Add-Type -Namespace W -Name K -MemberDefinition '
+[DllImport("kernel32.dll", SetLastError=true)] public static extern bool FreeConsole();
+[DllImport("kernel32.dll", SetLastError=true)] public static extern bool AttachConsole(uint pid);
+[DllImport("kernel32.dll", SetLastError=true)] public static extern bool SetConsoleCtrlHandler(IntPtr h, bool add);
+[DllImport("kernel32.dll", SetLastError=true)] public static extern bool GenerateConsoleCtrlEvent(uint e, uint g);'
+[void][W.K]::FreeConsole()
+if (-not [W.K]::AttachConsole({pid})) {{ exit 2 }}
+[void][W.K]::SetConsoleCtrlHandler([IntPtr]::Zero, $true)
+if (-not [W.K]::GenerateConsoleCtrlEvent(1, {pid})) {{ exit 3 }}
+Start-Sleep -Milliseconds 300
+exit 0"#
+        ),
+    )
+    .unwrap();
+    Command::new("powershell")
+        .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"])
+        .arg(&script)
+        .output()
+        .is_ok_and(|o| o.status.success())
+}
+
+/// **Manual test** (`cargo test -p armasync-cli --test sync_e2e -- --ignored ctrl_c`). In the environment this project
+/// was developed in, console interrupts do not reach child processes (not even for `ping`), so the signal delivery
+/// could not be proven automatically; the decision logic is unit-tested (`interrupt.rs`) and the clean-stop path
+/// itself is tested through the cancellation token (workflow, GUI and application tests).
+///
+/// Ctrl+C stops a running synchronisation cleanly: exit code 130, the old file unchanged, no temporary file, the
+/// destination lock released so that the next run works.
+#[cfg(windows)]
+#[test]
+#[ignore = "needs a console in which Ctrl+Break reaches child processes; see the note above"]
+fn ctrl_c_stops_a_running_synchronisation_cleanly_with_exit_code_130() {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+    let server = serve();
+    server.behavior.lock().unwrap().very_slow_pbo = true;
+    let env = http_env(&server);
+    fs::create_dir_all(env.dest.join("@example_core/addons")).unwrap();
+    fs::write(env.dest.join(PBO), b"the old version").unwrap();
+    let stderr_file = env.root.join("stderr.txt");
+    let mut child = Command::new(env!("CARGO_BIN_EXE_armasync"))
+        .args(ov(&[
+            "sync",
+            "run",
+            "example",
+            "--destination",
+            path(&env.dest),
+            "--config",
+            path(&env.config),
+        ]))
+        .creation_flags(CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::from(fs::File::create(&stderr_file).unwrap()))
+        .spawn()
+        .unwrap();
+    wait_for(
+        || server.requested("example_core.pbo") > 0,
+        "the transfer to start",
+    );
+    thread::sleep(Duration::from_millis(300));
+    assert!(
+        send_ctrl_c(child.id(), &env.root),
+        "the helper must be able to send Ctrl+C"
+    );
+    let started = Instant::now();
+    let status = loop {
+        if let Some(status) = child.try_wait().unwrap() {
+            break status;
+        }
+        if started.elapsed() >= Duration::from_secs(15) {
+            let _ = child.kill();
+            panic!(
+                "the run did not stop after Ctrl+C; stderr: {}",
+                fs::read_to_string(&stderr_file).unwrap()
+            );
+        }
+        thread::sleep(Duration::from_millis(50));
+    };
+    assert_eq!(
+        status.code(),
+        Some(130),
+        "stderr: {}",
+        fs::read_to_string(&stderr_file).unwrap()
+    );
+    let stderr = fs::read_to_string(&stderr_file).unwrap();
+    assert!(
+        stderr.contains("Stopping after the current step"),
+        "{stderr}"
+    );
+    assert_eq!(read(&env, PBO), b"the old version");
+    assert_eq!(
+        files(&env.dest),
+        [PBO],
+        "no partial file and no temporary file"
+    );
+    // the lock is released: the next run (against a healthy server) succeeds
+    let healthy = serve();
+    let env2 = env_for(&format!("http://{}/repo", healthy.addr), false);
+    let recovery = armasync(&ov(&[
+        "sync",
+        "run",
+        "example",
+        "--destination",
+        path(&env.dest),
+        "--config",
+        path(&env2.config),
+    ]));
+    assert_eq!(
+        recovery.status.code(),
+        Some(0),
+        "{}",
+        text(&recovery.stderr)
+    );
+    assert_eq!(read(&env, PBO), pbo());
+}

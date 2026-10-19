@@ -67,6 +67,9 @@ pub struct Behavior {
     /// Send the PBO in 40 small pieces with 50 ms pauses (about two seconds): a transfer that is slow but keeps
     /// flowing, so cancellation can be observed between pieces.
     pub trickle_pbo: bool,
+    /// Like `trickle_pbo`, but 500 ms between the pieces (about twenty seconds): time enough to send Ctrl+C from a
+    /// helper process.
+    pub very_slow_pbo: bool,
 }
 
 /// Requests seen by a server: (target, lower-case headers).
@@ -156,7 +159,7 @@ fn handle(stream: &mut impl Write, target: &str, behavior: &Behavior) {
                 let _ = stream.write_all(&body[..1000]);
                 let _ = stream.flush();
                 thread::sleep(Duration::from_secs(40));
-            } else if behavior.trickle_pbo {
+            } else if behavior.trickle_pbo || behavior.very_slow_pbo {
                 let head = "HTTP/1.1 200 OK
 Connection: close
 Content-Length: 8193
@@ -168,7 +171,11 @@ Content-Length: 8193
                         break;
                     }
                     let _ = stream.flush();
-                    thread::sleep(Duration::from_millis(50));
+                    thread::sleep(Duration::from_millis(if behavior.very_slow_pbo {
+                        500
+                    } else {
+                        50
+                    }));
                 }
             } else if behavior.short_pbo {
                 let head = "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 8193\r\n\r\n";

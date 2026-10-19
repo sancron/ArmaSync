@@ -9,9 +9,11 @@ use std::ffi::OsString;
 use std::io::Write;
 use std::path::PathBuf;
 
+use armasync_core::CancelToken;
 use clap::{Args, Parser, Subcommand};
 
 mod import_cmd;
+pub mod interrupt;
 mod list_cmd;
 mod sync_cmd;
 
@@ -217,6 +219,21 @@ where
     I: IntoIterator<Item = T>,
     T: Into<OsString> + Clone,
 {
+    run_with_cancel(args, stdout, stderr, &CancelToken::new())
+}
+
+/// Like [`run`]; the running operation stops cleanly (exit status 130) when `cancel` is triggered (the binary ties
+/// it to Ctrl+C).
+pub fn run_with_cancel<I, T>(
+    args: I,
+    stdout: &mut dyn Write,
+    stderr: &mut dyn Write,
+    cancel: &CancelToken,
+) -> ExitStatus
+where
+    I: IntoIterator<Item = T>,
+    T: Into<OsString> + Clone,
+{
     let cli = match Cli::try_parse_from(args) {
         Ok(cli) => cli,
         Err(error) => {
@@ -271,7 +288,7 @@ where
                 allow_unreleased_platform,
                 config: options.config,
             };
-            sync_cmd::run(&args, cli.json, cli.quiet, stdout, stderr)
+            sync_cmd::run(&args, cli.json, cli.quiet, stdout, stderr, cancel)
         }
         Command::Profile(ProfileArgs {
             command: ProfileCommand::List(args),
