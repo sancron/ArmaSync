@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! `armasync import <file> [--apply] [--on-conflict keep-both|fail|replace] [--config <dir>]`.
+//! `armasync import <file>` (neutral import file, MIG-021) and `armasync repository import <autoconfig>` (a
+//! repository's published auto-configuration, MIG-022), both with
+//! `[--apply] [--on-conflict keep-both|fail|replace] [--config <dir>]`.
 //!
 //! Without `--apply` the command only shows what would happen (nothing is written, not even directories). The
 //! command never prompts. Results go to stdout (text or a versioned JSON envelope), diagnostics to stderr.
@@ -7,6 +9,7 @@
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+use armasync_adapters::import::notice::{Notice, scope_notices};
 use armasync_adapters::import::{Action, ImportPlan, Importer, OnConflict, Warning};
 use armasync_adapters::{DataRoots, PathMode};
 use armasync_core::{CancelToken, Error, ErrorKind};
@@ -14,9 +17,28 @@ use serde_json::{Value, json};
 
 use crate::{ExitStatus, JSON_SCHEMA_VERSION};
 
+/// What the file given on the command line is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SourceKind {
+    /// A neutral import file (`armasync.import`).
+    Neutral,
+    /// A repository's published auto-configuration file.
+    Autoconfig,
+}
+
+impl SourceKind {
+    const fn command(self) -> &'static str {
+        match self {
+            Self::Neutral => "import",
+            Self::Autoconfig => "repository-import",
+        }
+    }
+}
+
 /// Parsed arguments of the command.
 #[derive(Debug)]
 pub(crate) struct ImportArgs {
+    pub kind: SourceKind,
     pub file: PathBuf,
     pub apply: bool,
     pub on_conflict: OnConflict,
@@ -74,6 +96,14 @@ fn warning_text(warning: &Warning) -> String {
     }
 }
 
+fn notices_for(plan: &ImportPlan) -> Vec<Notice> {
+    let unresolved = plan
+        .warnings
+        .iter()
+        .any(|w| matches!(w, Warning::UnresolvedRepository { .. }));
+    scope_notices(&plan.source.format, &plan.notes, unresolved)
+}
+
 fn plan_json(plan: &ImportPlan) -> Value {
     let counts = plan.counts();
     json!({
@@ -97,6 +127,9 @@ fn plan_json(plan: &ImportPlan) -> Value {
         "warnings": plan.warnings.iter().map(warning_json).collect::<Vec<_>>(),
         "notes": plan.notes.iter().map(|n| json!({"code": n.code, "subject": n.subject, "count": n.count})).collect::<Vec<_>>(),
         "source": {"tool": plan.source.tool, "tool_version": plan.source.tool_version, "format": plan.source.format},
+        "scope_notices": notices_for(plan).iter().map(|n| json!({
+            "code": n.code, "severity": n.severity.name(), "text": n.en, "text_de": n.de,
+        })).collect::<Vec<_>>(),
     })
 }
 
@@ -151,11 +184,14 @@ fn plan_text(plan: &ImportPlan, out: &mut String) {
             .map(|s| format!(" '{s}'"))
             .unwrap_or_default();
         let count = note.count.map(|c| format!(" ({c})")).unwrap_or_default();
-        let _ = writeln!(
-            out,
-            "  note from the exporter: {}{subject}{count}",
-            note.code
-        );
+        let _ = writeln!(out, "  note from the source: {}{subject}{count}", note.code);
+    }
+    let notices = notices_for(plan);
+    if !notices.is_empty() {
+        let _ = writeln!(out, "What this import covers:");
+        for notice in notices {
+            let _ = writeln!(out, "  - {}", notice.en);
+        }
     }
     let replaced = plan
         .repositories
@@ -182,6 +218,7 @@ fn config_dir(config: Option<&Path>) -> Result<PathBuf, Error> {
 }
 
 fn fail(
+    command: &str,
     error: &Error,
     json_output: bool,
     stdout: &mut dyn Write,
@@ -190,7 +227,7 @@ fn fail(
     let _ = writeln!(stderr, "error: {error}");
     if json_output {
         let envelope = json!({
-            "schema_version": JSON_SCHEMA_VERSION, "command": "import", "operation_id": Value::Null,
+            "schema_version": JSON_SCHEMA_VERSION, "command": command, "operation_id": Value::Null,
             "status": "error", "error": {"kind": error.kind().code(), "message": error.message()},
         });
         let _ = writeln!(stdout, "{envelope}");
@@ -207,13 +244,19 @@ pub(crate) fn run(
 ) -> ExitStatus {
     let config = match config_dir(args.config.as_deref()) {
         Ok(dir) => dir,
-        Err(error) => return fail(&error, json_output, stdout, stderr),
+        Err(error) => return fail(args.kind.command(), &error, json_output, stdout, stderr),
     };
     let importer = Importer::new(config);
     // Ctrl-C is not wired yet; the token keeps the cancellation path of the library in use.
     let cancel = CancelToken::new();
     let result = if args.apply {
-        importer.apply(&args.file, args.on_conflict, &cancel).map(|outcome| {
+        let applied = match args.kind {
+            SourceKind::Neutral => importer.apply(&args.file, args.on_conflict, &cancel),
+            SourceKind::Autoconfig => {
+                importer.apply_autoconfig(&args.file, args.on_conflict, &cancel)
+            }
+        };
+        applied.map(|outcome| {
             let extra = json!({
                 "mode": "apply",
                 "changed": outcome.changed,
@@ -223,24 +266,26 @@ pub(crate) fn run(
             (outcome.plan, outcome.source_sha256, false, extra, outcome.changed, outcome.backup, outcome.journal_warning)
         })
     } else {
-        importer
-            .preview(&args.file, args.on_conflict)
-            .map(|preview| {
-                let extra = json!({"mode": "preview", "changed": false});
-                (
-                    preview.plan,
-                    preview.source_sha256,
-                    preview.already_imported,
-                    extra,
-                    false,
-                    None,
-                    None,
-                )
-            })
+        let previewed = match args.kind {
+            SourceKind::Neutral => importer.preview(&args.file, args.on_conflict),
+            SourceKind::Autoconfig => importer.preview_autoconfig(&args.file, args.on_conflict),
+        };
+        previewed.map(|preview| {
+            let extra = json!({"mode": "preview", "changed": false});
+            (
+                preview.plan,
+                preview.source_sha256,
+                preview.already_imported,
+                extra,
+                false,
+                None,
+                None,
+            )
+        })
     };
     let (plan, sha, already, extra, changed, backup, journal_warning) = match result {
         Ok(value) => value,
-        Err(error) => return fail(&error, json_output, stdout, stderr),
+        Err(error) => return fail(args.kind.command(), &error, json_output, stdout, stderr),
     };
     if let Some(warning) = &journal_warning {
         let _ = writeln!(
@@ -262,7 +307,7 @@ pub(crate) fn run(
             stdout,
             "{}",
             json!({
-                "schema_version": JSON_SCHEMA_VERSION, "command": "import", "operation_id": Value::Null,
+                "schema_version": JSON_SCHEMA_VERSION, "command": args.kind.command(), "operation_id": Value::Null,
                 "status": "ok", "result": result,
             })
         )

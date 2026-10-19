@@ -3,7 +3,7 @@
 //!
 //! Contract: `docs/migration/CLI_CONTRACT.md`. Structured results go to stdout, diagnostics to stderr, and the
 //! process never waits for input (`--no-input` is accepted for forward compatibility; there is no prompt yet).
-//! `version` and `import` exist so far; synchronisation commands are added with the use cases in later tasks.
+//! `version`, `import` and `repository import` exist so far; synchronisation commands are added with the use cases in later tasks.
 
 use std::ffi::OsString;
 use std::io::Write;
@@ -85,11 +85,28 @@ enum Command {
     Version,
     /// Import repositories and profiles from a neutral import file (preview unless --apply is given).
     Import(ImportArgs),
+    /// Work with repositories.
+    Repository(RepositoryArgs),
+}
+
+#[derive(Debug, Args)]
+struct RepositoryArgs {
+    #[command(subcommand)]
+    command: RepositoryCommand,
+}
+
+#[derive(Debug, Subcommand)]
+enum RepositoryCommand {
+    /// Import a repository from the settings its server publishes (`.a3s/autoconfig`). Reads only a local file
+    /// (no download), only the name and address, never passwords; preview unless --apply is given. This does not
+    /// replace your own repository files and imports no settings or addon lists.
+    Import(ImportArgs),
 }
 
 #[derive(Debug, Args)]
 struct ImportArgs {
-    /// The neutral import file (`armasync.import`).
+    /// The file to import: a neutral import file (`armasync.import`) for `import`, a repository's
+    /// `.a3s/autoconfig` file for `repository import`.
     file: PathBuf,
     /// Write the changes. Without this flag the command only shows what would happen.
     #[arg(long)]
@@ -125,17 +142,44 @@ where
     let _ = cli.no_input;
     match cli.command {
         Command::Version => version(cli.json, cli.quiet, stdout),
-        Command::Import(args) => {
-            let args = import_cmd::ImportArgs {
-                file: args.file,
-                apply: args.apply,
-                on_conflict: armasync_adapters::import::OnConflict::from_name(&args.on_conflict)
-                    .unwrap_or_default(),
-                config: args.config,
-            };
-            import_cmd::run(&args, cli.json, cli.quiet, stdout, stderr)
-        }
+        Command::Import(args) => run_import(
+            import_cmd::SourceKind::Neutral,
+            args,
+            cli.json,
+            cli.quiet,
+            stdout,
+            stderr,
+        ),
+        Command::Repository(RepositoryArgs {
+            command: RepositoryCommand::Import(args),
+        }) => run_import(
+            import_cmd::SourceKind::Autoconfig,
+            args,
+            cli.json,
+            cli.quiet,
+            stdout,
+            stderr,
+        ),
     }
+}
+
+fn run_import(
+    kind: import_cmd::SourceKind,
+    args: ImportArgs,
+    json: bool,
+    quiet: bool,
+    stdout: &mut dyn Write,
+    stderr: &mut dyn Write,
+) -> ExitStatus {
+    let args = import_cmd::ImportArgs {
+        kind,
+        file: args.file,
+        apply: args.apply,
+        on_conflict: armasync_adapters::import::OnConflict::from_name(&args.on_conflict)
+            .unwrap_or_default(),
+        config: args.config,
+    };
+    import_cmd::run(&args, json, quiet, stdout, stderr)
 }
 
 fn version(json: bool, quiet: bool, stdout: &mut dyn Write) -> ExitStatus {

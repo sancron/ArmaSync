@@ -216,7 +216,9 @@ dependencies = [
 name = "armasync-adapters"
 version = "0.0.0"
 dependencies = [
+ "armasync-compat",
  "armasync-core",
+ "flate2",
  "serde",
  "serde_json",
  "sha2",
@@ -240,6 +242,13 @@ dependencies = [
  "armasync-core",
  "clap",
  "serde_json",
+]
+
+[[package]]
+name = "armasync-compat"
+version = "0.0.0"
+dependencies = [
+ "flate2",
 ]
 
 [[package]]

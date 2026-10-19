@@ -7,7 +7,9 @@
 //! A damaged existing library is never overwritten. Nothing here handles secrets.
 
 pub mod document;
+pub mod notice;
 pub mod plan;
+pub mod server;
 
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
@@ -142,14 +144,28 @@ impl Importer {
     /// library; [`ErrorKind::Config`] for a collision under [`OnConflict::Fail`]; [`ErrorKind::FileSystem`].
     pub fn preview(&self, source: &Path, policy: OnConflict) -> Result<Preview, Error> {
         let (document, hash) = Self::read_source(source)?;
+        self.preview_document(&document, &hash, policy)
+    }
+
+    /// Plans importing an already validated `document` (whose file has the SHA-256 `source_sha256`) without
+    /// writing anything.
+    ///
+    /// # Errors
+    /// As [`Importer::preview`], without the file-related cases.
+    pub fn preview_document(
+        &self,
+        document: &ImportDocument,
+        source_sha256: &str,
+        policy: OnConflict,
+    ) -> Result<Preview, Error> {
         let existing = self.library_store().load()?;
-        let plan = plan_import(&existing, &document, policy, &CancelToken::new())?;
+        let plan = plan_import(&existing, document, policy, &CancelToken::new())?;
         let already_imported = self
             .read_journal()
-            .is_ok_and(|entries| entries.iter().any(|e| e.source_sha256 == hash));
+            .is_ok_and(|entries| entries.iter().any(|e| e.source_sha256 == source_sha256));
         Ok(Preview {
             plan,
-            source_sha256: hash,
+            source_sha256: source_sha256.to_owned(),
             already_imported,
         })
     }
@@ -168,9 +184,60 @@ impl Importer {
         cancel: &CancelToken,
     ) -> Result<Outcome, Error> {
         let (document, hash) = Self::read_source(source)?;
+        self.apply_document(&document, &hash, policy, cancel)
+    }
+
+    /// Like [`Importer::preview`] for a repository's published auto-configuration file (`.a3s/autoconfig`, see
+    /// [`server`]).
+    ///
+    /// # Errors
+    /// As [`Importer::preview`]; [`ErrorKind::Unsupported`] for a transport that is not a repository transport.
+    pub fn preview_autoconfig(&self, source: &Path, policy: OnConflict) -> Result<Preview, Error> {
+        let (document, hash) = Self::read_autoconfig(source)?;
+        self.preview_document(&document, &hash, policy)
+    }
+
+    /// Like [`Importer::apply`] for a repository's published auto-configuration file.
+    ///
+    /// # Errors
+    /// As [`Importer::apply`]; [`ErrorKind::Unsupported`] for a transport that is not a repository transport.
+    pub fn apply_autoconfig(
+        &self,
+        source: &Path,
+        policy: OnConflict,
+        cancel: &CancelToken,
+    ) -> Result<Outcome, Error> {
+        let (document, hash) = Self::read_autoconfig(source)?;
+        self.apply_document(&document, &hash, policy, cancel)
+    }
+
+    fn read_autoconfig(source: &Path) -> Result<(ImportDocument, String), Error> {
+        let bytes = read_limited(source, server::MAX_AUTOCONFIG_BYTES)?.ok_or_else(|| {
+            Error::new(
+                ErrorKind::Usage,
+                format!("the file '{}' does not exist", source.display()),
+            )
+        })?;
+        let hash = sha256_hex(&bytes);
+        Ok((server::document_from_autoconfig(source, &bytes)?, hash))
+    }
+
+    /// Imports an already validated `document` (whose file has the SHA-256 `source_sha256`); see
+    /// [`Importer::apply`].
+    ///
+    /// # Errors
+    /// As [`Importer::apply`], without the file-related cases.
+    pub fn apply_document(
+        &self,
+        document: &ImportDocument,
+        source_sha256: &str,
+        policy: OnConflict,
+        cancel: &CancelToken,
+    ) -> Result<Outcome, Error> {
+        let hash = source_sha256.to_owned();
         let store = self.library_store();
         let existing = store.load()?;
-        let plan = plan_import(&existing, &document, policy, cancel)?;
+        let plan = plan_import(&existing, document, policy, cancel)?;
         if !plan.changes_library() {
             return Ok(Outcome {
                 plan,

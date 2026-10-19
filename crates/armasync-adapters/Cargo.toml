@@ -10,10 +10,14 @@ publish.workspace = true
 
 [dependencies]
 armasync-core.workspace = true
+armasync-compat.workspace = true
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 sha2 = "0.11.0"
 toml = "1.1.8"
+
+[dev-dependencies]
+flate2 = { version = "1.1.10", default-features = false, features = ["rust_backend"] }
 
 [lints]
 workspace = true

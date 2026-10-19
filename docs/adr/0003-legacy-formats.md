@@ -16,6 +16,10 @@ Nicht gewählt: globales Package-Replacement; unbeschränkte Deserialisierung; J
 
 Der lokale Weg ist umgesetzt: Offline-Exporter (nur lesend, unverschlüsselte Dateien) → neutrales `armasync.import` → Rust-Import ([IMPORT_SCHEMA](../migration/IMPORT_SCHEMA.md)). **Nicht entschieden und nicht umgesetzt:** das Entschlüsseln der `.a3s.repository`-Dateien (Rust-Konstante aus dem Altquelltext oder einmaliger JVM-Export, siehe FORMAT_INVENTORY Abschnitt 7) – abhängig von der Herkunfts-/Rechtefrage RQ-01. Der Exporter listet diese Dateien nur als übersprungen.
 
+## Stand nach MIG-022 (2026-10-19)
+
+Der begrenzte Leser für Server-Metadaten ist für `.a3s/autoconfig` umgesetzt (`armasync-compat`, [SERVER_METADATA_IMPORT](../migration/SERVER_METADATA_IMPORT.md)): ohne JVM, ohne Klassenladen, mit Grenzen, Tabelle bekannter Wire-Deskriptoren und ohne Geheimnisse. Er liest nur Name und Adresse eines Repositorys. **Nicht entschieden und nicht gelöst:** das Entschlüsseln der lokalen `.a3s.repository`-Dateien (weiterhin RQ-01), Einstellungen und Addon-Listen. MIG-022 ist keine Lösung dafür. Lesen von `serverinfo`/`sync`/`changelogs`/`events` folgt mit dem Sync (ab MIG-030).
+
 ## Offene Schreibentscheidung
 
 Vor P4-Repository-Publisher verbindlich wählen: (A) legacy-kompatible Ausgabe mit Gegentests in Java oder (B) neues Manifestformat mit versioniertem Servercutover, Export und ausdrücklich erklärten Clientgrenzen. Lesekompatibilität allein beweist keine Schreibkompatibilität.
