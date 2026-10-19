@@ -17,6 +17,8 @@ Aktueller Batch: Integrator **Claude**. Rollenregel: Claude ist Standard-Hauptbe
 | MIG-012A | GUI-Nachbesserung: Kontrast Auswahlfläche, Screenreader-Prüfprotokoll | Claude (`claude/mig-012a-contrast`) | integriert (Merge `9577b58`, gepusht); P1-Gate bleibt offen | MIG-012 |
 | MIG-020 | Datenmodell, Stores, Pfade, Credentials | Claude (`claude/mig-020-data-store`) | integriert (Merge `83e8ebe`, gepusht); Schlüsselbund-Adapter offen (ADR-0005) | MIG-011 |
 | MIG-021 | Offline-Export und neutraler Import lokaler Altdaten | Claude (`claude/mig-021-import`) | integriert (Merge `814720a`, gepusht 2026-10-18); verschlüsselte Repositorydateien nicht importiert (ADR-0003/RQ-01 offen) | MIG-020 |
+| MIG-030 | Scan/Plan/HTTP(S)/atomare Installation (Dachtask, zerlegt in A–E) | Claude | Vorprüfung abgeschlossen ([ADR-0006](../adr/0006-sync-metadata-and-http-transport.md), [SYNC_METADATA](../migration/SYNC_METADATA.md)); Umsetzung in Teiltasks | MIG-023 |
+| MIG-030A | Sync-Metadaten-Leser, SHA-1 im Core, Manifest-Abbildung (kein Netzwerk/Dateisystem) | Claude (`claude/mig-030a-sync-metadata`) | in Arbeit | MIG-022 |
 | MIG-023 | CLI-Anzeige importierter Repositories und Profile (`repository list`, `profile list`) | Claude (`claude/mig-023-repository-list`) | integriert (Merge 738f035); CLI-Teil des P2-Gates | MIG-022 |
 | MIG-022 | Begrenzter Import von Server-Metadaten (`.a3s/autoconfig`), Umfangs-Hinweise | Claude (`claude/mig-022-server-metadata`) | integriert (Merge `0f2ee31`); nur Name/Adresse, kein Netzwerkabruf; löst weder Entschlüsselung noch Einstellungen/Addon-Listen | MIG-021 |
 
