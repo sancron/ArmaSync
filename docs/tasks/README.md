@@ -2,7 +2,7 @@
 
 Gemeinsamer Status nur durch den Integrator ändern. Vor parallelem Start Eigentümer, Basis-SHA und disjunkte Schreibbereiche in einzelnen Task-Dateien committen. Ein Plan ist keine Reservierung.
 
-Aktueller Batch: Integrator **Claude**. Rollenregel: Claude ist Standard-Hauptbearbeiter und Integrator, Codex Fallback (siehe [WORKFLOW](../ai/WORKFLOW.md)). MIG-001, MIG-002, MIG-003, MIG-010, MIG-011, MIG-012 (Prototyp), MIG-012A, MIG-013, MIG-020, MIG-021, MIG-022 und MIG-023 sind nach `development` integriert; bis MIG-020 ist `origin/development` @ `734a20b` (2026-10-18, auf Autorisierung des Projektverantwortlichen, CI grün) gepusht; `testing`/`master`/`legacy` unverändert. MIG-002/003 wurden am 2026-10-18 vom Projektverantwortlichen von Codex an Claude übertragen (Codex-Vorarbeit `760e20d`, `044e6aa` bleibt in der Historie; Details in den Taskdateien). Offene Rechtefragen: [RIGHTS_QUESTIONS.md](RIGHTS_QUESTIONS.md). MIG-010 und MIG-011 sind integriert.
+Aktueller Batch: Integrator **Claude**. Rollenregel: Claude ist Standard-Hauptbearbeiter und Integrator, Codex Fallback (siehe [WORKFLOW](../ai/WORKFLOW.md)). MIG-001, MIG-002, MIG-003, MIG-010, MIG-011, MIG-012 (Prototyp), MIG-012A, MIG-013, MIG-020 bis MIG-023 und MIG-030A sind nach `development` integriert; bis MIG-020 ist `origin/development` @ `734a20b` (2026-10-18, auf Autorisierung des Projektverantwortlichen, CI grün) gepusht; `testing`/`master`/`legacy` unverändert. MIG-002/003 wurden am 2026-10-18 vom Projektverantwortlichen von Codex an Claude übertragen (Codex-Vorarbeit `760e20d`, `044e6aa` bleibt in der Historie; Details in den Taskdateien). Offene Rechtefragen: [RIGHTS_QUESTIONS.md](RIGHTS_QUESTIONS.md). MIG-010 und MIG-011 sind integriert.
 
 | ID | Aufgabe | Eigentümer | Status | Voraussetzung |
 | --- | --- | --- | --- | --- |
@@ -18,7 +18,7 @@ Aktueller Batch: Integrator **Claude**. Rollenregel: Claude ist Standard-Hauptbe
 | MIG-020 | Datenmodell, Stores, Pfade, Credentials | Claude (`claude/mig-020-data-store`) | integriert (Merge `83e8ebe`, gepusht); Schlüsselbund-Adapter offen (ADR-0005) | MIG-011 |
 | MIG-021 | Offline-Export und neutraler Import lokaler Altdaten | Claude (`claude/mig-021-import`) | integriert (Merge `814720a`, gepusht 2026-10-18); verschlüsselte Repositorydateien nicht importiert (ADR-0003/RQ-01 offen) | MIG-020 |
 | MIG-030 | Scan/Plan/HTTP(S)/atomare Installation (Dachtask, zerlegt in A–E) | Claude | Vorprüfung abgeschlossen ([ADR-0006](../adr/0006-sync-metadata-and-http-transport.md), [SYNC_METADATA](../migration/SYNC_METADATA.md)); Umsetzung in Teiltasks | MIG-023 |
-| MIG-030A | Sync-Metadaten-Leser, SHA-1 im Core, Manifest-Abbildung (kein Netzwerk/Dateisystem) | Claude (`claude/mig-030a-sync-metadata`) | in Arbeit | MIG-022 |
+| MIG-030A | Sync-Metadaten-Leser, SHA-1 im Core, Manifest-Abbildung (kein Netzwerk/Dateisystem) | Claude (`claude/mig-030a-sync-metadata`) | integriert (Merge 460e4ac); es wird noch nichts Reales synchronisiert | MIG-022 |
 | MIG-023 | CLI-Anzeige importierter Repositories und Profile (`repository list`, `profile list`) | Claude (`claude/mig-023-repository-list`) | integriert (Merge 738f035); CLI-Teil des P2-Gates | MIG-022 |
 | MIG-022 | Begrenzter Import von Server-Metadaten (`.a3s/autoconfig`), Umfangs-Hinweise | Claude (`claude/mig-022-server-metadata`) | integriert (Merge `0f2ee31`); nur Name/Adresse, kein Netzwerkabruf; löst weder Entschlüsselung noch Einstellungen/Addon-Listen | MIG-021 |
 
