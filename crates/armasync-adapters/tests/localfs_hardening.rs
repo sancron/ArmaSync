@@ -239,8 +239,12 @@ mod windows_swap {
                 }
             })
         };
-        // Control: with nothing pinned the attacker does succeed, so the test is sensitive to the attack.
-        thread::sleep(Duration::from_millis(1500));
+        // Control: with nothing pinned the attacker does succeed, so the test is sensitive to the attack. Wait for
+        // the first successful swap (it needs a helper process, so allow time on a busy machine).
+        let waited = std::time::Instant::now();
+        while swaps.load(Ordering::SeqCst) == 0 && waited.elapsed() < Duration::from_secs(30) {
+            thread::sleep(Duration::from_millis(50));
+        }
         assert!(
             swaps.load(Ordering::SeqCst) > 0,
             "the attacker must be able to swap an unpinned folder"

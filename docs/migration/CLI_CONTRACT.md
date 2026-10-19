@@ -52,6 +52,15 @@ armasync profile list    [--config <dir>] [--json] [--quiet]
 
 Zeigen den Bestand aus `library.json` rein lesend (nichts wird geschrieben oder angelegt; fehlende Bibliothek = leer, beschädigte = Exitcode 7 ohne Änderung). Pro Repository `id`, `name`, `url`, `unencrypted`, `credentials_required` (nie Zugangsdaten), pro Profil `id`, `name`, `repositories` (geordnete IDs). JSON: `command` = `repository-list` bzw. `profile-list`. Damit ist der CLI-Teil des P2-Gates („importierte Repositories anzeigen“) erfüllt; die GUI-Anzeige folgt mit MIG-031.
 
+## Umgesetzt: `sync plan`, `sync run` (MIG-030D)
+
+```text
+armasync sync plan <repository-id> --destination <dir> [--delete-extra --managed-root <folder>...] [--config <dir>] [--json] [--quiet]
+armasync sync run  <repository-id> --destination <dir> [--dry-run] [--delete-extra --managed-root <folder>...] [--config <dir>] [--json] [--quiet]
+```
+
+Die Repository-ID stammt aus der Bibliothek (`repository list`); die Adresse ist `http` oder `https` (andere Schemata: Exitcode 8). `plan` und `run --dry-run` ändern nichts und öffnen das Ziel schreibgeschützt. `run` verlangt das **vorhandene** Zielverzeichnis, hält eine exklusive Sperre (ein zweiter Lauf: Exitcode 3), streamt jede Datei in eine Staging-Datei, prüft Größe und SHA-1 des Manifests und ersetzt das Ziel atomar; jeder Fehler lässt vorhandene Zieldateien unverändert. Löschen fremder Dateien nur mit `--delete-extra` **und** mindestens einem `--managed-root` (relativ zum Ziel); vom Repository geschützte Ordner und lokal vorhandene Kopien komprimiert geführter Dateien werden nie gelöscht. Es werden keine Zugangsdaten gesendet (Authentifizierung fehlt noch; ein Hinweis erscheint, wenn das Repository als „braucht Zugangsdaten“ markiert ist). Exitcodes: 0; 2 Aufruf; 3 zweiter Lauf; 4 Netzwerk/TLS/HTTP-Status; 5 Dateisystem; 6 Integrität (falscher Hash/Größe); 7 Metadaten; 8 nicht unterstütztes Schema. `--json`: `command` = `sync-plan`/`sync-run`; Ergebnis mit `mode` (`plan`, `dry-run`, `applied`), `summary`, `steps`, `warnings`, `metadata_warnings`, `unsupported_paths`, `protected_paths`, `report`. Ein Ctrl+C-Handler fehlt (Exitcode 130 reserviert); beendet man den Prozess, bleibt das Ziel unverändert und der nächste Lauf räumt Reste auf.
+
 ## Ausgabevertrag
 
 Menschenlesbare Fortschritte/Diagnosen nach stderr, strukturiertes Ergebnis nach stdout. `--json`: versionierter Ergebnis-Envelope mit `schema_version`, `operation_id`, `status`, `result` oder typisiertem `error`; niemals Secrets. Für lange Events optional separat dokumentiertes NDJSON-Format, nicht still mehrere JSON-Dokumente in eine Ausgabe mischen. Lokalisierte Meldungen dürfen stabile Fehlercodes nicht verändern.

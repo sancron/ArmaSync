@@ -306,6 +306,57 @@ impl HttpRepository {
     }
 }
 
+/// A repository together with **one** reading of its published metadata. Planning and applying work on this
+/// snapshot, so a command sees one consistent revision; every file is still verified against its checksum.
+#[derive(Debug)]
+pub struct HttpSnapshot<'a> {
+    repository: &'a HttpRepository,
+    metadata: SyncMetadata,
+}
+
+impl HttpRepository {
+    /// Reads the metadata once and returns the snapshot.
+    ///
+    /// # Errors
+    /// As [`HttpRepository::metadata`].
+    pub fn snapshot(&self) -> Result<HttpSnapshot<'_>, Error> {
+        Ok(HttpSnapshot {
+            repository: self,
+            metadata: self.metadata()?,
+        })
+    }
+}
+
+impl HttpSnapshot<'_> {
+    /// What was read: the manifest, warnings, protected and unsupported paths.
+    #[must_use]
+    pub fn metadata(&self) -> &SyncMetadata {
+        &self.metadata
+    }
+}
+
+impl RepositorySource for HttpSnapshot<'_> {
+    fn manifest(&self) -> Result<Manifest, Error> {
+        Ok(self.metadata.manifest.clone())
+    }
+
+    fn read(&self, path: &RelativePath) -> Result<Vec<u8>, Error> {
+        self.repository.read(path)
+    }
+
+    fn fetch(
+        &self,
+        path: &RelativePath,
+        expected_size: u64,
+        out: &mut dyn Write,
+        cancel: &CancelToken,
+        progress: &mut dyn FnMut(u64),
+    ) -> Result<u64, Error> {
+        self.repository
+            .fetch(path, expected_size, out, cancel, progress)
+    }
+}
+
 impl RepositorySource for HttpRepository {
     fn manifest(&self) -> Result<Manifest, Error> {
         Ok(self.metadata()?.manifest)

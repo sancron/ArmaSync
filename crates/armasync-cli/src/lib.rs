@@ -13,6 +13,7 @@ use clap::{Args, Parser, Subcommand};
 
 mod import_cmd;
 mod list_cmd;
+mod sync_cmd;
 
 /// Version of the JSON envelope schema.
 pub const JSON_SCHEMA_VERSION: u32 = 1;
@@ -90,6 +91,8 @@ enum Command {
     Repository(RepositoryArgs),
     /// Work with profiles.
     Profile(ProfileArgs),
+    /// Plan or run a synchronisation of a repository into a destination folder.
+    Sync(SyncCommandArgs),
 }
 
 #[derive(Debug, Args)]
@@ -108,6 +111,49 @@ struct ProfileArgs {
 enum ProfileCommand {
     /// List the profiles in the library (read-only).
     List(ListArgs),
+}
+
+#[derive(Debug, Args)]
+struct SyncCommandArgs {
+    #[command(subcommand)]
+    command: SyncCommand,
+}
+
+#[derive(Debug, Subcommand)]
+enum SyncCommand {
+    /// Show what a synchronisation would do. Changes nothing; opens the destination read-only.
+    Plan(SyncOptions),
+    /// Synchronise: download missing and changed files into the destination (verified, staged, atomic).
+    Run(SyncRunOptions),
+}
+
+#[derive(Debug, Args)]
+struct SyncOptions {
+    /// Id of a repository in the library (see `armasync repository list`).
+    repository: String,
+    /// The destination folder (must exist). Only one run at a time may use it.
+    #[arg(long, value_name = "DIR")]
+    destination: PathBuf,
+    /// Also delete local files the repository does not contain, but only inside the `--managed-root` folders and
+    /// never in folders the repository protects.
+    #[arg(long)]
+    delete_extra: bool,
+    /// A folder (relative to the destination) where extra files may be deleted; repeatable. Required with
+    /// `--delete-extra`.
+    #[arg(long, value_name = "FOLDER")]
+    managed_root: Vec<String>,
+    /// Config directory holding `library.json` (default: the platform's ArmaSync config directory).
+    #[arg(long, value_name = "DIR")]
+    config: Option<PathBuf>,
+}
+
+#[derive(Debug, Args)]
+struct SyncRunOptions {
+    #[command(flatten)]
+    options: SyncOptions,
+    /// Compute and show the plan only; change nothing.
+    #[arg(long)]
+    dry_run: bool,
 }
 
 #[derive(Debug, Args)]
@@ -184,6 +230,22 @@ where
             stdout,
             stderr,
         ),
+        Command::Sync(SyncCommandArgs { command }) => {
+            let (run, dry_run, options) = match command {
+                SyncCommand::Plan(options) => (false, false, options),
+                SyncCommand::Run(run_options) => (true, run_options.dry_run, run_options.options),
+            };
+            let args = sync_cmd::SyncArgs {
+                run,
+                repository: options.repository,
+                destination: options.destination,
+                delete_extra: options.delete_extra,
+                managed_roots: options.managed_root,
+                dry_run,
+                config: options.config,
+            };
+            sync_cmd::run(&args, cli.json, cli.quiet, stdout, stderr)
+        }
         Command::Profile(ProfileArgs {
             command: ProfileCommand::List(args),
         }) => list_cmd::run(
