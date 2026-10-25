@@ -1,0 +1,35 @@
+# MIG-042, Schritt 4c — Fortschritt pro Datei in CLI und GUI
+
+- Status: **integriert** (2026-10-25, Fast-Forward nach `development`, nach den finalen Windows-Prüfungen). Eigentümer und Integrator: Claude. Basis `4e2e134` (`origin/development`, Stand nach Schritt 4b). Branch `claude/mig-042-s4c-progress`.
+- Freigabe durch den Projektverantwortlichen für 4c, mit der Vorgabe, zuerst den Ereignisvertrag festzulegen (ADR-0016, eigener Commit vor der Implementierung).
+- Vorgaben, eingehalten:
+  - Ereignisse für Beginn und Ende je Datei, übertragene Bytes, Gesamtfortschritt, Abschluss, Abbruch und Fehler.
+  - Stabile, versionierte Ereignistypen (`upload.started`, `upload.file_started`, `upload.file_bytes`, `upload.file_finished`, `upload.finished`, `upload.cancelled`, `upload.failed`; Schemaversion 1) und eine monotone Sequenz je Vorgang.
+  - Zugangsdaten, absolute lokale Pfade und Adressen stehen nie in Ereignissen, in der CLI-Ausgabe oder in der GUI.
+  - Derselbe Ereigniskanal in CLI und GUI, über `armasync_workflow::upload::publish_observed`.
+  - GUI responsiv (Abfrage pro Bild, kein Warten im Fenster-Thread) und mit Text statt Farbe; die Fortschrittszeile ist keine Live-Region.
+  - CLI: Textmodus mit Zeilen auf stderr; JSON-Envelope, Exitcodes und `--quiet` unverändert.
+  - Abbruch über den vorhandenen `CancelToken`.
+  - Keine parallelen Uploads, kein Resume.
+  - Keine WSL-/Linux-Läufe, keine GitHub-Actions. `testing`, `master`, `legacy` unverändert.
+- Entscheidung: [ADR-0016](../adr/0016-upload-progress-events.md) (angenommen für 4c). ADR-0015 ist in dem Punkt überholt, der den fehlenden Fortschritt festschrieb.
+- Schreibbereich:
+  - `crates/armasync-core/src/upload_event.rs` (neu), `src/lib.rs`.
+  - `crates/armasync-application/src/progress.rs` (neu: Beobachter und Lese-Wrapper), `src/upload.rs` (`apply_observed`), `src/revision.rs` (`publish_observed`), `src/lib.rs`.
+  - `crates/armasync-workflow/src/upload.rs` (`publish_observed`), `tests/upload_progress.rs` (neu, 5 Tests).
+  - `crates/armasync-cli/src/upload_cmd.rs` (Thread, Ereignisempfang, Textzeilen), `tests/upload_process.rs` (+1 Test).
+  - `crates/armasync-gui/src/upload_screen.rs` (Ereignisse, `ProgressView`), `src/upload_ui.rs` (Fortschrittsleiste und Text), `tests/upload_screen.rs` (+1 Test).
+  - `docs/adr/0016-…`, `docs/adr/0015-…` (Hinweis), `docs/migration/CLI_CONTRACT.md` (Fortschritt), Taskdatei, Bericht, Handoff, Integratordokumente.
+- Ziele: Reihenfolge und Sequenz beweisen; Fortschrittswerte beweisen; Abbruch mitten in einer Datei; Fehler auf dem Ziel; Geheimnisfreiheit; CLI-Verträge unverändert.
+- Nicht im Scope: parallele Uploads; Resume; Fortschritt für Manifest, Zeiger, Verlauf und Rücklesen; Netzwerkmessung; Screenreader- und Sichtprüfung (bleiben separat offen, kein Nachweis behauptet); Legacy-Schreibformat; dauerhafte Zugangsdaten.
+- Abnahmekriterien und Prüfungen (Windows, Loopback über anonymes HTTP):
+  - Workflow `upload_progress` 5/5: Reihenfolge und Sequenz, Byte-Fortschritt je Datei streng steigend, Summen, Wiederholung nur Start und Ende, Abbruch mitten in der Datei mit einem Endereignis und ohne Zeiger, Fehler auf dem Ziel als `upload.failed` mit der Fehlerkategorie, Ablehnung vor dem Verbindungsaufbau als `started` plus `failed`, Geheimnisfreiheit über die Debug-Ausgabe aller Ereignisse.
+  - CLI `upload_process` 6/6, davon neu: Textmodus mit genau vier Zeilen auf stderr in Planreihenfolge; JSON-Modus bleibt ohne stderr (bestehender Test).
+  - GUI `upload_screen` 9/9, davon neu: Fortschritt während des Laufs (Bytes, aktuelle Datei), monoton, Verschwinden nach dem Ergebnis.
+  - Core: Ereignisnamen stabil, Endereignisse markiert.
+  - fmt, Clippy `-D warnings`, Workspace-Test (64 Suiten), MSRV 1.85 ohne GUI (56 Suiten), Markdown-Links, `git diff --check`.
+- Blocker und offene Punkte:
+  - Kein Lesegerät (NVDA, Narrator, Orca, JAWS) geprüft; die Fortschrittsleiste ist nicht per Screenreader abgenommen.
+  - Keine Sichtprüfung der Fortschrittsleiste in hellem und dunklem Thema.
+  - Bytes zählen die Lesevorgänge des Ziel-Adapters, keine Netzwerkmessung.
+  - Keine echten WebDAV-Server; keine Interoperabilitätsaussage; keine atomare Veröffentlichung behauptet (ADR-0012).

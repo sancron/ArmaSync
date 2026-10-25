@@ -12,7 +12,7 @@ Die Veröffentlichung liefert bisher nur ein Ergebnis am Ende. Die GUI zeigt ein
 2. **Stabile Ereignisnamen.** Jeder Typ hat einen festen Namen, der in Logs und JSON-Zeilen verwendet werden kann: `upload.started`, `upload.file_started`, `upload.file_bytes`, `upload.file_finished`, `upload.finished`, `upload.cancelled`, `upload.failed`. Namen werden nicht umbenannt; ein inkompatibler Wechsel erhöht die Schemaversion.
 3. **Monotone Sequenz.** Pro Vorgang beginnt `sequence` bei 0 und wächst bei jedem Ereignis um genau 1. Lücken und Wiederholungen gibt es nicht.
 4. **Reihenfolge.**
-   - Genau ein `upload.started` als erstes Ereignis, mit den Gesamtwerten aus dem Plan.
+   - Genau ein `upload.started` als erstes Ereignis, mit den Gesamtwerten aus dem Plan. Scheitert ein Vorgang, bevor der Plan steht (etwa eine abgelehnte Adresse mit Zugangsdaten), sendet er trotzdem `upload.started` mit Nullwerten und danach `upload.failed`.
    - Je Revisionsdatei in Planreihenfolge: `upload.file_started` (mit Größe), danach beliebig viele `upload.file_bytes` mit streng steigendem `bytes_done` der Datei, dann `upload.file_finished`.
    - Genau ein Endereignis als letztes: `upload.finished` bei Erfolg, `upload.cancelled` bei Abbruch über den `CancelToken`, `upload.failed` mit der Fehlerkategorie bei jedem anderen Fehler. Danach kommt nichts mehr.
 5. **Fortschrittswerte.**

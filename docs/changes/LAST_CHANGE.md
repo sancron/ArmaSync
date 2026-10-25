@@ -1,5 +1,14 @@
 # Letzte integrierte Änderung
 
+**2026-10-25 · MIG-042 (Schritt 4c) · Claude · Fortschritt pro Datei in CLI und GUI (ADR-0016)** (nach `development`, Fast-Forward)
+
+* **MIG-042, Schritt 4c** ([Bericht](2026-10-25-MIG-042-S4C.md), [Handoff](../handoffs/MIG-042-S4C.md), [ADR-0016](../adr/0016-upload-progress-events.md), [Task](../tasks/MIG-042-S4C.md)): Versionierter Ereignistyp `UploadEvent` mit sieben stabilen Typen und monotoner Sequenz; Beginn und Ende je Datei, Bytes, Summen, Abschluss, Abbruch und Fehler. Derselbe Kanal in CLI (Zeilen auf stderr, nur im Textmodus) und GUI (Fortschrittsleiste mit Dateizähler). Abbruch über den vorhandenen `CancelToken`.
+* **Tests:** Workflow `upload_progress` 5/5 (Reihenfolge, Bytes, Summen, Abbruch mitten in der Datei, Fehler auf dem Ziel, Ablehnung vor dem Verbindungsaufbau, Geheimnisfreiheit); CLI-Prozess 6/6 (davon 1 neu); GUI `upload_screen` 9/9 (davon 1 neu), `upload_ui` 5/5.
+* **Prüfungen (finaler Stand, Windows):** fmt, Clippy `-D warnings`, Workspace-Test (64 Suiten) jeweils Exitcode 0; MSRV 1.85 ohne GUI Exitcode 0 (56 Suiten); Markdown-Links 199 Dateien, 716 Links, 0 defekt; `git diff --check` Exitcode 0.
+* **Offen:** Lesegerät- und Sichtprüfung (nicht behauptet); keine Parallelität und kein Resume.
+
+Vorheriger Stand:
+
 **2026-10-25 · MIG-042 (Schritt 4b) · Claude · Upload in der GUI: Vorschau, ausdrückliche Bestätigung, Zustände** (nach `development`, Fast-Forward)
 
 * **MIG-042, Schritt 4b** ([Bericht](2026-10-25-MIG-042-S4B.md), [Handoff](../handoffs/MIG-042-S4B.md), [ADR-0015](../adr/0015-upload-gui.md), [Task](../tasks/MIG-042-S4B.md)): Ansicht „Upload“ in `armasync-gui`; Vorschau mit Gründen; Veröffentlichen nur nach Bestätigung; Veraltung bei geänderten Eingaben; laufender Zustand mit Abbrechen über `CancelToken`; nur indeterminierter Fortschritt. Gemeinsame Verdrahtung mit der CLI in `armasync-workflow::upload`. Kennwort nur für die Sitzung, nach jeder Veröffentlichung geleert.
