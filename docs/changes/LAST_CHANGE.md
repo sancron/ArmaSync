@@ -1,5 +1,14 @@
 # Letzte integrierte Änderung
 
+**2026-10-25 · MIG-042 A11Y · Claude · Prüfprotokoll für die Upload-Ansicht (Dokumentation)** (nach `development`, Fast-Forward)
+
+* **MIG-042 A11Y** ([Bericht](2026-10-25-MIG-042-A11Y.md), [Handoff](../handoffs/MIG-042-A11Y.md), [Task](../tasks/MIG-042-A11Y.md), [Protokoll](../migration/GUI_UPLOAD_SCREENREADER_PROTOCOL.md)): Ergänzung zum GUI-Prüfprotokoll für Vorschau, Bestätigung, Kennwort, laufenden Upload, Ansagen, Tastatur und Darstellung. Automatisierte Abdeckung und manuelle Schritte sind getrennt; Ergebnisfelder für bestanden, fehlgeschlagen oder nicht geprüft.
+* **Gate:** P1-Zugänglichkeitsgate bleibt **geschlossen** (RB-02). Nicht ausgeführt: NVDA, Narrator, Orca, Sichtprüfung, Tastaturprüfung am Fenster.
+* **Prüfungen:** lokale Markdown-Links und `git diff --check` unter Windows; Testnamen im Protokoll gegen den Code abgeglichen.
+* **Offen:** manuelle Windows-Prüfung mit NVDA und Sichtprüfung; Orca und Linux-Sichtprüfung bis zur Linux-Abschlussvalidierung.
+
+Vorheriger Stand:
+
 **2026-10-25 · MIG-042 (Schritt 4c) · Claude · Fortschritt pro Datei in CLI und GUI (ADR-0016)** (nach `development`, Fast-Forward)
 
 * **MIG-042, Schritt 4c** ([Bericht](2026-10-25-MIG-042-S4C.md), [Handoff](../handoffs/MIG-042-S4C.md), [ADR-0016](../adr/0016-upload-progress-events.md), [Task](../tasks/MIG-042-S4C.md)): Versionierter Ereignistyp `UploadEvent` mit sieben stabilen Typen und monotoner Sequenz; Beginn und Ende je Datei, Bytes, Summen, Abschluss, Abbruch und Fehler. Derselbe Kanal in CLI (Zeilen auf stderr, nur im Textmodus) und GUI (Fortschrittsleiste mit Dateizähler). Abbruch über den vorhandenen `CancelToken`.

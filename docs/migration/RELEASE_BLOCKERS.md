@@ -5,7 +5,7 @@ Stand: 2026-10-25 (MIG-032R, MIG-032R2 und MIG-040A ändern keine Blocker; RB-01
 | ID | Blocker | Betrifft | Schließen durch |
 | --- | --- | --- | --- |
 | RB-01 | **Unix-Pfadrace im Dateisystemadapter** | Linux-Synchronisation und jede Aussage „race-freie Pfadgrenze unter Linux“ | siehe unten |
-| RB-02 | **P1-GUI-/Accessibility-Gate**: NVDA, Orca und Sichtprüfung des hellen Themes nicht ausgeführt | jede Veröffentlichung einer GUI | Protokoll [GUI_SCREENREADER_PROTOCOL](GUI_SCREENREADER_PROTOCOL.md) ausführen und ausfüllen; danach ADR-0002 auf „angenommen“ |
+| RB-02 | **P1-GUI-/Accessibility-Gate**: NVDA, Orca und Sichtprüfung des hellen Themes nicht ausgeführt | jede Veröffentlichung einer GUI | Protokoll [GUI_SCREENREADER_PROTOCOL](GUI_SCREENREADER_PROTOCOL.md) ausführen und ausfüllen; danach ADR-0002 auf „angenommen“. Zusätzlich für die Upload-Ansicht (MIG-042): [GUI_UPLOAD_SCREENREADER_PROTOCOL](GUI_UPLOAD_SCREENREADER_PROTOCOL.md) ausführen, NVDA und Sichtprüfung unter Windows; Orca und Linux-Sichtprüfung bis zur Linux-Abschlussvalidierung |
 | RB-03 | **Linux-/WSL-Abschlussvalidierung** (alle Plattformprüfungen sind bis zum Abschluss zurückgestellt) | Linux-Release, Plattformaussagen | vollständige Testläufe, Ende-zu-Ende und GUI-Start unter Linux (siehe unten) |
 | RB-04 | **Rechtefragen RQ-01 bis RQ-08 offen** (RQ-06 teilweise) | Veröffentlichung von Code und Paketen, Portierung von Bestandslogik, Release-BOM | Entscheidung des Projektverantwortlichen, dokumentiert im Tracker |
 | RB-05 | **Keine Prüfung gegen echte Altserver** (nur Loopback-Testserver) | Aussage „funktioniert mit bestehenden Repositories“ | kontrollierter Test gegen ein echtes Repository mit Einverständnis des Betreibers |

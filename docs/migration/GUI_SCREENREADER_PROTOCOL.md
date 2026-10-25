@@ -1,6 +1,6 @@
 # Manuelles Prüfprotokoll: Screenreader, Tastatur, Darstellung
 
-Zweck: Belege für das P1-GUI-/Accessibility-Gate ([ROADMAP](ROADMAP.md), [UI_REQUIREMENTS](UI_REQUIREMENTS.md)). **Stand: nicht ausgeführt.** Die Abschnitte B, C und D sind bewusst leer; erst ausgefüllte, mit Build-SHA und Datum versehene Protokolle auf **beiden** Systemen erfüllen das Gate. Dieses Dokument ändert nichts am Gate-Status.
+Zweck: Belege für das P1-GUI-/Accessibility-Gate ([ROADMAP](ROADMAP.md), [UI_REQUIREMENTS](UI_REQUIREMENTS.md)). **Stand: nicht ausgeführt.** Die Abschnitte B, C und D sind bewusst leer; erst ausgefüllte, mit Build-SHA und Datum versehene Protokolle auf **beiden** Systemen erfüllen das Gate. Dieses Dokument ändert nichts am Gate-Status. Die Upload-Ansicht (MIG-042) hat ein eigenes Ergänzungsprotokoll: [GUI_UPLOAD_SCREENREADER_PROTOCOL](GUI_UPLOAD_SCREENREADER_PROTOCOL.md).
 
 Gegenstand sind (1) der Prototyp aus MIG-012 (Ansicht „Repository-Liste (Prototyp, simuliert)“, Abschnitte A–D) und (2) die **Synchronisationsansicht aus MIG-031** (Abschnitt F, echter Ablauf gegen einen lokalen Testserver). **Beide sind nicht durch NVDA, Orca oder eine Sichtprüfung geprüft; ausgefüllte Ergebnisspalten gibt es nicht.**
 

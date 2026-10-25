@@ -2,6 +2,7 @@
 
 ## Unreleased — Rust-Migrationsvorbereitung (2026-10-25)
 
+- MIG-042 A11Y: Prüfprotokoll für die Upload-Ansicht ([GUI_UPLOAD_SCREENREADER_PROTOCOL](docs/migration/GUI_UPLOAD_SCREENREADER_PROTOCOL.md)). Das P1-Zugänglichkeitsgate bleibt geschlossen; NVDA und Sichtprüfung sind nicht ausgeführt.
 - MIG-042 (Schritt 4c): Fortschritt pro Datei in CLI und GUI ([ADR-0016](docs/adr/0016-upload-progress-events.md)). Versionierter Ereignistyp mit Beginn und Ende je Datei, übertragenen Bytes, Summen, Abschluss, Abbruch und Fehler; im Textmodus der CLI eine Zeile je Datei auf stderr; in der GUI eine Fortschrittsleiste. Keine Zugangsdaten, keine absoluten Pfade und keine Adressen in Ereignissen. Parallelität und Resume bleiben aus.
 - MIG-042 (Schritt 4b): Upload-Ansicht in der GUI ([ADR-0015](docs/adr/0015-upload-gui.md)). Vorschau mit Ein- und Ausschlüssen samt Grund; Veröffentlichen erst nach ausdrücklicher Bestätigung und nur bei unveränderten Eingaben; Abbrechen über den vorhandenen Abbruchmechanismus; Ergebnis und Fehler in Worten. Dieselben Workflow-Funktionen wie die CLI. Kennwort nur für die Sitzung. Fortschritt pro Datei folgt in 4c.
 - MIG-042 (Schritt 4a): `armasync upload plan` und `armasync upload publish --yes` in der CLI ([ADR-0014](docs/adr/0014-upload-cli.md)). Vorschau mit Ein- und Ausschlüssen samt Grund; Veröffentlichung nur mit ausdrücklicher Bestätigung; Kennwort nur aus einer Umgebungsvariablen; stabile Exitcodes und JSON. GUI und Fortschritt pro Datei folgen separat.
