@@ -2,7 +2,7 @@
 
 **2026-10-25 · MIG-042 (Schritt 3b) · Claude · Upload-Ausschlüsse: feste Regeln, Vorschau mit Gründen** (nach `development`, Fast-Forward)
 
-* **MIG-042, Schritt 3b** ([Bericht](2026-10-25-MIG-042-S3B.md), [Handoff](../handoffs/MIG-042-S3B.md), [ADR-0013](../adr/0013-upload-exclusions.md), [Task](../tasks/MIG-042.md)): Teildateien und interne Daten werden nie hochgeladen; ausdrückliche Ausschlüsse als validierte Pfade; die Vorschau zeigt jede ausgeschlossene Datei mit Grund und ungenutzte Regeln; die Quelle wird rein lesend gelistet. **Das Benutzerformat für Ausschlussregeln ist blockiert** (Produktentscheidung, ADR-0013, Optionen A, B, C).
+* **MIG-042, Schritt 3b** ([Bericht](2026-10-25-MIG-042-S3B.md), [Handoff](../handoffs/MIG-042-S3B.md), [ADR-0013](../adr/0013-upload-exclusions.md), [Task](../tasks/MIG-042.md)): Teildateien und interne Daten werden nie hochgeladen; ausdrückliche Ausschlüsse als validierte Pfade; die Vorschau zeigt jede ausgeschlossene Datei mit Grund und ungenutzte Regeln; die Quelle wird rein lesend gelistet. **Benutzerformat: Option A entschieden** (explizite Pfade; Ordner komponentenweise, `cache` trifft `cache-backup` nicht). Muster und Regeldatei bleiben spätere Entscheidungen (ADR-0013).
 * **Tests:** Core-Modultests, 9 Anwendungstests, 4 Ende-zu-Ende-Tests am echten Ordner mit Loopback-Server.
 * **Prüfungen (finaler Stand, Windows):** fmt, Clippy `-D warnings`, Workspace-Test (58 Suiten) und MSRV 1.85 (52 Suiten) jeweils Exitcode 0; Markdown-Links 187 Dateien, 0 defekt; `git diff --check` Exitcode 0.
 
