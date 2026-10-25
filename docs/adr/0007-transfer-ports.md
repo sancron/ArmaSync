@@ -1,6 +1,6 @@
 # ADR-0007 — Streaming-Übertragung, Staging und Schutzpfade (Ports für MIG-030B/C)
 
-Datum: 2026-10-19. Status: **angenommen**; umgesetzt und getestet in MIG-030P (Core-Typen, Use-Case, In-Memory-Adapter). Bezug: [ADR-0004](0004-core-contracts.md), [ADR-0006](0006-sync-metadata-and-http-transport.md), [SYNC_METADATA](../migration/SYNC_METADATA.md).
+Datum: 2026-10-19. Status: **angenommen**; umgesetzt und getestet in MIG-030P (Core-Typen, Use-Case, In-Memory-Adapter). Bezug: [ADR-0004](0004-core-contracts.md), [ADR-0006](0006-sync-metadata-and-http-transport.md), [SYNC_METADATA](../migration/SYNC_METADATA.md). Ergänzt durch [ADR-0009](0009-resume-range.md): Resume mit `Range`; ein Netzabbruch behält die Teildaten (Abschnitt 5 dort).
 
 ## Kontext
 
