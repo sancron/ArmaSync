@@ -1,6 +1,6 @@
 # ADR-0013 — Upload-Ausschlüsse: feste Regeln, Vorschau und die offene Formatfrage (MIG-042, Schritt 3b)
 
-Datum: 2026-10-25. Status: **angenommen** für die fest eingebauten Regeln, die Ausschlüsse als validierte Pfade und die Vorschau im Plan. **Blockiert und nicht entschieden:** das Benutzerformat für Ausschlussregeln (Muster, Regeldatei, Oberfläche). Das ist eine Produktentscheidung (siehe „Offene Formatfrage“). Bezug: [ADR-0011](0011-upload-contract.md) (Upload), [ADR-0012](0012-revisions-and-publication.md) (Revisionen), [ADR-0004](0004-core-contracts.md) (Kernverträge, keine I/O im Core).
+Datum: 2026-10-25. Status: **angenommen**. Entscheidung des Projektverantwortlichen (2026-10-25): **Option A**, explizite Datei- und Ordnerpfade. Angenommen sind die fest eingebauten Regeln, die Ausschlüsse als validierte Pfade, die komponentenweise Ordnerabgrenzung und die Vorschau im Plan. **Nicht entschieden und nicht Teil dieses ADR:** Muster (Option B) und gitignore-artige Regeldateien (Option C); beide bleiben spätere, separat zu entscheidende Erweiterungen. Bezug: [ADR-0011](0011-upload-contract.md) (Upload), [ADR-0012](0012-revisions-and-publication.md) (Revisionen), [ADR-0004](0004-core-contracts.md) (Kernverträge, keine I/O im Core).
 
 ## Kontext
 
@@ -20,15 +20,15 @@ Der Upload darf keine internen ArmaSync-Daten, keine Teildateien und keine ausdr
 7. **Revision und Plan teilen dieselbe Partition.** Eine Veröffentlichung enthält nur einbezogene Dateien; Manifest und Vorschau stimmen überein.
 8. **Keine Geheimnisse in Vorschau oder Manifest.** Die Vorschau zeigt Pfade, Größen und Gründe. Das Revisions-Manifest enthält nur einbezogene Dateien. Zugangsdaten gelangen weder in die Vorschau noch in Logs oder Upload-Metadaten.
 
-## Offene Formatfrage (Produktentscheidung, blockiert)
+## Benutzerformat: Entscheidung (Option A angenommen)
 
-Wie Nutzer Ausschlüsse angeben, ist **nicht entschieden**. Es wird kein Format festgelegt. Optionen:
+Der Projektverantwortliche hat Option A gewählt. Die Optionen im Überblick, mit Stand der Entscheidung:
 
 - **A. Explizite Pfade und Ordner (in Schritt 3b umgesetzt).** Keine Muster, keine Mehrdeutigkeit, leicht zu prüfen. Nachteil: bei vielen Dateien umständlich.
 - **B. Muster (z. B. `*.log`, `**/cache`).** Mächtig; braucht eine dokumentierte Semantik (Groß-/Kleinschreibung, Trennzeichen, Vorrang) und eine eigene Testmatrix. Muster dürfen keine internen oder Teildateien wieder einbeziehen.
 - **C. Regeldatei im Quellordner (gitignore-artig).** Nutzerfreundlich, aber die Datei selbst wird zur Nutzerdatei; braucht Speicherort, Vorrangregeln und den Umgang mit ihrer eigenen Hochladbarkeit.
 
-Empfehlung: **A jetzt** (umgesetzt); **B oder C** erst nach einer Produktentscheidung, mit eigenem Vertrag. Bis dahin ist die Implementierung eines Benutzerformats gesperrt.
+Stand: **A angenommen und umgesetzt.** **B und C** sind nicht entschieden und nicht implementiert; sie brauchen eine eigene Entscheidung und einen eigenen Vertrag.
 
 ## Nicht im Scope
 

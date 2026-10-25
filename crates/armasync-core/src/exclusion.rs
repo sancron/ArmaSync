@@ -157,6 +157,23 @@ mod tests {
     }
 
     #[test]
+    fn folder_rules_match_whole_components_only() {
+        // The rule `cache` must not exclude `cache-backup`, and a file named like the rule is not a folder rule.
+        let rules = ExclusionRules::new([path("cache")]);
+        assert_eq!(decide(&path("cache-backup/x.bin"), &rules), None);
+        assert_eq!(decide(&path("cache-backup"), &rules), None);
+        assert_eq!(
+            decide(&path("cache/x.bin"), &rules),
+            Some(ExclusionReason::UserRule(path("cache")))
+        );
+        assert_eq!(
+            decide(&path("mods/cache/x.bin"), &rules),
+            None,
+            "a rule is anchored at the source root"
+        );
+    }
+
+    #[test]
     fn rules_are_sorted_and_deduplicated() {
         let rules = ExclusionRules::new([path("b"), path("a"), path("b")]);
         assert_eq!(rules.rules(), [path("a"), path("b")]);
