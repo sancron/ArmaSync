@@ -279,6 +279,7 @@ dependencies = [
  "eframe",
  "egui_extras",
  "egui_kittest",
+ "zip",
 ]
 
 [[package]]
