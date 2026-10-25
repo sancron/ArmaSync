@@ -1,5 +1,14 @@
 # Letzte integrierte Änderung
 
+**2026-10-25 · MIG-032B · Claude · Freiplatz-Vorabkontrolle und Abbruchtests für große und gepackte Downloads** (nach `development`, Fast-Forward)
+
+* **MIG-032B** ([Bericht](2026-10-25-MIG-032B.md), [Handoff](../handoffs/MIG-032B.md)): `LocalStore::free_space` (Standard `None` = unbekannt; Dateisystem über `fs4::available_space`). Vor dem ersten Download simuliert der Lauf den Platzbedarf in Planreihenfolge (Datei plus Archiv bei gepackten Blättern, 16 MiB Reserve, Gutschrift bei ersetzten Dateien) und bricht bei Mangel vor jeder Änderung ab. Nur Vorabkontrolle: anderer Prozess kann Platz verbrauchen. Abbruchtests in der GUI für einen großen normalen und einen gepackten Download (alte Datei bleibt, keine Reste). Testkit: `Published::trickle`.
+* **Prüfungen (Windows, lokal):** fmt, clippy `-D warnings`, Workspace-Tests inkl. Ende-zu-Ende und GUI bestanden, MSRV 1.85 ohne GUI bestanden, CLI-Baum ohne GUI-Crates.
+* **Nicht geprüft:** WSL/Linux, GitHub-CI (pausiert), echte Server, NVDA/Orca/Sichtprüfung, Konsolen-Tastatur-Ctrl+C für diese Fälle.
+* **Offen:** MIG-032R (Resume, ADR-Zusatz nötig; danach eigener Task), Authentifizierung (ausgesetzt, ADR-0005), RB-01..RB-06, RQ-01..RQ-08.
+
+Vorheriger Stand:
+
 **2026-10-25 · MIG-030E · Claude · gepackte Blätter (`.zip`) sicher entpacken; GUI-Hinweis angeglichen** (nach `development`, Fast-Forward)
 
 * **MIG-030E** ([Bericht](2026-10-25-MIG-030E.md), [Handoff](../handoffs/MIG-030E.md), [ADR-0008](../adr/0008-packed-files-zip.md)): Blätter mit `compressed` und bekannter Archivgröße werden installiert. Archiv in Spool, genau ein Eintrag mit Stored oder Deflate, Grenzen 2 GiB und 1032:1, Größen- und SHA-1-Prüfung vor dem atomaren Commit. Commits: `4c6be08` (Implementierung), `72f0ecc` (Reservierung), `60372df` (MIG-032A-Nachtrag).

@@ -188,6 +188,7 @@ pub struct InMemoryStore {
     files: BTreeMap<RelativePath, Vec<u8>>,
     fail_writes_to: Option<RelativePath>,
     fail_staging_after: Option<usize>,
+    free_space: Option<u64>,
 }
 
 impl InMemoryStore {
@@ -195,6 +196,14 @@ impl InMemoryStore {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Announces this much free space (test setup); without it the free space is unknown, as on a platform that
+    /// cannot tell.
+    #[must_use]
+    pub fn with_free_space(mut self, bytes: u64) -> Self {
+        self.free_space = Some(bytes);
+        self
     }
 
     /// Puts a file into the store (test setup).
@@ -291,6 +300,10 @@ impl LocalStore for InMemoryStore {
 
     fn spool(&mut self, _expected_size: u64) -> Result<Box<dyn Spool>, Error> {
         Ok(Box::new(Cursor::new(Vec::new())))
+    }
+
+    fn free_space(&self) -> Result<Option<u64>, Error> {
+        Ok(self.free_space)
     }
 }
 

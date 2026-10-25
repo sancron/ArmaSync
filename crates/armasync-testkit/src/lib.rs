@@ -85,6 +85,9 @@ pub struct Published {
     pub sync: Vec<u8>,
     /// Files below `/repo`, by their path (no leading slash).
     pub files: BTreeMap<String, Vec<u8>>,
+    /// Send every file in 16 KiB pieces with 50 ms between them (about 3 s for 1 MiB): a transfer that keeps flowing,
+    /// so a cancellation can be requested while it runs (MIG-032B).
+    pub trickle: bool,
 }
 
 /// Requests seen by a server: (target, lower-case headers).
@@ -212,6 +215,30 @@ Content-Length: 8193
     }
 }
 
+/// Piece size of a trickled published file.
+const TRICKLE_PIECE: usize = 16 * 1024;
+
+fn trickle_body(stream: &mut impl Write, body: &[u8]) {
+    let head = format!(
+        "HTTP/1.1 200 OK
+Connection: close
+Content-Length: {}
+
+",
+        body.len()
+    );
+    if stream.write_all(head.as_bytes()).is_err() {
+        return;
+    }
+    for piece in body.chunks(TRICKLE_PIECE) {
+        if stream.write_all(piece).is_err() {
+            break;
+        }
+        let _ = stream.flush();
+        thread::sleep(Duration::from_millis(50));
+    }
+}
+
 fn handle_published(stream: &mut impl Write, target: &str, published: &Published) {
     match target {
         "/repo/.a3s/sync" => reply(stream, "200 OK", &published.sync),
@@ -220,6 +247,7 @@ fn handle_published(stream: &mut impl Write, target: &str, published: &Published
             .strip_prefix("/repo/")
             .and_then(|path| published.files.get(path))
         {
+            Some(body) if published.trickle => trickle_body(stream, body),
             Some(body) => reply(stream, "200 OK", body),
             None => reply(stream, "404 Not Found", b""),
         },

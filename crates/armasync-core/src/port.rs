@@ -161,6 +161,17 @@ pub trait LocalStore {
     /// # Errors
     /// File-system failures.
     fn spool(&mut self, expected_size: u64) -> Result<Box<dyn Spool>, Error>;
+
+    /// Free bytes available to the sync on the file system of the destination, checked before a run starts
+    /// (MIG-032B). `Ok(None)` means the value is not known for this store or platform: the run then goes ahead
+    /// without the advance check, and a full disk still fails on write. The value is advisory only; other processes
+    /// may use the space after the check.
+    ///
+    /// # Errors
+    /// Only if the store itself is broken; a missing value is `Ok(None)`, never an error.
+    fn free_space(&self) -> Result<Option<u64>, Error> {
+        Ok(None)
+    }
 }
 
 /// A temporary file that holds a packed archive (see [`LocalStore::spool`]). The archive is written first, then read

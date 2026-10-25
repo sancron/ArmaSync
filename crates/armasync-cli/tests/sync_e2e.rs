@@ -818,6 +818,7 @@ fn packed_repository(content: &[u8], archive: Vec<u8>, archive_size: i64) -> Pub
     Published {
         sync: tree_file(&root),
         files,
+        trickle: false,
     }
 }
 

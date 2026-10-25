@@ -469,6 +469,12 @@ impl LocalStore for LocalDirectory {
         }
     }
 
+    /// Free bytes for the user on the file system of the destination (`fs4::available_space`: `GetDiskFreeSpaceEx`
+    /// on Windows, `statvfs` on Unix). A query that fails is reported as unknown, never as a guess.
+    fn free_space(&self) -> Result<Option<u64>, Error> {
+        Ok(fs4::available_space(&self.root).ok())
+    }
+
     /// The spool lives in the destination root (same file system, reserved prefix, never listed). Free space is not
     /// checked in advance: the standard library has no portable query, so a full disk fails on write.
     fn spool(&mut self, _expected_size: u64) -> Result<Box<dyn Spool>, Error> {

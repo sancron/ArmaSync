@@ -2,6 +2,7 @@
 
 ## Unreleased — Rust-Migrationsvorbereitung (2026-10-25)
 
+- MIG-032B integriert: Vorabkontrolle des freien Speicherplatzes vor einer Synchronisation (mit Reserve und Berücksichtigung gepackter Blätter; bei unbekanntem Platz ohne Prüfung) sowie Abbruchtests für große und gepackte Downloads in der GUI.
 - MIG-030E integriert: komprimierte Blätter mit bekannter Archivgröße werden sicher entpackt und installiert (ein Eintrag, Stored/Deflate, 2 GiB, Verhältnis 1032:1, SHA-1-Prüfung vor dem atomaren Commit); Blätter ohne nutzbare Archivgröße bleiben unsupported. Echte Serverarchive nicht belegt ([ADR-0008](docs/adr/0008-packed-files-zip.md)).
 - GUI-Hinweis zu komprimierten Dateien an CLI/JSON angeglichen (gleicher Code `compressed-file-unsupported`).
 - MIG-032A: Windows-Ende-zu-Ende-Test des Ctrl+C-Abbruchs bestanden (Exitcode 130, unveränderte Zieldatei, keine Temp-Datei, Folgelauf).

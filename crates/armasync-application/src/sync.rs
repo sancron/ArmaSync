@@ -15,13 +15,57 @@ use std::io::{self, Seek, SeekFrom, Write};
 
 use armasync_core::{
     ARCHIVE_SUFFIX, ArchiveReader, CancelToken, Digest, EVENT_SCHEMA_VERSION, Error, ErrorKind,
-    EventSink, FileEntry, HashAlgorithm, Hasher, JobState, LocalStore, Manifest, OperationEvent,
-    OperationId, Phase, PlanOptions, Progress, RelativePath, RepositorySource, StagedFile,
-    SyncPlan, SyncStep, plan_sync,
+    EventSink, FileEntry, HashAlgorithm, Hasher, JobState, LocalFile, LocalStore, Manifest,
+    OperationEvent, OperationId, Phase, PlanOptions, Progress, RelativePath, RepositorySource,
+    StagedFile, SyncPlan, SyncStep, plan_sync,
 };
 
 /// Progress events during a transfer are emitted at most once per this many bytes (and at the end of each file).
 const PROGRESS_STEP: u64 = 256 * 1024;
+
+/// Space kept free on the destination on top of what a run needs (heuristic, MIG-032B).
+pub const FREE_SPACE_RESERVE: u64 = 16 * 1024 * 1024;
+
+/// Advance check of the free space (MIG-032B). It walks the plan in its order and assumes that each file is complete
+/// before the next starts: a file needs its size, plus the archive for a packed file, on top of the free space at that
+/// moment, and keeps [`FREE_SPACE_RESERVE`]; a replaced file gives its old size back when it is committed. Overflow
+/// counts as not enough space. This is advisory: other processes may use the space after the check, and a full disk
+/// still fails on write.
+fn check_free_space(
+    plan: &SyncPlan,
+    manifest: &Manifest,
+    local: &[LocalFile],
+    free: u64,
+) -> Result<(), Error> {
+    let mut available = free;
+    for step in &plan.steps {
+        let (path, size, old_size) = match step {
+            SyncStep::Download { path, size, .. } => (path, *size, 0),
+            SyncStep::Replace { path, size, .. } => {
+                let old = local
+                    .iter()
+                    .find(|file| file.path == *path)
+                    .map_or(0, |file| file.size);
+                (path, *size, old)
+            }
+            SyncStep::Keep { .. } | SyncStep::Delete { .. } => continue,
+        };
+        let archive = manifest.archive_size(path).unwrap_or(0);
+        let needed = size
+            .checked_add(archive)
+            .and_then(|total| total.checked_add(FREE_SPACE_RESERVE));
+        if needed.is_none_or(|needed| available < needed) {
+            return Err(Error::new(
+                ErrorKind::FileSystem,
+                format!(
+                    "not enough free space for {path}: {available} bytes free, a reserve of {FREE_SPACE_RESERVE} bytes is kept"
+                ),
+            ));
+        }
+        available = available.saturating_sub(size).saturating_add(old_size);
+    }
+    Ok(())
+}
 
 /// Computes a plan for the current repository revision and local state without changing anything.
 ///
@@ -312,6 +356,17 @@ pub fn apply(
             "plan is stale: repository revision or local files changed since planning",
         );
         return Err(reporter.finish_with(progress, error));
+    }
+
+    // Advance check (MIG-032B) before anything is downloaded or changed. Unknown free space skips it.
+    match context.store.free_space() {
+        Ok(Some(free)) => {
+            if let Err(error) = check_free_space(plan, &manifest, &local, free) {
+                return Err(reporter.finish_with(progress, error));
+            }
+        }
+        Ok(None) => {}
+        Err(error) => return Err(reporter.finish_with(progress, error)),
     }
 
     for step in &plan.steps {

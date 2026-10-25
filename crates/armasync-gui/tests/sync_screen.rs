@@ -585,6 +585,7 @@ fn packed_repository(content: &[u8], archive: Vec<u8>) -> Published {
     Published {
         sync: tree_file(&root),
         files,
+        trickle: false,
     }
 }
 
@@ -618,4 +619,97 @@ fn a_compressed_file_with_a_usable_archive_size_is_installed_not_listed_as_unsup
     assert_eq!(fs::read(env.dest.join(PACKED)).unwrap(), content);
     assert_eq!(files(&env.dest), [PACKED], "no archive is left behind");
     assert_eq!(server.requested(".zip"), 1);
+}
+
+// ---- cancelling large and packed downloads (MIG-032B) -------------------------------------------------------------
+//
+// The repository is synthetic and delivered slowly (`trickle`), so a cancellation arrives while the transfer runs.
+
+const BIG: &str = "@big/big.pbo";
+
+fn noise(len: usize, seed: u64) -> Vec<u8> {
+    let mut x = seed | 1;
+    (0..len)
+        .map(|_| {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            x as u8
+        })
+        .collect()
+}
+
+fn large_repository(content: &[u8]) -> Published {
+    use armasync_core::{HashAlgorithm, Hasher};
+    let sha1 = armasync_adapters::Sha256Hasher
+        .hash(HashAlgorithm::Sha1, content)
+        .hex()
+        .to_owned();
+    let mut file = TestFile::new("big.pbo", content.len() as i64);
+    file.sha1 = sha1.as_str().into();
+    let addon = TestDir {
+        name: "@big".to_owned(),
+        hidden: false,
+        addon: true,
+        items: vec![Item::File(file)],
+    };
+    let root = TestDir::new("racine", vec![Item::Dir(addon)]);
+    let mut files = std::collections::BTreeMap::new();
+    files.insert(BIG.to_owned(), content.to_vec());
+    Published {
+        sync: tree_file(&root),
+        files,
+        trickle: true,
+    }
+}
+
+#[test]
+fn cancelling_a_large_download_keeps_the_existing_file_and_leaves_nothing_partial() {
+    let content = noise(1024 * 1024, 11);
+    let server = serve_published(large_repository(&content));
+    let env = env_for(&server);
+    fs::create_dir_all(env.dest.join("@big")).unwrap();
+    fs::write(env.dest.join(BIG), b"the old version").unwrap();
+    let mut screen = screen(&env);
+    plan(&mut screen);
+    screen.start();
+    wait_until(&mut screen, "the transfer to start", |_| {
+        server.requested("big.pbo") > 0
+    });
+    screen.cancel();
+    wait_until(&mut screen, "the run to stop", |s| !s.is_busy());
+    assert_eq!(screen.outcome(), Some(&Outcome::Cancelled));
+    assert_eq!(fs::read(env.dest.join(BIG)).unwrap(), b"the old version");
+    assert_eq!(
+        files(&env.dest),
+        [BIG],
+        "no partial file, no temporary file"
+    );
+}
+
+#[test]
+fn cancelling_a_packed_download_leaves_no_archive_spool_or_partial_file() {
+    let content = noise(1024 * 1024, 12);
+    let archive = deflated_zip("packed.pbo", &content);
+    let mut published = packed_repository(&content, archive);
+    published.trickle = true;
+    let server = serve_published(published);
+    let env = env_for(&server);
+    fs::create_dir_all(env.dest.join("@packed")).unwrap();
+    fs::write(env.dest.join(PACKED), b"the old version").unwrap();
+    let mut screen = screen(&env);
+    plan(&mut screen);
+    screen.start();
+    wait_until(&mut screen, "the archive transfer to start", |_| {
+        server.requested(".zip") > 0
+    });
+    screen.cancel();
+    wait_until(&mut screen, "the run to stop", |s| !s.is_busy());
+    assert_eq!(screen.outcome(), Some(&Outcome::Cancelled));
+    assert_eq!(fs::read(env.dest.join(PACKED)).unwrap(), b"the old version");
+    assert_eq!(
+        files(&env.dest),
+        [PACKED],
+        "no archive, no spool file and no partial file"
+    );
 }
