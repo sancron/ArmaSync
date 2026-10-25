@@ -10,8 +10,8 @@ use std::sync::Mutex;
 use armasync_adapters::Sha256Hasher;
 use armasync_application::revision::{self, Revision};
 use armasync_core::{
-    CancelToken, Error, ErrorKind, HashAlgorithm, Hasher, LocalSource, OpenedSource, RelativePath,
-    RemoteTarget, SourceFile,
+    CancelToken, Error, ErrorKind, HashAlgorithm, Hasher, InventoryEntry, LocalSource,
+    OpenedSource, RelativePath, RemoteTarget, SourceFile,
 };
 
 fn path(text: &str) -> RelativePath {
@@ -32,6 +32,17 @@ struct FakeSource {
 }
 
 impl LocalSource for FakeSource {
+    fn inventory(&self, _cancel: &CancelToken) -> Result<Vec<InventoryEntry>, Error> {
+        Ok(self
+            .contents
+            .iter()
+            .map(|(name, bytes)| InventoryEntry {
+                path: path(name),
+                size: bytes.len() as u64,
+            })
+            .collect())
+    }
+
     fn files(&self, _cancel: &CancelToken) -> Result<Vec<SourceFile>, Error> {
         Ok(self
             .contents

@@ -15,8 +15,8 @@ use armasync_adapters::localfs::LocalDirectory;
 use armasync_adapters::webdav::WebDavClient;
 use armasync_application::revision::{self, PublishReport};
 use armasync_core::{
-    CancelToken, Error, ErrorKind, HashAlgorithm, Hasher, LocalSource, OpenedSource, RelativePath,
-    SourceFile,
+    CancelToken, Error, ErrorKind, HashAlgorithm, Hasher, InventoryEntry, LocalSource,
+    OpenedSource, RelativePath, SourceFile,
 };
 use support::{credentials, start};
 
@@ -70,6 +70,10 @@ struct CancelAfter<'a> {
 }
 
 impl LocalSource for CancelAfter<'_> {
+    fn inventory(&self, cancel: &CancelToken) -> Result<Vec<InventoryEntry>, Error> {
+        self.inner.inventory(cancel)
+    }
+
     fn files(&self, cancel: &CancelToken) -> Result<Vec<SourceFile>, Error> {
         self.inner.files(cancel)
     }

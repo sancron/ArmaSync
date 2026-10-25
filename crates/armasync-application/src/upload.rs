@@ -1,13 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Upload of a local folder into a folder tree on a remote target (MIG-042, step 1; ADR-0011).
+//! Upload of a local folder into a folder tree on a remote target (MIG-042; ADR-0011, ADR-0013).
 //!
-//! [`plan`] lists the source and asks the target what exists; it changes nothing. [`apply`] executes the plan step
-//! by step, checks cancellation before every step and during every upload, and reports what it did. Nothing is ever
-//! deleted, and paths are always [`RelativePath`]s.
+//! [`plan_with_rules`] splits the source into uploaded and excluded files, asks the target what exists and changes
+//! nothing. The plan shows both sides: the steps and the excluded files with their reasons, plus rules that matched
+//! nothing. [`apply`] executes the plan step by step, checks cancellation before every step and during every upload,
+//! and reports what it did. Nothing is ever deleted, and paths are always [`RelativePath`]s.
 
 use std::collections::BTreeSet;
 
-use armasync_core::{CancelToken, Error, ErrorKind, LocalSource, RelativePath, RemoteTarget};
+use armasync_core::exclusion::ExclusionRules;
+use armasync_core::{
+    CancelToken, Error, ErrorKind, LocalSource, RelativePath, RemoteTarget, SourceFile,
+};
+
+use crate::exclusion::{Exclusion, partition};
 
 /// One step of an upload plan.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -41,6 +47,10 @@ pub struct UploadPlan {
     pub replacements: u64,
     /// Total bytes to send.
     pub bytes: u64,
+    /// Files of the source that are not uploaded, with the reason (ADR-0013).
+    pub exclusions: Vec<Exclusion>,
+    /// Exclusion rules that match no file of the source.
+    pub unused_rules: Vec<RelativePath>,
 }
 
 /// What an upload did.
@@ -56,18 +66,51 @@ pub struct UploadReport {
     pub bytes: u64,
 }
 
-/// Computes the upload plan for everything the source lists.
+/// Computes the upload plan for everything the source lists, without exclusions beyond the built-in ones.
 ///
 /// # Errors
-/// [`ErrorKind::Cancelled`] if `cancel` was requested; source and target errors otherwise.
+/// As [`plan_with_rules`].
 pub fn plan(
     source: &dyn LocalSource,
     target: &dyn RemoteTarget,
     cancel: &CancelToken,
 ) -> Result<UploadPlan, Error> {
-    let files = source.files(cancel)?;
+    plan_with_rules(source, target, &ExclusionRules::default(), cancel)
+}
+
+/// Computes the upload plan with the explicit exclusion `rules`. Internal and partial files are always excluded.
+///
+/// # Errors
+/// [`ErrorKind::Cancelled`] if `cancel` was requested; source and target errors otherwise.
+pub fn plan_with_rules(
+    source: &dyn LocalSource,
+    target: &dyn RemoteTarget,
+    rules: &ExclusionRules,
+    cancel: &CancelToken,
+) -> Result<UploadPlan, Error> {
+    let split = partition(source, rules, cancel)?;
+    plan_included(
+        &split.included,
+        split.excluded,
+        split.unused_rules,
+        target,
+        cancel,
+    )
+}
+
+/// Builds the plan for files that are already split (used by publication, which splits once).
+///
+/// # Errors
+/// [`ErrorKind::Cancelled`] if `cancel` was requested; target errors otherwise.
+pub fn plan_included(
+    files: &[SourceFile],
+    exclusions: Vec<Exclusion>,
+    unused_rules: Vec<RelativePath>,
+    target: &dyn RemoteTarget,
+    cancel: &CancelToken,
+) -> Result<UploadPlan, Error> {
     let mut folder_paths: BTreeSet<String> = BTreeSet::new();
-    for file in &files {
+    for file in files {
         folder_paths.extend(file.path.ancestors().map(str::to_owned));
     }
     let mut folders: Vec<String> = folder_paths.into_iter().collect();
@@ -85,15 +128,19 @@ pub fn plan(
         check_cancel(cancel)?;
         let replace = target.exists(&file.path)?;
         steps.push(UploadStep::Upload {
-            path: file.path,
+            path: file.path.clone(),
             size: file.size,
             replace,
         });
     }
-    Ok(summarize(steps))
+    Ok(summarize(steps, exclusions, unused_rules))
 }
 
-fn summarize(steps: Vec<UploadStep>) -> UploadPlan {
+fn summarize(
+    steps: Vec<UploadStep>,
+    exclusions: Vec<Exclusion>,
+    unused_rules: Vec<RelativePath>,
+) -> UploadPlan {
     let (mut folders, mut files, mut replacements, mut bytes) = (0, 0, 0, 0);
     for step in &steps {
         match step {
@@ -113,6 +160,8 @@ fn summarize(steps: Vec<UploadStep>) -> UploadPlan {
         files,
         replacements,
         bytes,
+        exclusions,
+        unused_rules,
     }
 }
 

@@ -10,8 +10,8 @@ use std::sync::Mutex;
 use armasync_adapters::Sha256Hasher;
 use armasync_application::upload::{self, UploadStep};
 use armasync_core::{
-    CancelToken, Error, ErrorKind, HashAlgorithm, Hasher, LocalSource, OpenedSource, RelativePath,
-    RemoteTarget, SourceFile,
+    CancelToken, Error, ErrorKind, HashAlgorithm, Hasher, InventoryEntry, LocalSource,
+    OpenedSource, RelativePath, RemoteTarget, SourceFile,
 };
 
 fn path(text: &str) -> RelativePath {
@@ -36,6 +36,17 @@ impl FakeSource {
 }
 
 impl LocalSource for FakeSource {
+    fn inventory(&self, _cancel: &CancelToken) -> Result<Vec<InventoryEntry>, Error> {
+        Ok(self
+            .files
+            .iter()
+            .map(|(p, bytes)| InventoryEntry {
+                path: path(p),
+                size: bytes.len() as u64,
+            })
+            .collect())
+    }
+
     fn files(&self, cancel: &CancelToken) -> Result<Vec<SourceFile>, Error> {
         if cancel.is_cancelled() {
             return Err(Error::new(ErrorKind::Cancelled, "cancelled"));

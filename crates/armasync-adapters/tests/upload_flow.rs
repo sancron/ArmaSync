@@ -47,6 +47,10 @@ struct CancelAfter<'a> {
 }
 
 impl LocalSource for CancelAfter<'_> {
+    fn inventory(&self, cancel: &CancelToken) -> Result<Vec<armasync_core::InventoryEntry>, Error> {
+        self.inner.inventory(cancel)
+    }
+
     fn files(&self, cancel: &CancelToken) -> Result<Vec<armasync_core::SourceFile>, Error> {
         self.inner.files(cancel)
     }

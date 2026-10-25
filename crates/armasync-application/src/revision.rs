@@ -9,11 +9,13 @@
 
 use std::io::Cursor;
 
+use armasync_core::exclusion::ExclusionRules;
 use armasync_core::{
     CancelToken, Error, ErrorKind, HashAlgorithm, Hasher, LocalSource, OpenedSource, RelativePath,
     RemoteTarget, SourceFile,
 };
 
+use crate::exclusion::{Exclusion, partition};
 use crate::upload;
 
 /// Schema name of the revision manifest.
@@ -108,6 +110,10 @@ pub struct PublishReport {
     pub files_uploaded: u64,
     /// Whether `current.json` was replaced by this run.
     pub pointer_changed: bool,
+    /// Files of the source that are not part of the revision, with the reason (ADR-0013).
+    pub exclusions: Vec<Exclusion>,
+    /// Exclusion rules that match no file of the source.
+    pub unused_rules: Vec<RelativePath>,
 }
 
 /// Publishes the content of `source` as a revision (ADR-0012).
@@ -122,8 +128,23 @@ pub fn publish(
     hasher: &dyn Hasher,
     cancel: &CancelToken,
 ) -> Result<PublishReport, Error> {
-    let files = source.files(cancel)?;
-    let revision = Revision::build(&files, hasher)?;
+    publish_with_rules(source, target, hasher, &ExclusionRules::default(), cancel)
+}
+
+/// Publishes the content of `source` without the excluded files (ADR-0013): internal and partial files are never part
+/// of a revision, and the files matched by `rules` are left out.
+///
+/// # Errors
+/// As [`publish`].
+pub fn publish_with_rules(
+    source: &dyn LocalSource,
+    target: &dyn RemoteTarget,
+    hasher: &dyn Hasher,
+    rules: &ExclusionRules,
+    cancel: &CancelToken,
+) -> Result<PublishReport, Error> {
+    let split = partition(source, rules, cancel)?;
+    let revision = Revision::build(&split.included, hasher)?;
     let directory = format!("revisions/{}", revision.id);
     let manifest_path = parse(&format!("{directory}/manifest.json"))?;
     let mut report = PublishReport {
@@ -131,6 +152,8 @@ pub fn publish(
         revision_was_complete: false,
         files_uploaded: 0,
         pointer_changed: false,
+        exclusions: split.excluded.clone(),
+        unused_rules: split.unused_rules.clone(),
     };
 
     match target.fetch(&manifest_path, MAX_MANIFEST_BYTES)? {
@@ -156,7 +179,13 @@ pub fn publish(
             inner: target,
             prefix: format!("{files_directory}/"),
         };
-        let plan = upload::plan(source, &scoped, cancel)?;
+        let plan = upload::plan_included(
+            &split.included,
+            split.excluded.clone(),
+            split.unused_rules.clone(),
+            &scoped,
+            cancel,
+        )?;
         let uploaded = upload::apply(&plan, source, &scoped, cancel)?;
         report.files_uploaded = uploaded.files_created + uploaded.files_replaced;
         check_cancel(cancel)?;

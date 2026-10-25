@@ -463,6 +463,15 @@ pub struct SourceFile {
     pub hash: ContentHash,
 }
 
+/// One regular file of the source, as seen by the inventory: its path and size.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InventoryEntry {
+    /// Relative path below the source root.
+    pub path: RelativePath,
+    /// Size in bytes at listing time.
+    pub size: u64,
+}
+
 /// A local file opened for an upload (ADR-0011).
 pub struct OpenedSource {
     /// Size in bytes at the time the file was opened.
@@ -482,11 +491,19 @@ impl std::fmt::Debug for OpenedSource {
 /// Local files an upload reads from (ADR-0011). Implementations never list or open links, junctions or other
 /// non-regular files, and they never leave their root.
 pub trait LocalSource {
-    /// All regular files below the source root, sorted by path. `cancel` is checked between files.
+    /// All regular files below the source root that may be uploaded (no internal data, no partial files), with
+    /// their hashes, sorted by path. Listing never changes the source (ADR-0013). `cancel` is checked between files.
     ///
     /// # Errors
     /// File-system failures; [`ErrorKind::Cancelled`].
     fn files(&self, cancel: &CancelToken) -> Result<Vec<SourceFile>, Error>;
+
+    /// Every regular file below the source root, including internal and partial files, with path and size only,
+    /// sorted by path. Used for the upload preview so that every exclusion can be shown (ADR-0013).
+    ///
+    /// # Errors
+    /// File-system failures; [`ErrorKind::Cancelled`].
+    fn inventory(&self, cancel: &CancelToken) -> Result<Vec<InventoryEntry>, Error>;
 
     /// Opens one regular file for reading.
     ///

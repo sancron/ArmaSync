@@ -31,7 +31,7 @@ use super::{LocalDirectory, Pins, STAGING_PREFIX, fs_error, is_link, refused};
 use crate::memory::Sha256Hasher;
 
 /// Prefix of the partial data and state files; names with this prefix belong to the adapter.
-pub const PARTIAL_PREFIX: &str = ".armasync-partial-";
+pub const PARTIAL_PREFIX: &str = armasync_core::exclusion::PARTIAL_PREFIX;
 /// Partial files older than this are removed by a scan (a transfer that long ago cannot be continued).
 pub const PARTIAL_MAX_AGE: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 

@@ -46,9 +46,9 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use fs4::FileExt;
 
 use armasync_core::{
-    CancelToken, ContentHash, Digest, Error, ErrorKind, HashAlgorithm, Hasher, LocalFile,
-    LocalSource, LocalStore, OpenedSource, PartialFile, PartialKey, RelativePath, SourceFile,
-    Spool, StagedFile, TRANSFER_CHUNK,
+    CancelToken, ContentHash, Digest, Error, ErrorKind, HashAlgorithm, Hasher, InventoryEntry,
+    LocalFile, LocalSource, LocalStore, OpenedSource, PartialFile, PartialKey, RelativePath,
+    SourceFile, Spool, StagedFile, TRANSFER_CHUNK,
 };
 
 use crate::memory::Sha256Hasher;
@@ -58,7 +58,7 @@ mod partial;
 pub use partial::{PARTIAL_MAX_AGE, PARTIAL_PREFIX};
 
 /// Prefix of temporary staging files; names with this prefix belong to the adapter.
-pub const STAGING_PREFIX: &str = ".armasync-";
+pub const STAGING_PREFIX: &str = armasync_core::exclusion::INTERNAL_PREFIX;
 const STAGING_SUFFIX: &str = ".tmp";
 /// Staging leftovers older than this are removed by a scan (a live transfer is never that old).
 pub const STALE_STAGING_AGE: Duration = Duration::from_secs(60 * 60);
@@ -429,27 +429,97 @@ fn hash_file(
     }
 }
 
-/// The source side of an upload (ADR-0011). Listing uses the scan rules; reading refuses links and non-regular files
+impl LocalDirectory {
+    /// Read-only walk below `directory` for the upload source (ADR-0013). It collects regular files with their sizes and
+    /// changes nothing: no removal of staging or partial files, no lock. Links are never followed. Internal names
+    /// (`.armasync-…`) are skipped unless `include_internal` is set; unsafe names are skipped as well.
+    fn walk(
+        &self,
+        directory: &Path,
+        prefix: &str,
+        include_internal: bool,
+        cancel: &CancelToken,
+        out: &mut Vec<(RelativePath, u64)>,
+    ) -> Result<(), Error> {
+        let entries = fs::read_dir(directory).map_err(|e| {
+            fs_error(
+                "read the folder",
+                if prefix.is_empty() { "." } else { prefix },
+                &e,
+            )
+        })?;
+        for entry in entries {
+            if cancel.is_cancelled() {
+                return Err(Error::new(ErrorKind::Cancelled, "cancelled"));
+            }
+            let Ok(entry) = entry else { continue };
+            let file_name = entry.file_name();
+            let Some(name) = file_name.to_str() else {
+                continue;
+            };
+            if !include_internal && name.starts_with(STAGING_PREFIX) {
+                continue;
+            }
+            let Ok(metadata) = fs::symlink_metadata(entry.path()) else {
+                continue;
+            };
+            if is_link(&metadata) {
+                continue;
+            }
+            let relative = format!("{prefix}{name}");
+            if metadata.is_dir() {
+                self.walk(
+                    &entry.path(),
+                    &format!("{relative}/"),
+                    include_internal,
+                    cancel,
+                    out,
+                )?;
+            } else if metadata.is_file() {
+                let Ok(path) = RelativePath::parse(&relative) else {
+                    continue;
+                };
+                out.push((path, metadata.len()));
+            }
+        }
+        Ok(())
+    }
+}
+
+/// The source side of an upload (ADR-0011). Listing is read-only (ADR-0013); reading refuses links and non-regular files
 /// and keeps the verified folders pinned while the file is read (Windows).
 impl LocalSource for LocalDirectory {
     fn files(&self, cancel: &CancelToken) -> Result<Vec<SourceFile>, Error> {
-        let listed = LocalStore::list(self, HashAlgorithm::Sha256, cancel)?;
-        listed
+        let mut found = Vec::new();
+        self.walk(&self.root, "", false, cancel, &mut found)?;
+        found.sort_by(|a, b| a.0.cmp(&b.0));
+        found
             .into_iter()
-            .map(|file| {
-                let hash = file.hash.ok_or_else(|| {
+            .map(|(path, size)| {
+                let hash = hash_file(
+                    &self.root.join(path.as_str()),
+                    HashAlgorithm::Sha256,
+                    cancel,
+                )?
+                .ok_or_else(|| {
                     Error::new(
                         ErrorKind::FileSystem,
-                        format!("'{}' could not be read for hashing", file.path),
+                        format!("'{path}' could not be read for hashing"),
                     )
                 })?;
-                Ok(SourceFile {
-                    path: file.path,
-                    size: file.size,
-                    hash,
-                })
+                Ok(SourceFile { path, size, hash })
             })
             .collect()
+    }
+
+    fn inventory(&self, cancel: &CancelToken) -> Result<Vec<InventoryEntry>, Error> {
+        let mut found = Vec::new();
+        self.walk(&self.root, "", true, cancel, &mut found)?;
+        found.sort_by(|a, b| a.0.cmp(&b.0));
+        Ok(found
+            .into_iter()
+            .map(|(path, size)| InventoryEntry { path, size })
+            .collect())
     }
 
     fn open(&self, path: &RelativePath) -> Result<OpenedSource, Error> {
