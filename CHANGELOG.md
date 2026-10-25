@@ -2,6 +2,7 @@
 
 ## Unreleased — Rust-Migrationsvorbereitung (2026-10-25)
 
+- MIG-032R2 integriert: Teildateien werden nie mehr über einen vorhandenen Namen geöffnet oder beschrieben (Fortsetzen über kopierte Bytes, Zustand über Temp-Datei und Rename, Linkschutz beim Öffnen; Sentinel-Tests). Unter Windows bleibt die Linkzahl ungeprüft (stabiles Rust 1.85); RB-01 offen ([ADR-0009](docs/adr/0009-resume-range.md)).
 - MIG-032R integriert: Fortsetzen unterbrochener Downloads gewöhnlicher Dateien mit HTTP-`Range` und starkem ETag als Validator (`If-Range`, strenge 206-Prüfung, einmaliger Neustart bei verweigertem Resume, Gesamtprüfung über Hash). Teildaten bleiben nach einem Netzabbruch im Zielordner; ein Abbruch entfernt sie. Gepackte Archive laden weiterhin neu ([ADR-0009](docs/adr/0009-resume-range.md)).
 - MIG-032B integriert: Vorabkontrolle des freien Speicherplatzes vor einer Synchronisation (mit Reserve und Berücksichtigung gepackter Blätter; bei unbekanntem Platz ohne Prüfung) sowie Abbruchtests für große und gepackte Downloads in der GUI.
 - MIG-030E integriert: komprimierte Blätter mit bekannter Archivgröße werden sicher entpackt und installiert (ein Eintrag, Stored/Deflate, 2 GiB, Verhältnis 1032:1, SHA-1-Prüfung vor dem atomaren Commit); Blätter ohne nutzbare Archivgröße bleiben unsupported. Echte Serverarchive nicht belegt ([ADR-0008](docs/adr/0008-packed-files-zip.md)).

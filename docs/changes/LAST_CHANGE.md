@@ -1,5 +1,14 @@
 # Letzte integrierte Änderung
 
+**2026-10-25 · MIG-032R2 · Claude · Härtung der Teildateien gegen Hardlinks und Namensaustausch** (nach `development`, Fast-Forward)
+
+* **MIG-032R2** ([Bericht](2026-10-25-MIG-032R2.md), [Handoff](../handoffs/MIG-032R2.md), [Task](../tasks/MIG-032R2.md)): Ein vorhandener Teilnamen wird nie mehr zum Schreiben geöffnet. Frischer Start entfernt den Eintrag und legt neu an; Fortsetzen kopiert die gültigen Bytes lesend in eine neue Datei; der Zustand wird über eine Temp-Datei ersetzt. Öffnen verweigert Links; drei Sentinel-Tests belegen, dass externe Dateien unverändert bleiben.
+* **Grenze:** Die Linkzahl kann unter Windows auf stabilem Rust 1.85 nicht gelesen werden; RB-01 (Unix-Pfadrennen) bleibt offen.
+* **Prüfungen (Windows, lokal):** fmt, Clippy `-D warnings`, Workspace-Tests inkl. GUI und Ende-zu-Ende, MSRV 1.85 ohne GUI bestanden.
+* **Nicht geprüft:** WSL/Linux (zurückgestellt), GitHub-CI (pausiert).
+
+Vorheriger Stand:
+
 **2026-10-25 · MIG-032R · Claude · Resume mit `Range` und Validatorvertrag für gewöhnliche Dateien** (nach `development`, Fast-Forward)
 
 * **MIG-032R** ([Bericht](2026-10-25-MIG-032R.md), [Handoff](../handoffs/MIG-032R.md), [ADR-0009](../adr/0009-resume-range.md)): Ein unterbrochener Download einer Datei wird nur mit einem **starken** ETag fortgesetzt: `Range` und `If-Range`, Prüfung von 206, `Content-Range`, Gesamtgröße und Validator; 200, 416 und abweichende Antworten führen zu einem Neustart oder einer verweigerten Wiederaufnahme (einmal von Null). Teildaten liegen im Zielordner unter dem reservierten Präfix; ein Netzabbruch behält sie, ein kooperativer Abbruch entfernt sie. Vor dem Übernehmen wird die Gesamtdatei über Größe und Manifest-Hash geprüft, die Zieldatei bleibt bis dahin unverändert. Gepackte Archive sind **nicht** fortsetzbar (bewusst).
