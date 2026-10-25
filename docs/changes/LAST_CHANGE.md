@@ -1,5 +1,12 @@
 # Letzte integrierte Änderung
 
+**2026-10-25 · MIG-042 (Schritt 2) · Claude · Revisionen und Veröffentlichung (ADR-0012)** (nach `development`, Fast-Forward)
+
+* **MIG-042, Schritt 2** ([Bericht](2026-10-25-MIG-042-S2.md), [Handoff](../handoffs/MIG-042-S2.md), [ADR-0012](../adr/0012-revisions-and-publication.md), [Task](../tasks/MIG-042.md)): Revisionskennung aus dem Inhalt; Revisions-Manifest; Dateien in `revisions/<id>/files/`, Manifest zuletzt; Zeiger `current.json` zuletzt, alter Zeiger in `history/` gesichert und per GET verifiziert. Keine Löschungen. **Atomarität wird nicht behauptet**; das Legacy-Metadatenformat (ADR-0003) ist nicht geschrieben.
+* **Tests:** 6 Loopback-Tests (Erfolg, Wiederholung, neue Revision mit Archivierung, Abbruch während der Übertragung, Fehler beim Zeiger-Schreiben, abweichende Revision), 5 Anwendungstests mit In-Memory-Ziel.
+
+Vorheriger Stand:
+
 **2026-10-25 · MIG-042 (Schritt 1) · Claude · Upload-Vertrag und Plan/Apply mit WebDAV-Ziel und lokaler Quelle** (nach `development`, Fast-Forward)
 
 * **MIG-042, Schritt 1** ([Bericht](2026-10-25-MIG-042.md), [Handoff](../handoffs/MIG-042.md), [ADR-0011](../adr/0011-upload-contract.md), [Task](../tasks/MIG-042.md)): Core-Ports `LocalSource` und `RemoteTarget`; Anwendungsschicht `upload::plan` (ändert nichts) und `upload::apply` (Planreihenfolge, Abbruch vor jedem Schritt und während jedes Uploads, Größenprüfung gegen den Plan, keine Löschungen); `LocalDirectory` als Quelle mit den Scan-Schutzregeln; `WebDavClient` als Ziel mit Streaming-Upload und Abbruch.
