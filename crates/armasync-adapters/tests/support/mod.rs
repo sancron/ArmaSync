@@ -28,6 +28,53 @@ struct State {
     seen: Vec<Seen>,
     /// Path whose `PUT` is answered with `500` and not stored (fault injection).
     fail_put: Option<String>,
+    /// Content faults: what a successful-looking `PUT` or a `GET` does to files whose path contains the text.
+    faults: Vec<Fault>,
+}
+
+/// A fault applied to every `PUT` (stored differently or not at all) or `GET` (failing) of a matching path.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FaultKind {
+    /// The first byte is changed before the content is stored.
+    CorruptBody,
+    /// Only the first half of the content is stored.
+    TruncateBody,
+    /// Nothing is stored, although the server answers success.
+    DropBody,
+    /// Reading the file answers `500`.
+    FailGet,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct Fault {
+    contains: String,
+    kind: FaultKind,
+}
+
+/// The content that is stored for a `PUT`, or `None` when the fault drops it.
+fn put_fault(faults: &[Fault], rel: &str, body: Vec<u8>) -> Option<Vec<u8>> {
+    let Some(fault) = faults
+        .iter()
+        .find(|f| f.kind != FaultKind::FailGet && rel.contains(&f.contains))
+    else {
+        return Some(body);
+    };
+    match fault.kind {
+        FaultKind::CorruptBody => {
+            let mut body = body;
+            if let Some(first) = body.first_mut() {
+                *first ^= 0xff;
+            }
+            Some(body)
+        }
+        FaultKind::TruncateBody => {
+            let mut body = body;
+            body.truncate(body.len() / 2);
+            Some(body)
+        }
+        FaultKind::DropBody => None,
+        FaultKind::FailGet => Some(body),
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -84,6 +131,19 @@ impl Server {
     /// Stops the fault injection.
     pub fn clear_failures(&self) {
         self.state.lock().unwrap().fail_put = None;
+    }
+
+    /// Applies `kind` to every path that contains `contains`, from now on.
+    pub fn inject(&self, contains: &str, kind: FaultKind) {
+        self.state.lock().unwrap().faults.push(Fault {
+            contains: contains.to_owned(),
+            kind,
+        });
+    }
+
+    /// Removes all content faults.
+    pub fn clear_faults(&self) {
+        self.state.lock().unwrap().faults.clear();
     }
 
     /// Names of all stored files, sorted.
@@ -328,11 +388,17 @@ fn handle<S: Read + Write>(stream: &mut S, state: &Mutex<State>, options: &Optio
             } else if parent_missing || st.dirs.contains(rel) {
                 respond(stream, "409 Conflict", &[], b"");
             } else {
-                let existed = st.files.insert(rel.to_owned(), request.body).is_some();
-                let status = if existed {
-                    "204 No Content"
-                } else {
-                    "201 Created"
+                // The server answers success in every case; a fault decides what it actually stores.
+                let status = match put_fault(&st.faults, rel, request.body) {
+                    None => "201 Created",
+                    Some(stored) => {
+                        let existed = st.files.insert(rel.to_owned(), stored).is_some();
+                        if existed {
+                            "204 No Content"
+                        } else {
+                            "201 Created"
+                        }
+                    }
                 };
                 respond(stream, status, &[], b"");
             }
@@ -349,10 +415,20 @@ fn handle<S: Read + Write>(stream: &mut S, state: &Mutex<State>, options: &Optio
                 respond(stream, "404 Not Found", &[], b"");
             }
         }
-        "GET" => match st.files.get(rel) {
-            Some(bytes) => respond(stream, "200 OK", &[], bytes),
-            None => respond(stream, "404 Not Found", &[], b""),
-        },
+        "GET" => {
+            if st
+                .faults
+                .iter()
+                .any(|f| f.kind == FaultKind::FailGet && rel.contains(&f.contains))
+            {
+                respond(stream, "500 Internal Server Error", &[], b"");
+            } else {
+                match st.files.get(rel) {
+                    Some(bytes) => respond(stream, "200 OK", &[], bytes),
+                    None => respond(stream, "404 Not Found", &[], b""),
+                }
+            }
+        }
         _ => respond(stream, "405 Method Not Allowed", &[], b""),
     }
 }

@@ -160,8 +160,13 @@ pub fn publish(
         let uploaded = upload::apply(&plan, source, &scoped, cancel)?;
         report.files_uploaded = uploaded.files_created + uploaded.files_replaced;
         check_cancel(cancel)?;
+    }
+    // Every file is read back and checked before anything that names the revision is written (step 3a, ADR-0012).
+    verify_files(target, &directory, &revision.files, hasher, cancel)?;
+    if !report.revision_was_complete {
         // The manifest comes last: its presence marks the revision as complete.
         upload_bytes(target, &manifest_path, &revision.manifest, cancel)?;
+        verify_manifest(target, &manifest_path, &revision.manifest)?;
     }
 
     publish_pointer(
@@ -172,6 +177,80 @@ pub fn publish(
         &mut report,
     )?;
     Ok(report)
+}
+
+/// Reads every file of the revision back from the target and checks its size and SHA-256 against the manifest.
+///
+/// Nothing is written by this function. Any missing, shortened, lengthened or altered file stops the publication with
+/// [`ErrorKind::Integrity`]; a failed read is reported as the transport error it is.
+fn verify_files(
+    target: &dyn RemoteTarget,
+    directory: &str,
+    files: &[SourceFile],
+    hasher: &dyn Hasher,
+    cancel: &CancelToken,
+) -> Result<(), Error> {
+    for file in files {
+        check_cancel(cancel)?;
+        let path = parse(&format!("{directory}/files/{}", file.path))?;
+        let bytes = match target.fetch(&path, file.size) {
+            Ok(Some(bytes)) => bytes,
+            Ok(None) => {
+                return Err(Error::new(
+                    ErrorKind::Integrity,
+                    format!(
+                        "'{}' is missing on the target; the pointer was not changed",
+                        file.path
+                    ),
+                ));
+            }
+            // The read is limited to the announced size: a longer file is refused by the adapter.
+            Err(error) if error.kind() == ErrorKind::Format => {
+                return Err(Error::new(
+                    ErrorKind::Integrity,
+                    format!(
+                        "'{}' differs in size on the target; the pointer was not changed",
+                        file.path
+                    ),
+                ));
+            }
+            Err(error) => return Err(error),
+        };
+        if bytes.len() as u64 != file.size {
+            return Err(Error::new(
+                ErrorKind::Integrity,
+                format!(
+                    "'{}' differs in size on the target; the pointer was not changed",
+                    file.path
+                ),
+            ));
+        }
+        if hasher.hash(HashAlgorithm::Sha256, &bytes) != file.hash {
+            return Err(Error::new(
+                ErrorKind::Integrity,
+                format!(
+                    "'{}' differs in content on the target; the pointer was not changed",
+                    file.path
+                ),
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Reads the manifest back and compares it with the bytes that were written.
+fn verify_manifest(
+    target: &dyn RemoteTarget,
+    path: &RelativePath,
+    manifest: &[u8],
+) -> Result<(), Error> {
+    match target.fetch(path, MAX_MANIFEST_BYTES)? {
+        Some(stored) if stored == manifest => Ok(()),
+        _ => Err(Error::new(
+            ErrorKind::Integrity,
+            "the revision manifest could not be verified on the target; the pointer was not changed",
+        )),
+    }
 }
 
 /// Replaces `current.json` with `pointer`, keeping the previous pointer in `history/` first.
