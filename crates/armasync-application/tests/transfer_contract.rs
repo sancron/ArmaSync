@@ -504,7 +504,11 @@ impl armasync_core::PartialFile for CountingPartial<'_> {
 
     fn discard(self: Box<Self>) {}
 
-    fn commit_to(self: Box<Self>, target: &RelativePath) -> Result<(), Error> {
+    fn commit_to(
+        self: Box<Self>,
+        target: &RelativePath,
+        _expected: &armasync_core::ContentHash,
+    ) -> Result<(), Error> {
         let this = *self;
         this.store.committed = Some((target.clone(), this.bytes));
         Ok(())

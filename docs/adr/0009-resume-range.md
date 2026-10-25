@@ -111,3 +111,12 @@ Ein Review fand, dass Teildatei-Namen geprüft und danach geöffnet bzw. beschri
 * Die Zustandsdatei wird über eine neue Temp-Datei und Rename geschrieben. Ein Link am Zustandsnamen wird ersetzt, sein Ziel nie beschrieben.
 * Öffnen bestehender Namen verweigert Links: `O_NOFOLLOW` unter Linux und macOS, unter Windows das Reparse-Point-Öffnen mit Prüfung des Handles. Windows-Handles ohne `FILE_SHARE_DELETE` verhindern, dass der Name während der Nutzung ersetzt wird.
 * **Grenze:** Die Linkzahl wird nicht geprüft; stabiles Rust (1.85) kann sie unter Windows nicht lesen. Unix-Pfadrennen (RB-01) bleibt offen.
+
+### Zweite Härtungsrunde (Namensaustausch während des Übergangs)
+
+Ein weiteres Review fand, dass ein Name zwischen dem Schließen eines Handles und dem Rename per Pfad getauscht werden konnte. Die Regel ist jetzt:
+
+* **Schreiben nur über einen Handle, den der Adapter selbst angelegt hat** (`create_new`). Ein Fortsetzen kopiert die gültigen Bytes in dieses Handle und behält es für den Rest des Laufs. Namen werden nur noch umbenannt oder entfernt, nie mehr beschrieben.
+* **Commit** schreibt nichts mehr über einen Namen. Das Ziel wird per Rename ersetzt; danach wird der installierte Inhalt über einen Handle mit Linkschutz gelesen und gegen den **erwarteten Hash** aus dem Manifest geprüft (`PartialFile::commit_to(target, expected)`). Stimmt er nicht, wird der Name entfernt (der Link-Ziel bleibt unberührt) und `Integrity` gemeldet. Ein unverifizierter Inhalt bleibt also nicht installiert. Der Preis: Die Gesamtdatei wird einmal zusätzlich gelesen.
+* **Grenze:** Ein Angreifer mit Schreibrecht im Zielordner kann das Ziel ersetzen; das Ergebnis ist dann ein Integritätsfehler, und die alte Zieldatei ist verloren. Eine Wiederherstellung der alten Datei ist nicht möglich, weil sie beim Rename bereits überschrieben ist.
+* **Test-Seam:** `LocalDirectory::set_rename_hook` (versteckt, nur für Tests) ruft vor jedem Rename per Name einen Callback auf. Die Race-Tests tauschen den Namen genau in diesem Übergang gegen einen Hardlink auf eine externe Sentinel-Datei. Ohne den Nachprüfschritt schlagen die Tests fehl (geprüft durch Abschalten des Schritts).

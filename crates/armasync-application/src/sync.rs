@@ -359,7 +359,7 @@ fn install_plain(
         partial.discard();
         return Err(integrity(path, "checksum differs"));
     }
-    partial.commit_to(path)
+    partial.commit_to(path, &entry.hash)
 }
 
 fn integrity(path: &RelativePath, what: &str) -> Error {

@@ -107,6 +107,18 @@ pub struct LocalDirectory {
     root: PathBuf,
     /// The held exclusive lock (`None` for a read-only handle). Released when the last clone is dropped.
     lock: Option<Arc<File>>,
+    /// Test seam (MIG-032R2): called with a name right before a partial file renames it. `None` in products.
+    rename_hook: Option<RenameHook>,
+}
+
+/// A callback that observes names before the adapter renames them (see [`LocalDirectory::set_rename_hook`]).
+#[derive(Clone)]
+pub struct RenameHook(pub Arc<dyn Fn(&Path) + Send + Sync>);
+
+impl std::fmt::Debug for RenameHook {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("RenameHook")
+    }
 }
 
 /// Handles that keep verified folders from being renamed or deleted (Windows); empty elsewhere.
@@ -138,7 +150,11 @@ impl LocalDirectory {
                 format!("the destination folder cannot be resolved: {e}"),
             )
         })?;
-        Ok(Self { root, lock: None })
+        Ok(Self {
+            root,
+            lock: None,
+            rename_hook: None,
+        })
     }
 
     /// A handle that may change the destination and holds the exclusive lock until it is dropped. Use it for the
@@ -175,6 +191,12 @@ impl LocalDirectory {
         })?;
         directory.lock = Some(Arc::new(file));
         Ok(directory)
+    }
+
+    /// Installs a test seam that observes every name a partial file renames (MIG-032R2 race tests).
+    #[doc(hidden)]
+    pub fn set_rename_hook(&mut self, hook: RenameHook) {
+        self.rename_hook = Some(hook);
     }
 
     fn require_lock(&self) -> Result<(), Error> {

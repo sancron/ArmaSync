@@ -526,7 +526,19 @@ impl PartialFile for InMemoryPartial<'_> {
         self.fate = Fate::Discard;
     }
 
-    fn commit_to(mut self: Box<Self>, target: &RelativePath) -> Result<(), Error> {
+    fn commit_to(
+        mut self: Box<Self>,
+        target: &RelativePath,
+        expected: &ContentHash,
+    ) -> Result<(), Error> {
+        if Sha256Hasher.hash(expected.algorithm(), &self.data) != *expected {
+            self.data.clear();
+            self.fate = Fate::Discard;
+            return Err(Error::new(
+                ErrorKind::Integrity,
+                "verification failed; the file was not installed",
+            ));
+        }
         self.fate = Fate::Commit;
         let data = std::mem::take(&mut self.data);
         self.store.write(target, &data)

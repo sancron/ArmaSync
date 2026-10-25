@@ -9,8 +9,12 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use armasync_adapters::localfs::{LocalDirectory, PARTIAL_PREFIX};
-use armasync_core::{LocalStore, PartialKey, RelativePath};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+use armasync_adapters::Sha256Hasher;
+use armasync_adapters::localfs::{LocalDirectory, PARTIAL_PREFIX, RenameHook};
+use armasync_core::{ErrorKind, HashAlgorithm, Hasher, LocalStore, PartialKey, RelativePath};
 
 const SIZE: u64 = 4000;
 
@@ -156,5 +160,90 @@ fn a_linked_data_file_on_a_fresh_start_is_removed_as_a_name_only() {
     drop(destination);
 
     assert_eq!(fs::read(&sentinel).unwrap(), original);
+    fs::remove_dir_all(base).unwrap();
+}
+
+/// A test seam that, the first time the adapter renames a name ending with `suffix`, moves the object at that name out
+/// of the way and puts a hard link to `sentinel` in its place: a name swapped in the middle of the transition.
+fn swap_hook(suffix: &'static str, sentinel: PathBuf, moved: PathBuf) -> RenameHook {
+    let fired = Arc::new(AtomicBool::new(false));
+    RenameHook(Arc::new(move |name: &Path| {
+        if name.to_string_lossy().ends_with(suffix) && !fired.swap(true, Ordering::SeqCst) {
+            fs::rename(name, &moved).unwrap();
+            fs::hard_link(&sentinel, name).unwrap();
+        }
+    }))
+}
+
+#[test]
+fn a_name_swapped_during_the_commit_never_installs_the_external_file() {
+    let base = scratch("race-commit");
+    let root = base.join("dest");
+    let sentinel = base.join("sentinel.bin");
+    let original = vec![0x5A; 2000];
+    fs::write(&sentinel, &original).unwrap();
+    let verified = vec![0x11; SIZE as usize];
+    let expected = Sha256Hasher.hash(HashAlgorithm::Sha256, &verified);
+
+    let mut destination = LocalDirectory::open_exclusive(&root).unwrap();
+    destination.set_rename_hook(swap_hook(
+        ".part",
+        sentinel.clone(),
+        base.join("moved-commit.bin"),
+    ));
+    let mut partial = destination.partial(&key()).unwrap();
+    partial.restart(Some("\"v1\"")).unwrap();
+    partial.write_all(&verified).unwrap();
+    let target = RelativePath::parse("a.pbo").unwrap();
+    let error = partial.commit_to(&target, &expected).unwrap_err();
+
+    assert_eq!(error.kind(), ErrorKind::Integrity);
+    assert_eq!(
+        fs::read(&sentinel).unwrap(),
+        original,
+        "the external file is untouched"
+    );
+    assert!(
+        !root.join("a.pbo").exists(),
+        "no unverified file is installed"
+    );
+    assert!(partial_entries(&root).is_empty(), "nothing is left behind");
+    fs::remove_dir_all(base).unwrap();
+}
+
+#[test]
+fn a_name_swapped_during_a_resume_never_installs_external_bytes() {
+    let base = scratch("race-resume");
+    let root = base.join("dest");
+    leave_partial(&root, &[7; 1000]);
+    let sentinel = base.join("sentinel.bin");
+    let original = vec![0x5A; 2000];
+    fs::write(&sentinel, &original).unwrap();
+    let mut verified = vec![7u8; 1000];
+    verified.extend(vec![9u8; SIZE as usize - 1000]);
+    let expected = Sha256Hasher.hash(HashAlgorithm::Sha256, &verified);
+
+    let mut destination = LocalDirectory::open_exclusive(&root).unwrap();
+    destination.set_rename_hook(swap_hook(
+        ".tmp",
+        sentinel.clone(),
+        base.join("moved-resume.bin"),
+    ));
+    let mut partial = destination.partial(&key()).unwrap();
+    assert!(partial.stored().is_some(), "the stored prefix is continued");
+    partial.write_all(&vec![9u8; SIZE as usize - 1000]).unwrap();
+    let target = RelativePath::parse("a.pbo").unwrap();
+    let error = partial.commit_to(&target, &expected).unwrap_err();
+
+    assert_eq!(error.kind(), ErrorKind::Integrity);
+    assert_eq!(
+        fs::read(&sentinel).unwrap(),
+        original,
+        "the external file is untouched"
+    );
+    assert!(
+        !root.join("a.pbo").exists(),
+        "no unverified file is installed"
+    );
     fs::remove_dir_all(base).unwrap();
 }

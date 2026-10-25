@@ -22,12 +22,13 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
 use armasync_core::{
-    Error, PartialFile, PartialKey, RelativePath, StoredPartial, TRANSFER_CHUNK,
-    is_strong_validator,
+    ContentHash, Error, ErrorKind, Hasher, PartialFile, PartialKey, RelativePath, StoredPartial,
+    TRANSFER_CHUNK, is_strong_validator,
 };
 use sha2::{Digest as _, Sha256};
 
 use super::{LocalDirectory, Pins, STAGING_PREFIX, fs_error, is_link, refused};
+use crate::memory::Sha256Hasher;
 
 /// Prefix of the partial data and state files; names with this prefix belong to the adapter.
 pub const PARTIAL_PREFIX: &str = ".armasync-partial-";
@@ -123,14 +124,47 @@ fn open_existing_read(path: &Path) -> io::Result<File> {
     guard(OpenOptions::new().read(true)).open(path)
 }
 
-/// Opens an existing name for reading and writing, never following a link.
-fn open_existing_write(path: &Path) -> io::Result<File> {
-    guard(OpenOptions::new().read(true).write(true)).open(path)
+/// Creates a new file. Fails if the name exists in any form, including a link. The handle is what the adapter writes
+/// through for the whole run; names are only renamed or removed. On Windows the handle allows renaming (share
+/// delete), because the file moves to its final name while it is still open.
+fn create_new(path: &Path) -> io::Result<File> {
+    let mut options = OpenOptions::new();
+    options.read(true).write(true).create_new(true);
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        const FILE_SHARE_READ: u32 = 0x1;
+        const FILE_SHARE_WRITE: u32 = 0x2;
+        const FILE_SHARE_DELETE: u32 = 0x4;
+        options.share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE);
+    }
+    options.open(path)
 }
 
-/// Creates a new file. Fails if the name exists in any form, including a link.
-fn create_new(path: &Path) -> io::Result<File> {
-    guard(OpenOptions::new().read(true).write(true).create_new(true)).open(path)
+/// Calls the test seam before the adapter renames `path` by name (see [`crate::localfs::RenameHook`]).
+fn before_rename(store: &LocalDirectory, path: &Path) {
+    if let Some(hook) = &store.rename_hook {
+        (hook.0)(path);
+    }
+}
+
+/// Whether the file at `path` (read through a guarded handle) has exactly the verified content. Used after a rename by
+/// name, because a rename may have moved another object into place.
+fn installed_matches(path: &Path, expected: &ContentHash) -> io::Result<bool> {
+    let mut file = open_existing_read(path)?;
+    if !is_plain_handle(&file) {
+        return Ok(false);
+    }
+    let mut digest = Sha256Hasher.digest(expected.algorithm());
+    let mut buffer = vec![0u8; TRANSFER_CHUNK];
+    loop {
+        let read = file.read(&mut buffer)?;
+        if read == 0 {
+            break;
+        }
+        digest.update(&buffer[..read]);
+    }
+    Ok(digest.finish() == *expected)
 }
 
 /// Removes the directory entry at `path` (never the target of a link). Missing names are fine.
@@ -193,10 +227,11 @@ fn copy_prefix(source: &mut File, target: &mut File, length: u64) -> io::Result<
     Ok(true)
 }
 
-/// Continues from a prefix without writing to the existing name: the valid bytes are copied into a new file the
-/// adapter created (a temporary name with the staging suffix, so a crash leaves a leftover the scan removes), and that
-/// file is renamed over the data name. Returns the handle of the new data file, positioned at its end.
+/// Continues from a prefix. The valid bytes are copied into a new file the adapter created under a temporary name, and
+/// that **same handle** is kept for the rest of the run: after the rename into place, all writes go through the handle,
+/// never through a name. Returns the handle, positioned after the copied prefix.
 fn continue_in_place(
+    store: &LocalDirectory,
     directory: &Path,
     data_name: &str,
     data_path: &Path,
@@ -216,15 +251,9 @@ fn continue_in_place(
             "the stored bytes are shorter than their state",
         ));
     }
-    copy.sync_all()?;
-    drop(copy);
+    before_rename(store, &temporary);
     fs::rename(&temporary, data_path)?;
-    let mut file = open_existing_write(data_path)?;
-    if !is_plain_handle(&file) {
-        return Err(io::Error::other("the data file was replaced"));
-    }
-    file.seek(SeekFrom::End(0))?;
-    Ok(file)
+    Ok(copy)
 }
 
 /// What happens to the bytes when the handle ends.
@@ -290,7 +319,14 @@ pub(super) fn open<'a>(
     };
     let (stored, file) = match read_stored(key, &data_path, &state_path) {
         Some((stored, source)) => {
-            match continue_in_place(&directory, &data_name, &data_path, source, stored.offset) {
+            match continue_in_place(
+                store,
+                &directory,
+                &data_name,
+                &data_path,
+                source,
+                stored.offset,
+            ) {
                 Ok(file) => (Some(stored), file),
                 Err(_) => (None, fresh(&data_path)?),
             }
@@ -411,23 +447,39 @@ impl PartialFile for LocalPartial<'_> {
         self.fate = Fate::Discard;
     }
 
-    fn commit_to(mut self: Box<Self>, target: &RelativePath) -> Result<(), Error> {
-        // Every failure before the swap removes the bytes (the target keeps its content); only a successful swap
-        // leaves nothing but the state to remove.
+    fn commit_to(
+        mut self: Box<Self>,
+        target: &RelativePath,
+        expected: &ContentHash,
+    ) -> Result<(), Error> {
+        // Until the swap, a failure removes the bytes and the target keeps its content.
         self.fate = Fate::Discard;
         let relative = target.as_str().to_owned();
         let file = self
             .file
-            .take()
+            .as_ref()
             .ok_or_else(|| refused(&relative, "the partial file is already closed"))?;
         file.sync_all()
             .map_err(|e| fs_error("flush to disk", &relative, &e))?;
-        drop(file);
-        // Re-check right before the swap, like a staged commit.
+        // Re-check right before the swap, like a staged commit. The write handle stays open across the rename: the
+        // bytes are written through it, so the swap cannot send a write to another object.
         let (target_path, _recheck) = self.store.secure_target(target, false)?;
+        before_rename(self.store, &self.data_path);
         fs::rename(&self.data_path, &target_path)
             .map_err(|e| fs_error("replace", &relative, &e))?;
         self.fate = Fate::Commit;
+        self.file = None;
+        // A rename by name can move another object into place. The installed file must be the verified content;
+        // anything else is removed as a name (the link's target is never touched) and reported.
+        let verified = installed_matches(&target_path, expected).unwrap_or(false);
+        if !verified {
+            let _ = remove_entry(&target_path);
+            self.remove_state();
+            return Err(Error::new(
+                ErrorKind::Integrity,
+                format!("verification failed for {relative} after the swap; the file was removed"),
+            ));
+        }
         self.remove_state();
         #[cfg(unix)]
         if let Some(parent) = target_path.parent() {

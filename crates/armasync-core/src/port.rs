@@ -375,7 +375,11 @@ pub trait PartialFile: Read + Write + Seek {
     ///
     /// # Errors
     /// [`ErrorKind::FileSystem`].
-    fn commit_to(self: Box<Self>, target: &RelativePath) -> Result<(), Error>;
+    fn commit_to(
+        self: Box<Self>,
+        target: &RelativePath,
+        expected: &ContentHash,
+    ) -> Result<(), Error>;
 }
 
 /// Unpacks a packed archive (ADR-0008). The core only states the contract; the archive format lives in an adapter.
