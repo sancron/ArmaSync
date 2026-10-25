@@ -1,9 +1,10 @@
 # Letzte integrierte Änderung
 
-**2026-10-25 · MIG-032R2 · Claude · Härtung der Teildateien gegen Hardlinks und Namensaustausch** (nach `development`, Fast-Forward)
+**2026-10-25 · MIG-032R2 · Claude · Härtung der Teildateien, zwei Review-Runden** (nach `development`, Fast-Forward)
 
 * **MIG-032R2** ([Bericht](2026-10-25-MIG-032R2.md), [Handoff](../handoffs/MIG-032R2.md), [Task](../tasks/MIG-032R2.md)): Ein vorhandener Teilnamen wird nie mehr zum Schreiben geöffnet. Frischer Start entfernt den Eintrag und legt neu an; Fortsetzen kopiert die gültigen Bytes lesend in eine neue Datei; der Zustand wird über eine Temp-Datei ersetzt. Öffnen verweigert Links; drei Sentinel-Tests belegen, dass externe Dateien unverändert bleiben.
-* **Grenze:** Die Linkzahl kann unter Windows auf stabilem Rust 1.85 nicht gelesen werden; RB-01 (Unix-Pfadrennen) bleibt offen.
+* **Zweite Runde:** Schreiben nur über selbst angelegte Handles, Commit prüft den installierten Inhalt nach dem Rename gegen den Manifest-Hash. Schlägt die Prüfung fehl und lässt sich die unverifizierte Datei nicht entfernen, meldet der Commit einen Dateisystemfehler, der sagt, dass sie am Ziel liegen bleiben kann.
+* **Grenze:** Die Linkzahl kann unter Windows auf stabilem Rust 1.85 nicht gelesen werden; RB-01 (Unix-Pfadrennen) bleibt offen. Der Löschfehler-Pfad hat keinen deterministischen Test.
 * **Prüfungen (Windows, lokal):** fmt, Clippy `-D warnings`, Workspace-Tests inkl. GUI und Ende-zu-Ende, MSRV 1.85 ohne GUI bestanden.
 * **Nicht geprüft:** WSL/Linux (zurückgestellt), GitHub-CI (pausiert).
 

@@ -370,11 +370,18 @@ pub trait PartialFile: Read + Write + Seek {
     /// Removes the bytes and their state at once (cancellation, integrity failure, end of a verified archive).
     fn discard(self: Box<Self>);
 
-    /// Makes the complete, verified file the content of `target` **atomically**, like [`StagedFile::commit`]. The
-    /// state is removed. If this fails, `target` keeps its old content and the bytes are removed.
+    /// Makes the complete file the content of `target`, after checking that the installed content has the hash
+    /// `expected` (the verified checksum of the manifest). The swap is by name, so the check runs after it.
+    ///
+    /// Outcomes (MIG-032R2):
+    /// * before the swap fails (flush, target check, rename): `target` keeps its old content and the bytes are removed;
+    /// * the swap succeeded but the installed content does not match `expected`: the unverified file is removed and
+    ///   [`ErrorKind::Integrity`] is returned; **the previous content of `target` is lost** by then. If that removal
+    ///   fails too, [`ErrorKind::FileSystem`] is returned and the message says that an unverified file may remain;
+    /// * success: the state is removed and `target` has the verified content.
     ///
     /// # Errors
-    /// [`ErrorKind::FileSystem`].
+    /// [`ErrorKind::FileSystem`], [`ErrorKind::Integrity`].
     fn commit_to(
         self: Box<Self>,
         target: &RelativePath,

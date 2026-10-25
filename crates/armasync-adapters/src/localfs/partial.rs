@@ -473,12 +473,21 @@ impl PartialFile for LocalPartial<'_> {
         // anything else is removed as a name (the link's target is never touched) and reported.
         let verified = installed_matches(&target_path, expected).unwrap_or(false);
         if !verified {
-            let _ = remove_entry(&target_path);
             self.remove_state();
-            return Err(Error::new(
-                ErrorKind::Integrity,
-                format!("verification failed for {relative} after the swap; the file was removed"),
-            ));
+            return Err(match remove_entry(&target_path) {
+                Ok(()) => Error::new(
+                    ErrorKind::Integrity,
+                    format!(
+                        "verification failed for {relative} after the swap; the unverified file was removed"
+                    ),
+                ),
+                Err(error) => Error::new(
+                    ErrorKind::FileSystem,
+                    format!(
+                        "verification failed for {relative} after the swap, and the unverified file could not be removed ({error}); it may remain at the target"
+                    ),
+                ),
+            });
         }
         self.remove_state();
         #[cfg(unix)]
