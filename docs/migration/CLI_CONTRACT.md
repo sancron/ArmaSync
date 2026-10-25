@@ -67,6 +67,10 @@ Menschenlesbare Fortschritte/Diagnosen nach stderr, strukturiertes Ergebnis nach
 
 Nicht-TTY/`--no-input` darf nie auf Eingaben warten. Fehlende Credentials oder notwendige Zustimmung mit eindeutigem Fehler beenden. Credential-Eingabe per sicherem Prompt bzw. expliziter Credential-Quelle; kein Kennwort in History/Logs. Kein versteckter Import oder Löschdefault.
 
+## Upload (`upload plan`, `upload publish`; MIG-042 Schritt 4a, [ADR-0014](../adr/0014-upload-cli.md))
+
+`upload plan --source DIR --target URL [--user NAME] [--password-env VARIABLE] [--exclude PFAD]…` zeigt die Vorschau: einbezogene und ausgeschlossene Dateien mit Grund (`partial-file`, `internal-data`, `user-rule`) und ungenutzte Regeln. Schreibt nichts auf das Ziel. `upload publish …` veröffentlicht die Revision nur mit `--yes`; ohne `--yes` endet der Befehl mit Exitcode 3 und veröffentlicht nichts. Es gibt keine Rückfrage, die CLI wartet nie auf Eingaben. Das Kennwort wird nie als Argument angenommen, sondern aus der Umgebungsvariable gelesen, die `--password-env` nennt (Standard `ARMASYNC_UPLOAD_PASSWORD`); es wird nicht ausgegeben und nicht gespeichert. Adressen mit Benutzername, Kennwort, Abfrage oder Fragment werden abgelehnt (Exitcode 3). Zugangsdaten gehen nur an HTTPS. `--json`: `command` = `upload-plan` bzw. `upload-publish`. Exitcodes: 0; 2 Aufruf oder unsicherer Ausschluss; 3 fehlende Zustimmung, Zugangsdaten oder unzulässige Adresse; 4 Netzwerk, TLS oder HTTP-Status; 5 Quelle oder Dateisystem; 6 Integrität; 130 Abbruch (der Zeiger bleibt unverändert). **Noch nicht enthalten:** Fortschritt pro Datei (MIG-042-S4C) und die GUI (MIG-042-S4B).
+
 ## Vorgeschlagene Exitcodes
 
 | Code | Bedeutung |
