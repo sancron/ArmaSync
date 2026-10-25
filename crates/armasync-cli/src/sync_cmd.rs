@@ -195,19 +195,19 @@ fn metadata_warning_text(warning: &SyncWarning) -> String {
 fn metadata_warning_json(warning: &SyncWarning) -> Value {
     match warning {
         SyncWarning::UnsafeFileName { shown, reason } => {
-            json!({"code": "unsafe-file-name", "name": shown, "reason": reason})
+            json!({"code": warning.code(), "name": shown, "reason": reason})
         }
         SyncWarning::UnsafeFolderName {
             shown,
             reason,
             files_left_out,
         } => {
-            json!({"code": "unsafe-folder-name", "name": shown, "reason": reason, "files_left_out": files_left_out})
+            json!({"code": warning.code(), "name": shown, "reason": reason, "files_left_out": files_left_out})
         }
         SyncWarning::CompressedFileUnsupported(path) => {
-            json!({"code": "compressed-file-unsupported", "path": path.as_str()})
+            json!({"code": warning.code(), "path": path.as_str()})
         }
-        SyncWarning::ServerInfoPathIgnored => json!({"code": "server-info-path-ignored"}),
+        SyncWarning::ServerInfoPathIgnored => json!({"code": warning.code()}),
     }
 }
 

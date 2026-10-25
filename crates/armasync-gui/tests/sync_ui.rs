@@ -173,8 +173,7 @@ fn plan_rows_state_their_action_in_words_and_start_appears_only_after_the_plan()
         "each row says what it does"
     );
     harness.get_by_label(PBO);
-    harness
-        .get_by_label_contains("Hinweis: Komprimiert geführte Datei wird noch nicht unterstützt");
+    harness.get_by_label_contains("Hinweis: Komprimiert geführte Datei ohne nutzbare Archivgröße");
     harness.get_by_label_contains("Bleibt unverändert (2)");
     let start = harness.get_by_role_and_label(Role::Button, START_LABEL);
     assert!(!start.accesskit_node().is_disabled());

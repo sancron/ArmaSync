@@ -71,6 +71,20 @@ pub enum SyncWarning {
     ServerInfoPathIgnored,
 }
 
+impl SyncWarning {
+    /// Stable machine-readable code: the CLI's JSON output uses it, and the GUI names the same cases with the same
+    /// meaning (in German).
+    #[must_use]
+    pub const fn code(&self) -> &'static str {
+        match self {
+            Self::UnsafeFileName { .. } => "unsafe-file-name",
+            Self::UnsafeFolderName { .. } => "unsafe-folder-name",
+            Self::CompressedFileUnsupported(_) => "compressed-file-unsupported",
+            Self::ServerInfoPathIgnored => "server-info-path-ignored",
+        }
+    }
+}
+
 /// Server-reported values (informational).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ServerSummary {

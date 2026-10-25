@@ -20,6 +20,8 @@ egui_extras = "0.37.0"
 [dev-dependencies]
 egui_kittest = "0.37.0"
 armasync-testkit.workspace = true
+# Test-only: packed test archives are generated in the tests (MIG-030E).
+zip = { version = "7.3.0", default-features = false, features = ["deflate-flate2"] }
 
 [lints]
 workspace = true

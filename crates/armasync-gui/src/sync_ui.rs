@@ -293,7 +293,7 @@ fn show_plan(screen: &mut SyncScreen, ui: &mut egui::Ui, error: egui::Color32) {
             }
             for path in &plan.unsupported {
                 ui.label(format!(
-                    "Komprimiert geführt, noch nicht unterstützt (wird nie gelöscht): {path}"
+                    "Komprimiert geführt ohne nutzbare Archivgröße, nicht unterstützt (wird nie gelöscht): {path}"
                 ));
             }
         });

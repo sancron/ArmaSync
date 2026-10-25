@@ -13,7 +13,7 @@
 //! * deleting extra files is off by default, needs explicit folders, lists every file to be deleted and needs a
 //!   separate confirmation;
 //! * on a platform that is not released, the plan can be viewed but not applied;
-//! * protected and unsupported (compressed) entries are shown as "stay unchanged" and are part of the plan
+//! * protected and unsupported (compressed without a usable archive size) entries are shown as "stay unchanged" and are part of the plan; compressed entries with a usable archive size are installed like any other file (MIG-030E)
 //!   options by construction of the workflow.
 
 use std::fmt;
@@ -118,7 +118,7 @@ pub struct PlanView {
     pub notes: Vec<String>,
     /// Paths that stay untouched because the repository protects them.
     pub protected: Vec<String>,
-    /// Paths of files the server holds compressed; not installed yet and never deleted.
+    /// Paths of files the server holds compressed without a usable archive size; not installed and never deleted.
     pub unsupported: Vec<String>,
     /// The repository was marked as needing credentials.
     pub needs_credentials: bool,
@@ -334,7 +334,7 @@ fn metadata_warning_text(warning: &SyncWarning) -> String {
             "Ein Ordner mit unsicherem Namen wurde mit {files_left_out} Datei(en) ausgelassen: „{shown}“."
         ),
         SyncWarning::CompressedFileUnsupported(path) => format!(
-            "Komprimiert geführte Datei wird noch nicht unterstützt und bleibt unverändert: {path}"
+            "Komprimiert geführte Datei ohne nutzbare Archivgröße bleibt unverändert: {path}"
         ),
         SyncWarning::ServerInfoPathIgnored => {
             "Ein Ordnerpfad der Serverinformation wurde ignoriert (kein sicherer Pfad).".to_owned()

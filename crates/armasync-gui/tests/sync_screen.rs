@@ -13,7 +13,10 @@ use armasync_adapters::LibraryStore;
 use armasync_adapters::localfs::LocalDirectory;
 use armasync_core::{DisplayName, ErrorKind, Library, Repository, RepositoryId, RepositoryUrl};
 use armasync_gui::sync_screen::{Outcome, PlanAction, Stage, SyncScreen};
-use armasync_testkit::{BIKEY, Behavior, PBO, Server, ZIP, bikey, pbo, serve, serve_tls};
+use armasync_testkit::synthetic::{Item, TestDir, TestFile, tree_file};
+use armasync_testkit::{
+    BIKEY, Behavior, PBO, Published, Server, ZIP, bikey, pbo, serve, serve_published, serve_tls,
+};
 use armasync_workflow::{PlatformStatus, platform_status_for};
 
 struct Env {
@@ -222,11 +225,9 @@ fn the_plan_is_shown_before_anything_changes() {
             .collect::<Vec<_>>(),
         [(PlanAction::Download, PBO), (PlanAction::Download, BIKEY)]
     );
-    assert!(
-        view.notes
-            .iter()
-            .any(|n| n.contains("Komprimiert geführte Datei"))
-    );
+    let hint =
+        format!("Komprimiert geführte Datei ohne nutzbare Archivgröße bleibt unverändert: {ZIP}");
+    assert!(view.notes.contains(&hint), "{:?}", view.notes);
     assert_eq!(view.unsupported, [ZIP]);
     assert_eq!(view.protected, ["@second"]);
     assert!(
@@ -534,4 +535,87 @@ fn dropping_the_screen_while_a_transfer_runs_cancels_it_without_hanging() {
     assert!(started.elapsed() < Duration::from_secs(10));
     // The worker was cancelled and joined; the old destination content is untouched.
     assert!(!env.dest.join(PBO).exists());
+}
+
+// ---- packed (ZIP) files with a usable archive size (MIG-030E, ADR-0008) ------------------------------------------
+//
+// Archives and metadata are generated here; no real repository content is involved.
+
+const PACKED: &str = "@packed/packed.pbo";
+
+fn packed_content() -> Vec<u8> {
+    (0..150_000u32)
+        .map(|i| (i % 239) as u8 ^ (i / 13) as u8)
+        .collect()
+}
+
+fn deflated_zip(name: &str, data: &[u8]) -> Vec<u8> {
+    use std::io::{Cursor, Write};
+    let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
+    writer
+        .start_file(
+            name,
+            zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Deflated),
+        )
+        .unwrap();
+    writer.write_all(data).unwrap();
+    writer.finish().unwrap().into_inner()
+}
+
+fn packed_repository(content: &[u8], archive: Vec<u8>) -> Published {
+    use armasync_core::{HashAlgorithm, Hasher};
+    let sha1 = armasync_adapters::Sha256Hasher
+        .hash(HashAlgorithm::Sha1, content)
+        .hex()
+        .to_owned();
+    let mut file = TestFile::new("packed.pbo", content.len() as i64);
+    file.sha1 = sha1.as_str().into();
+    file.compressed = true;
+    file.compressed_size = archive.len() as i64;
+    let addon = TestDir {
+        name: "@packed".to_owned(),
+        hidden: false,
+        addon: true,
+        items: vec![Item::File(file)],
+    };
+    let root = TestDir::new("racine", vec![Item::Dir(addon)]);
+    let mut files = std::collections::BTreeMap::new();
+    files.insert(format!("{PACKED}.zip"), archive);
+    Published {
+        sync: tree_file(&root),
+        files,
+    }
+}
+
+#[test]
+fn a_compressed_file_with_a_usable_archive_size_is_installed_not_listed_as_unsupported() {
+    let content = packed_content();
+    let archive = deflated_zip("packed.pbo", &content);
+    let server = serve_published(packed_repository(&content, archive));
+    let env = env_for(&server);
+    let mut screen = screen(&env);
+
+    plan(&mut screen);
+    let view = screen.plan().unwrap();
+    assert_eq!(
+        view.rows
+            .iter()
+            .map(|r| (r.action, r.path.as_str()))
+            .collect::<Vec<_>>(),
+        [(PlanAction::Download, PACKED)]
+    );
+    assert!(view.unsupported.is_empty(), "{:?}", view.unsupported);
+    assert!(
+        !view.notes.iter().any(|n| n.contains("Komprimiert")),
+        "{:?}",
+        view.notes
+    );
+    assert_eq!(server.requested(".zip"), 0, "planning downloads nothing");
+
+    run(&mut screen);
+    assert_eq!(screen.stage(), Stage::Finished);
+    assert_eq!(fs::read(env.dest.join(PACKED)).unwrap(), content);
+    assert_eq!(files(&env.dest), [PACKED], "no archive is left behind");
+    assert_eq!(server.requested(".zip"), 1);
 }
