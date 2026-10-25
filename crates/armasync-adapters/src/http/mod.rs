@@ -16,14 +16,19 @@
 //! * Every failure maps to a core [`ErrorKind`]: network, authentication and trust problems are `Network`; a body
 //!   that differs from the announcement is `Integrity`; cancellation is `Cancelled`.
 //!
-//! Not done here (later tasks): resume with `Range`, authentication, explicit proxy settings (the proxy of the
-//! environment is honoured), parallel transfers, compressed (`.zip`) files.
+//! Resume (MIG-032R, ADR-0009): a request with a stored **strong** validator sends `Range: bytes=<offset>-` and
+//! `If-Range`. Only a `206` whose `Content-Range` covers exactly the rest of the announced file **and** whose `ETag`
+//! equals the stored validator continues the transfer; every other answer restarts at zero or is refused as
+//! `Integrity` ("resume refused"). A `416` is a refused resume as well.
+//!
+//! Not done here (later tasks): authentication, explicit proxy settings (the proxy of the environment is honoured),
+//! parallel transfers, compressed (`.zip`) files.
 
-use std::io::{Read, Write};
+use std::io::Read;
 use std::time::Duration;
 
 use armasync_core::{
-    CancelToken, Error, ErrorKind, Manifest, RelativePath, RepositorySource, TRANSFER_CHUNK,
+    Error, ErrorKind, Manifest, Opened, RelativePath, RepositorySource, is_strong_validator,
 };
 use ureq::Agent;
 use ureq::tls::{Certificate, RootCerts, TlsConfig};
@@ -217,15 +222,24 @@ impl HttpRepository {
         format!("{}/{}", self.base, encoded.join("/"))
     }
 
-    /// Performs a GET, following permitted redirects, and returns the response when the status is 200.
+    /// Performs a GET, following permitted redirects. Without `range` the answer must be 200 (the whole file). With
+    /// `range = (offset, validator)` it asks `bytes=<offset>-` with `If-Range: <validator>`; the answer is then 200
+    /// (whole file: the range was ignored or the file changed) or 206. Returns the status with the response.
     fn get(
         &self,
         url: &str,
         body_budget: Option<Duration>,
-    ) -> Result<ureq::http::Response<ureq::Body>, Error> {
+        range: Option<(u64, &str)>,
+    ) -> Result<(u16, ureq::http::Response<ureq::Body>), Error> {
         let mut current = url.to_owned();
         for _ in 0..=MAX_REDIRECTS {
-            let builder = self.agent.get(&current).config();
+            let mut builder = self.agent.get(&current);
+            if let Some((offset, validator)) = range {
+                builder = builder
+                    .header("Range", format!("bytes={offset}-"))
+                    .header("If-Range", validator);
+            }
+            let builder = builder.config();
             let request = match body_budget {
                 Some(budget) => builder.timeout_recv_body(Some(budget)).build(),
                 None => builder.build(),
@@ -233,7 +247,12 @@ impl HttpRepository {
             let response = request.call().map_err(|e| map_ureq(&e))?;
             let status = response.status().as_u16();
             match status {
-                200 => {
+                200 | 206 => {
+                    if status == 206 && range.is_none() {
+                        return Err(network(
+                            "the server answered with unexpected partial content",
+                        ));
+                    }
                     let encoding = response
                         .headers()
                         .get("content-encoding")
@@ -244,7 +263,13 @@ impl HttpRepository {
                             "the server answered with an unsupported content encoding",
                         ));
                     }
-                    return Ok(response);
+                    return Ok((status, response));
+                }
+                416 if range.is_some() => {
+                    return Err(Error::new(
+                        ErrorKind::Integrity,
+                        "resume refused: the server cannot answer the requested range",
+                    ));
                 }
                 301 | 302 | 303 | 307 | 308 => {
                     let location = response
@@ -273,9 +298,10 @@ impl HttpRepository {
 
     /// Downloads a metadata file completely, within the size limit.
     fn metadata_file(&self, name: &str) -> Result<Vec<u8>, Error> {
-        let response = self.get(
+        let (_, response) = self.get(
             &self.url_for(&format!(".a3s/{name}")),
             Some(Duration::from_secs(300)),
+            None,
         )?;
         let mut body = response.into_body();
         let mut reader = body.as_reader();
@@ -344,16 +370,18 @@ impl RepositorySource for HttpSnapshot {
         self.repository.read(path)
     }
 
-    fn fetch(
+    fn identity(&self) -> &str {
+        self.repository.identity()
+    }
+
+    fn open(
         &self,
         path: &RelativePath,
         expected_size: u64,
-        out: &mut dyn Write,
-        cancel: &CancelToken,
-        progress: &mut dyn FnMut(u64),
-    ) -> Result<u64, Error> {
-        self.repository
-            .fetch(path, expected_size, out, cancel, progress)
+        offset: u64,
+        if_range: Option<&str>,
+    ) -> Result<Opened, Error> {
+        self.repository.open(path, expected_size, offset, if_range)
     }
 }
 
@@ -362,10 +390,15 @@ impl RepositorySource for HttpRepository {
         Ok(self.metadata()?.manifest)
     }
 
+    fn identity(&self) -> &str {
+        &self.base
+    }
+
     fn read(&self, path: &RelativePath) -> Result<Vec<u8>, Error> {
-        let response = self.get(
+        let (_, response) = self.get(
             &self.url_for(path.as_str()),
             Some(self.body_budget(MAX_READ_BYTES)),
+            None,
         )?;
         let mut body = response.into_body();
         let mut reader = body.as_reader();
@@ -384,74 +417,78 @@ impl RepositorySource for HttpRepository {
         Ok(data)
     }
 
-    fn fetch(
+    fn open(
         &self,
         path: &RelativePath,
         expected_size: u64,
-        out: &mut dyn Write,
-        cancel: &CancelToken,
-        progress: &mut dyn FnMut(u64),
-    ) -> Result<u64, Error> {
-        if cancel.is_cancelled() {
-            return Err(Error::new(ErrorKind::Cancelled, "cancelled"));
-        }
-        let response = self.get(
-            &self.url_for(path.as_str()),
-            Some(self.body_budget(expected_size)),
-        )?;
-        if let Some(announced) = response
+        offset: u64,
+        if_range: Option<&str>,
+    ) -> Result<Opened, Error> {
+        let url = self.url_for(path.as_str());
+        let remaining = expected_size.saturating_sub(offset);
+        let range = match if_range {
+            Some(validator) if offset > 0 && is_strong_validator(validator) => {
+                Some((offset, validator))
+            }
+            _ => None,
+        };
+        let (status, response) = self.get(&url, Some(self.body_budget(remaining)), range)?;
+        let validator = response
+            .headers()
+            .get("etag")
+            .and_then(|v| v.to_str().ok())
+            .filter(|v| is_strong_validator(v))
+            .map(str::to_owned);
+        let content_length = response
             .headers()
             .get("content-length")
             .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.parse::<u64>().ok())
-        {
-            if announced != expected_size {
-                return Err(Error::new(
-                    ErrorKind::Integrity,
-                    "the server announces a different size than the file list",
-                ));
-            }
-        }
-        let mut body = response.into_body();
-        let mut reader = body.as_reader();
-        let mut buffer = vec![0u8; TRANSFER_CHUNK];
-        let mut written: u64 = 0;
-        loop {
-            if cancel.is_cancelled() {
-                return Err(Error::new(ErrorKind::Cancelled, "cancelled"));
-            }
-            let read = reader.read(&mut buffer).map_err(|e| {
-                if e.kind() == std::io::ErrorKind::TimedOut {
-                    network("the transfer was too slow or stalled")
-                } else {
-                    network("the connection was lost during the transfer")
+            .and_then(|v| v.parse::<u64>().ok());
+        let start = match range {
+            Some((offset, wanted)) if status == 206 => {
+                let content_range = response
+                    .headers()
+                    .get("content-range")
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(parse_content_range);
+                let last = expected_size.saturating_sub(1);
+                let exact = content_range == Some((offset, last, expected_size))
+                    && validator.as_deref() == Some(wanted)
+                    && content_length.is_none_or(|len| len == remaining);
+                if !exact {
+                    return Err(refused_resume());
                 }
-            })?;
-            if read == 0 {
-                break;
+                offset
             }
-            let allowed = expected_size.saturating_sub(written);
-            let take = usize::try_from(allowed).map_or(read, |a| a.min(read));
-            if take > 0 {
-                out.write_all(&buffer[..take]).map_err(|_| {
-                    Error::new(ErrorKind::FileSystem, "cannot write the received data")
-                })?;
-                written += take as u64;
-                progress(take as u64);
+            _ => {
+                if content_length.is_some_and(|len| len != expected_size) {
+                    return Err(Error::new(
+                        ErrorKind::Integrity,
+                        "the server announces a different size than the file list",
+                    ));
+                }
+                0
             }
-            if take < read {
-                return Err(Error::new(
-                    ErrorKind::Integrity,
-                    "the server delivers more data than announced",
-                ));
-            }
-        }
-        if written != expected_size {
-            return Err(Error::new(
-                ErrorKind::Integrity,
-                "the server delivers less data than announced",
-            ));
-        }
-        Ok(written)
+        };
+        Ok(Opened {
+            start,
+            validator,
+            body: Box::new(response.into_body().into_reader()),
+        })
     }
+}
+
+fn refused_resume() -> Error {
+    Error::new(
+        ErrorKind::Integrity,
+        "resume refused: the answer does not match the requested range or validator",
+    )
+}
+
+/// Parses `bytes <first>-<last>/<total>` into its three numbers.
+fn parse_content_range(value: &str) -> Option<(u64, u64, u64)> {
+    let rest = value.strip_prefix("bytes ")?;
+    let (span, total) = rest.split_once('/')?;
+    let (first, last) = span.split_once('-')?;
+    Some((first.parse().ok()?, last.parse().ok()?, total.parse().ok()?))
 }

@@ -265,16 +265,15 @@ impl RepositorySource for CountingSource {
         self.inner.read(path)
     }
 
-    fn fetch(
+    fn open(
         &self,
         path: &RelativePath,
         expected_size: u64,
-        out: &mut dyn Write,
-        cancel: &CancelToken,
-        progress: &mut dyn FnMut(u64),
-    ) -> Result<u64, Error> {
+        offset: u64,
+        if_range: Option<&str>,
+    ) -> Result<armasync_core::Opened, Error> {
         self.fetched.set(self.fetched.get() + 1);
-        self.inner.fetch(path, expected_size, out, cancel, progress)
+        self.inner.open(path, expected_size, offset, if_range)
     }
 }
 
@@ -350,31 +349,41 @@ impl RepositorySource for GeneratedSource {
         panic!("the transfer must stream, not read the whole file");
     }
 
-    fn fetch(
+    fn open(
         &self,
         _path: &RelativePath,
         expected_size: u64,
-        out: &mut dyn Write,
-        cancel: &CancelToken,
-        progress: &mut dyn FnMut(u64),
-    ) -> Result<u64, Error> {
+        offset: u64,
+        _if_range: Option<&str>,
+    ) -> Result<armasync_core::Opened, Error> {
         assert_eq!(expected_size, self.size);
-        let mut chunk = vec![0u8; TRANSFER_CHUNK];
-        let mut done = 0u64;
-        while done < self.size {
-            if cancel.is_cancelled() {
-                return Err(Error::new(ErrorKind::Cancelled, "cancelled"));
-            }
-            let n = (self.size - done).min(TRANSFER_CHUNK as u64) as usize;
-            for (offset, byte) in chunk[..n].iter_mut().enumerate() {
-                *byte = generated_byte(done + offset as u64);
-            }
-            out.write_all(&chunk[..n])
-                .map_err(|_| Error::new(ErrorKind::FileSystem, "write failed"))?;
-            done += n as u64;
-            progress(n as u64);
+        assert_eq!(offset, 0, "this source has no validator and never resumes");
+        Ok(armasync_core::Opened {
+            start: 0,
+            validator: None,
+            body: Box::new(GeneratedBody {
+                size: self.size,
+                done: 0,
+            }),
+        })
+    }
+}
+
+/// The generated content of a source, streamed chunk by chunk.
+struct GeneratedBody {
+    size: u64,
+    done: u64,
+}
+
+impl io::Read for GeneratedBody {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        let left = self.size - self.done;
+        let n = usize::try_from(left).map_or(buffer.len(), |left| left.min(buffer.len()));
+        for (offset, byte) in buffer[..n].iter_mut().enumerate() {
+            *byte = generated_byte(self.done + offset as u64);
         }
-        Ok(done)
+        self.done += n as u64;
+        Ok(n)
     }
 }
 
@@ -438,6 +447,67 @@ impl LocalStore for CountingStore {
 
     fn spool(&mut self, _expected_size: u64) -> Result<Box<dyn armasync_core::Spool>, Error> {
         Ok(Box::new(std::io::Cursor::new(Vec::new())))
+    }
+
+    fn partial(
+        &mut self,
+        _key: &armasync_core::PartialKey,
+    ) -> Result<Box<dyn armasync_core::PartialFile + '_>, Error> {
+        Ok(Box::new(CountingPartial {
+            store: self,
+
+            bytes: 0,
+        }))
+    }
+}
+
+/// The partial file of [`CountingStore`]: counts the bytes, keeps nothing, and reports the total on commit.
+struct CountingPartial<'a> {
+    store: &'a mut CountingStore,
+    bytes: u64,
+}
+
+impl Write for CountingPartial<'_> {
+    fn write(&mut self, data: &[u8]) -> io::Result<usize> {
+        self.store.largest_write = self.store.largest_write.max(data.len());
+        self.bytes += data.len() as u64;
+        Ok(data.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+impl io::Read for CountingPartial<'_> {
+    fn read(&mut self, _buffer: &mut [u8]) -> io::Result<usize> {
+        Ok(0)
+    }
+}
+
+impl io::Seek for CountingPartial<'_> {
+    fn seek(&mut self, _position: io::SeekFrom) -> io::Result<u64> {
+        Ok(self.bytes)
+    }
+}
+
+impl armasync_core::PartialFile for CountingPartial<'_> {
+    fn stored(&self) -> Option<armasync_core::StoredPartial> {
+        None
+    }
+
+    fn restart(&mut self, _validator: Option<&str>) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn keep(self: Box<Self>) {}
+
+    fn discard(self: Box<Self>) {}
+
+    fn commit_to(self: Box<Self>, target: &RelativePath) -> Result<(), Error> {
+        let this = *self;
+        this.store.committed = Some((target.clone(), this.bytes));
+        Ok(())
     }
 }
 

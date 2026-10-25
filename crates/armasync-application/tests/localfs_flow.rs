@@ -5,7 +5,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::fs;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use armasync_adapters::localfs::LocalDirectory;
@@ -214,7 +213,9 @@ fn a_corrupted_transfer_leaves_the_old_file_and_no_temporary_file() {
 }
 
 #[test]
-fn a_dropped_connection_leaves_the_old_file_and_no_temporary_file() {
+fn a_dropped_connection_leaves_the_old_file_and_only_its_resumable_partial_bytes() {
+    // ADR-0009, section 5: a network failure keeps the received bytes (with their validator) for a resume; the target
+    // stays untouched. A cooperative cancellation would leave nothing (see the resume tests).
     let root = scratch("dropped");
     let big: Vec<u8> = (0..TRANSFER_CHUNK * 4).map(|i| (i % 251) as u8).collect();
     let mut source = repo(HashAlgorithm::Sha1, &[("a.pbo", big.as_slice())]);
@@ -230,7 +231,17 @@ fn a_dropped_connection_leaves_the_old_file_and_no_temporary_file() {
     .unwrap_err();
     assert_eq!(error.kind(), ErrorKind::Network);
     assert_eq!(fs::read(root.join("a.pbo")).unwrap(), b"old");
-    assert_eq!(files(&root), ["a.pbo"]);
+    let leftovers: Vec<String> = files(&root)
+        .into_iter()
+        .filter(|name| name != "a.pbo")
+        .collect();
+    assert!(
+        leftovers
+            .iter()
+            .all(|name| name.starts_with(armasync_adapters::localfs::PARTIAL_PREFIX)),
+        "only resumable partial files may remain: {leftovers:?}"
+    );
+    assert_eq!(leftovers.len(), 2, "data and state of the partial file");
     fs::remove_dir_all(root).unwrap();
 }
 
@@ -343,31 +354,41 @@ impl RepositorySource for Generated {
         panic!("must stream");
     }
 
-    fn fetch(
+    fn open(
         &self,
         _p: &RelativePath,
         expected: u64,
-        out: &mut dyn Write,
-        cancel: &CancelToken,
-        progress: &mut dyn FnMut(u64),
-    ) -> Result<u64, Error> {
+        offset: u64,
+        _if_range: Option<&str>,
+    ) -> Result<armasync_core::Opened, Error> {
         assert_eq!(expected, self.size);
-        let mut done = 0u64;
-        let mut chunk = vec![0u8; TRANSFER_CHUNK];
-        while done < self.size {
-            if cancel.is_cancelled() {
-                return Err(Error::new(ErrorKind::Cancelled, "cancelled"));
-            }
-            let n = (self.size - done).min(TRANSFER_CHUNK as u64) as usize;
-            for (o, b) in chunk[..n].iter_mut().enumerate() {
-                *b = generated_byte(done + o as u64);
-            }
-            out.write_all(&chunk[..n])
-                .map_err(|_| Error::new(ErrorKind::FileSystem, "write failed"))?;
-            done += n as u64;
-            progress(n as u64);
+        assert_eq!(offset, 0, "this source has no validator and never resumes");
+        Ok(armasync_core::Opened {
+            start: 0,
+            validator: None,
+            body: Box::new(GeneratedBody {
+                size: self.size,
+                done: 0,
+            }),
+        })
+    }
+}
+
+/// The generated content of a source, streamed (never held in memory).
+struct GeneratedBody {
+    size: u64,
+    done: u64,
+}
+
+impl std::io::Read for GeneratedBody {
+    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        let left = self.size - self.done;
+        let n = usize::try_from(left).map_or(buffer.len(), |left| left.min(buffer.len()));
+        for (offset, byte) in buffer[..n].iter_mut().enumerate() {
+            *byte = generated_byte(self.done + offset as u64);
         }
-        Ok(done)
+        self.done += n as u64;
+        Ok(n)
     }
 }
 

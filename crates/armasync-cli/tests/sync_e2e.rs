@@ -819,6 +819,7 @@ fn packed_repository(content: &[u8], archive: Vec<u8>, archive_size: i64) -> Pub
         sync: tree_file(&root),
         files,
         trickle: false,
+        ..Published::default()
     }
 }
 
@@ -924,4 +925,85 @@ fn a_packed_file_announced_above_the_size_limit_is_left_out_without_a_download()
     );
     assert_eq!(server.requested(".zip"), 0, "the archive is not downloaded");
     assert!(files(&env.dest).is_empty());
+}
+
+/// A repository with one plain file and a strong validator. Each `sync` call is its own process, so a second call
+/// proves the resume across process ends (MIG-032R, ADR-0009).
+fn plain_repository(name: &str, content: &[u8], cut_after: Option<usize>) -> Published {
+    let mut file = TestFile::new(name, content.len() as i64);
+    file.sha1 = sha1_hex(content).as_str().into();
+    let addon = TestDir {
+        name: "@plain".to_owned(),
+        hidden: false,
+        addon: true,
+        items: vec![Item::File(file)],
+    };
+    let root = TestDir::new("racine", vec![Item::Dir(addon)]);
+    let mut files = std::collections::BTreeMap::new();
+    files.insert(format!("@plain/{name}"), content.to_vec());
+    Published {
+        sync: tree_file(&root),
+        files,
+        etag: Some("\"v1\"".to_owned()),
+        cut_after,
+        ..Published::default()
+    }
+}
+
+#[test]
+fn an_interrupted_download_is_continued_by_the_next_process_with_a_range() {
+    let content: Vec<u8> = (0..400_000).map(|i| (i % 241) as u8).collect();
+    let server = serve_published(plain_repository("plain.pbo", &content, Some(150_000)));
+    let env = http_env(&server);
+    let folder = env.dest.join("@plain");
+    fs::create_dir_all(&folder).unwrap();
+
+    let first = sync(&env, "run", &[]);
+    assert_eq!(first.status.code(), Some(4), "{}", text(&first.stderr));
+    assert!(
+        !folder.join("plain.pbo").exists(),
+        "nothing is installed from a cut transfer"
+    );
+    let leftovers: Vec<String> = fs::read_dir(&folder)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .filter(|name| name.starts_with(".armasync-partial"))
+        .collect();
+    assert_eq!(leftovers.len(), 2, "data and state of the partial file");
+
+    server
+        .behavior
+        .lock()
+        .unwrap()
+        .published
+        .as_mut()
+        .unwrap()
+        .cut_after = None;
+    let second = sync(&env, "run", &[]);
+    assert_eq!(second.status.code(), Some(0), "{}", text(&second.stderr));
+    assert_eq!(fs::read(folder.join("plain.pbo")).unwrap(), content);
+    assert!(
+        fs::read_dir(&folder).unwrap().all(|entry| !entry
+            .unwrap()
+            .file_name()
+            .to_string_lossy()
+            .starts_with(".armasync-partial")),
+        "a verified file leaves no partial file"
+    );
+
+    let continued = server
+        .requests
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|(target, headers)| {
+            target.ends_with("plain.pbo")
+                && headers
+                    .iter()
+                    .any(|(key, value)| key == "range" && value == "bytes=150000-")
+        });
+    assert!(
+        continued,
+        "the second process asked for the rest of the file only"
+    );
 }

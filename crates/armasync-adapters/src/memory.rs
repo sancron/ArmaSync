@@ -5,12 +5,13 @@
 //! deterministically. They are test and prototype adapters, not a persistence layer.
 
 use std::collections::BTreeMap;
-use std::io::{self, Cursor, Write};
+use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
 
 use armasync_core::{
     CancelToken, ContentHash, Digest as CoreDigest, Error, ErrorKind, EventSink, FileEntry,
-    HashAlgorithm, Hasher, LocalFile, LocalStore, Manifest, OperationEvent, RelativePath,
-    RepositorySource, Spool, StagedFile, copy_in_chunks,
+    HashAlgorithm, Hasher, LocalFile, LocalStore, Manifest, Opened, OperationEvent, PartialFile,
+    PartialKey, RelativePath, RepositorySource, Spool, StagedFile, StoredPartial,
+    is_strong_validator,
 };
 use sha1::Sha1;
 use sha2::{Digest, Sha256};
@@ -63,6 +64,20 @@ pub struct InMemoryRepository {
     truncated: BTreeMap<RelativePath, usize>,
     algorithm: HashAlgorithm,
     unreachable: bool,
+    validator: ValidatorMode,
+    ignore_ranges: bool,
+}
+
+/// Which validator an in-memory repository sends with its answers (ADR-0009).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ValidatorMode {
+    /// A strong `ETag` derived from the served content (the default; changes with the content).
+    #[default]
+    Strong,
+    /// A weak `ETag` (`W/"…"`): must never be used for resume.
+    Weak,
+    /// No validator at all.
+    None,
 }
 
 impl InMemoryRepository {
@@ -87,6 +102,8 @@ impl InMemoryRepository {
             truncated: BTreeMap::new(),
             algorithm: HashAlgorithm::Sha256,
             unreachable: false,
+            validator: ValidatorMode::Strong,
+            ignore_ranges: false,
         })
     }
 
@@ -94,6 +111,20 @@ impl InMemoryRepository {
     #[must_use]
     pub fn with_algorithm(mut self, algorithm: HashAlgorithm) -> Self {
         self.algorithm = algorithm;
+        self
+    }
+
+    /// Chooses the validator sent with answers (ADR-0009). The default is a strong validator.
+    #[must_use]
+    pub fn with_validator(mut self, mode: ValidatorMode) -> Self {
+        self.validator = mode;
+        self
+    }
+
+    /// Answers every request with the whole file, as if `Range` were ignored (status 200).
+    #[must_use]
+    pub fn ignoring_ranges(mut self) -> Self {
+        self.ignore_ranges = true;
         self
     }
 
@@ -153,33 +184,77 @@ impl RepositorySource for InMemoryRepository {
             .ok_or_else(|| Error::new(ErrorKind::Network, format!("not found: {path}")))
     }
 
-    fn fetch(
+    fn identity(&self) -> &str {
+        "in-memory-repository"
+    }
+
+    fn open(
         &self,
         path: &RelativePath,
-        expected_size: u64,
-        out: &mut dyn Write,
-        cancel: &CancelToken,
-        progress: &mut dyn FnMut(u64),
-    ) -> Result<u64, Error> {
-        if cancel.is_cancelled() {
-            return Err(Error::new(ErrorKind::Cancelled, "cancelled"));
-        }
+        _expected_size: u64,
+        offset: u64,
+        if_range: Option<&str>,
+    ) -> Result<Opened, Error> {
         let data = self.read(path)?;
-        if let Some(limit) = self.truncated.get(path) {
-            let prefix = &data[..(*limit).min(data.len())];
-            // The prefix is delivered; the connection then drops.
-            match copy_in_chunks(prefix, prefix.len() as u64, out, cancel, progress) {
-                Ok(_) => {
-                    return Err(Error::new(
-                        ErrorKind::Network,
-                        "connection lost during the transfer",
-                    ));
-                }
-                Err(error) => return Err(error),
-            }
-        }
-        copy_in_chunks(&data, expected_size, out, cancel, progress)
+        let validator = match self.validator {
+            ValidatorMode::Strong => Some(format!("\"{:016x}\"", fnv1a(&data))),
+            ValidatorMode::Weak => Some(format!("W/\"{:016x}\"", fnv1a(&data))),
+            ValidatorMode::None => None,
+        };
+        // Like a server: the range is honoured only if `If-Range` names the current validator.
+        let resumes = !self.ignore_ranges
+            && offset > 0
+            && offset < data.len() as u64
+            && if_range.is_some()
+            && if_range == validator.as_deref();
+        let start = if resumes { offset } else { 0 };
+        let cut = self.truncated.get(path).copied();
+        Ok(Opened {
+            start,
+            validator: validator.filter(|v| is_strong_validator(v)),
+            body: Box::new(ScriptedBody {
+                data,
+                position: usize::try_from(start).unwrap_or(0),
+                cut,
+            }),
+        })
     }
+}
+
+/// The body of an in-memory answer. With `cut` set, it delivers the bytes up to that absolute position and then fails
+/// with a lost connection, like a dropped network transfer.
+struct ScriptedBody {
+    data: Vec<u8>,
+    position: usize,
+    cut: Option<usize>,
+}
+
+impl Read for ScriptedBody {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        let end = self
+            .cut
+            .map_or(self.data.len(), |cut| cut.min(self.data.len()));
+        if self.position < end {
+            let take = (end - self.position).min(buffer.len());
+            buffer[..take].copy_from_slice(&self.data[self.position..self.position + take]);
+            self.position += take;
+            return Ok(take);
+        }
+        if self.cut.is_some() {
+            return Err(io::Error::new(
+                io::ErrorKind::ConnectionReset,
+                "connection lost",
+            ));
+        }
+        Ok(0)
+    }
+}
+
+/// FNV-1a over the content: a deterministic stand-in for an `ETag` in tests (not a security property).
+fn fnv1a(data: &[u8]) -> u64 {
+    data.iter().fold(0xcbf2_9ce4_8422_2325, |hash, byte| {
+        (hash ^ u64::from(*byte)).wrapping_mul(0x0100_0000_01b3)
+    })
 }
 
 /// A local destination held in memory with atomic writes.
@@ -189,6 +264,15 @@ pub struct InMemoryStore {
     fail_writes_to: Option<RelativePath>,
     fail_staging_after: Option<usize>,
     free_space: Option<u64>,
+    partials: BTreeMap<PartialKey, PartialEntry>,
+}
+
+/// A partial file kept by an earlier handle (MIG-032R). Lives as long as the store instance, which stands for the
+/// destination between runs.
+#[derive(Debug, Clone)]
+struct PartialEntry {
+    data: Vec<u8>,
+    validator: Option<String>,
 }
 
 impl InMemoryStore {
@@ -235,6 +319,12 @@ impl InMemoryStore {
             .ok()
             .and_then(|path| self.files.get(&path))
             .map(Vec::as_slice)
+    }
+
+    /// Number of partial files kept for later runs (MIG-032R tests).
+    #[must_use]
+    pub fn partial_count(&self) -> usize {
+        self.partials.len()
     }
 
     /// All paths currently stored, sorted.
@@ -304,6 +394,162 @@ impl LocalStore for InMemoryStore {
 
     fn free_space(&self) -> Result<Option<u64>, Error> {
         Ok(self.free_space)
+    }
+
+    fn partial(&mut self, key: &PartialKey) -> Result<Box<dyn PartialFile + '_>, Error> {
+        let (data, validator) = self.partials.get(key).map_or((Vec::new(), None), |entry| {
+            (entry.data.clone(), entry.validator.clone())
+        });
+        let stored = match &validator {
+            Some(validator)
+                if !key.source.is_empty()
+                    && is_strong_validator(validator)
+                    && !data.is_empty()
+                    && (data.len() as u64) < key.size =>
+            {
+                Some(StoredPartial {
+                    offset: data.len() as u64,
+                    validator: validator.clone(),
+                })
+            }
+            _ => None,
+        };
+        let position = if stored.is_some() {
+            data.len() as u64
+        } else {
+            0
+        };
+        Ok(Box::new(InMemoryPartial {
+            store: self,
+            key: key.clone(),
+            data: if stored.is_some() { data } else { Vec::new() },
+            validator: if stored.is_some() { validator } else { None },
+            position,
+            stored,
+            fate: Fate::Keep,
+        }))
+    }
+}
+
+/// What happens to a partial file when its handle ends.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Fate {
+    /// Kept for a later run (also the result of dropping the handle).
+    Keep,
+    /// Removed.
+    Discard,
+    /// Moved to the target.
+    Commit,
+}
+
+/// The in-memory partial file. Its state is written back to the store when the handle ends.
+struct InMemoryPartial<'a> {
+    store: &'a mut InMemoryStore,
+    key: PartialKey,
+    data: Vec<u8>,
+    validator: Option<String>,
+    position: u64,
+    stored: Option<StoredPartial>,
+    fate: Fate,
+}
+
+impl Read for InMemoryPartial<'_> {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        let start = usize::try_from(self.position).unwrap_or(usize::MAX);
+        if start >= self.data.len() {
+            return Ok(0);
+        }
+        let take = (self.data.len() - start).min(buffer.len());
+        buffer[..take].copy_from_slice(&self.data[start..start + take]);
+        self.position += take as u64;
+        Ok(take)
+    }
+}
+
+impl Write for InMemoryPartial<'_> {
+    fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+        let end = self.position + buffer.len() as u64;
+        if let Some(limit) = self.store.fail_staging_after {
+            if end > limit as u64 {
+                return Err(io::Error::other("no space left"));
+            }
+        }
+        let start = usize::try_from(self.position).map_err(|_| io::Error::other("too large"))?;
+        if self.data.len() < start {
+            self.data.resize(start, 0);
+        }
+        let overlap = (self.data.len() - start).min(buffer.len());
+        self.data[start..start + overlap].copy_from_slice(&buffer[..overlap]);
+        self.data.extend_from_slice(&buffer[overlap..]);
+        self.position = end;
+        Ok(buffer.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+impl Seek for InMemoryPartial<'_> {
+    fn seek(&mut self, position: SeekFrom) -> io::Result<u64> {
+        let target = match position {
+            SeekFrom::Start(offset) => i128::from(offset),
+            SeekFrom::End(delta) => {
+                i128::try_from(self.data.len()).unwrap_or(i128::MAX) + i128::from(delta)
+            }
+            SeekFrom::Current(delta) => i128::from(self.position) + i128::from(delta),
+        };
+        let target = u64::try_from(target).map_err(|_| io::Error::other("invalid position"))?;
+        self.position = target;
+        Ok(target)
+    }
+}
+
+impl PartialFile for InMemoryPartial<'_> {
+    fn stored(&self) -> Option<StoredPartial> {
+        self.stored.clone()
+    }
+
+    fn restart(&mut self, validator: Option<&str>) -> Result<(), Error> {
+        self.data.clear();
+        self.position = 0;
+        self.validator = validator.map(str::to_owned);
+        self.stored = None;
+        Ok(())
+    }
+
+    fn keep(self: Box<Self>) {
+        drop(self);
+    }
+
+    fn discard(mut self: Box<Self>) {
+        self.fate = Fate::Discard;
+    }
+
+    fn commit_to(mut self: Box<Self>, target: &RelativePath) -> Result<(), Error> {
+        self.fate = Fate::Commit;
+        let data = std::mem::take(&mut self.data);
+        self.store.write(target, &data)
+    }
+}
+
+impl Drop for InMemoryPartial<'_> {
+    fn drop(&mut self) {
+        match self.fate {
+            Fate::Keep if self.validator.is_some() && !self.data.is_empty() => {
+                let entry = PartialEntry {
+                    data: std::mem::take(&mut self.data),
+                    validator: self.validator.take(),
+                };
+                self.store.partials.insert(self.key.clone(), entry);
+            }
+            Fate::Keep | Fate::Discard => {
+                self.store.partials.remove(&self.key);
+            }
+            Fate::Commit => {
+                self.store.partials.remove(&self.key);
+            }
+        }
     }
 }
 

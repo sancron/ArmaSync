@@ -20,7 +20,7 @@ pub mod store;
 pub mod sync_meta;
 
 pub use credentials::SessionCredentialStore;
-pub use memory::{InMemoryRepository, InMemoryStore, MemoryEventSink, Sha256Hasher};
+pub use memory::{InMemoryRepository, InMemoryStore, MemoryEventSink, Sha256Hasher, ValidatorMode};
 pub use paths::{DataRoots, PathMode};
 pub use store::{LibraryStore, SettingsStore};
 

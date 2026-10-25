@@ -218,6 +218,7 @@ version = "0.0.0"
 dependencies = [
  "armasync-compat",
  "armasync-core",
+ "armasync-testkit",
  "flate2",
  "fs4",
  "rcgen",

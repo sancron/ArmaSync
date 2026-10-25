@@ -16,8 +16,9 @@ use std::io::{self, Seek, SeekFrom, Write};
 use armasync_core::{
     ARCHIVE_SUFFIX, ArchiveReader, CancelToken, Digest, EVENT_SCHEMA_VERSION, Error, ErrorKind,
     EventSink, FileEntry, HashAlgorithm, Hasher, JobState, LocalFile, LocalStore, Manifest,
-    OperationEvent, OperationId, Phase, PlanOptions, Progress, RelativePath, RepositorySource,
-    StagedFile, SyncPlan, SyncStep, plan_sync,
+    OperationEvent, OperationId, PartialFile, PartialKey, Phase, PlanOptions, Progress,
+    RelativePath, RepositorySource, StagedFile, SyncPlan, SyncStep, TRANSFER_CHUNK, copy_body,
+    is_strong_validator, plan_sync,
 };
 
 /// Progress events during a transfer are emitted at most once per this many bytes (and at the end of each file).
@@ -149,27 +150,7 @@ fn install(
     on_bytes: &mut dyn FnMut(u64),
 ) -> Result<(), Error> {
     let Some(archive_size) = archive_size else {
-        let mut stage = store.begin(path, entry.size)?;
-        let mut digest = hasher.digest(entry.hash.algorithm());
-        let (fetched, written, overflow) = {
-            let mut tee = Tee {
-                stage: &mut *stage,
-                digest: &mut *digest,
-                written: 0,
-                limit: entry.size,
-                overflow: false,
-            };
-            let fetched = source.fetch(path, entry.size, &mut tee, cancel, on_bytes);
-            (fetched, tee.written, tee.overflow)
-        };
-        if let Err(error) = fetched {
-            return Err(if overflow {
-                integrity(path, "longer than announced")
-            } else {
-                error
-            });
-        }
-        return verify_and_commit(stage, digest, entry, path, written);
+        return install_plain(source, store, hasher, cancel, path, entry, on_bytes);
     };
 
     let archive_path = RelativePath::parse(&format!("{path}{ARCHIVE_SUFFIX}"))
@@ -201,6 +182,184 @@ fn install(
         });
     }
     verify_and_commit(stage, digest, entry, path, written)
+}
+
+/// Why a transfer into a partial file stopped, and whether the bytes received so far stay on disk for a later run
+/// (ADR-0009, section 5).
+struct Stopped {
+    error: Error,
+    keep: bool,
+}
+
+/// Writes received bytes into the partial file and into the digest of the complete file.
+struct Hashing<'a> {
+    out: &'a mut dyn PartialFile,
+    digest: &'a mut dyn Digest,
+}
+
+impl Write for Hashing<'_> {
+    fn write(&mut self, data: &[u8]) -> io::Result<usize> {
+        let written = self.out.write(data)?;
+        self.digest.update(&data[..written]);
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.out.flush()
+    }
+}
+
+/// Feeds the first `length` bytes of the partial file into the digest (they are part of the complete file).
+fn hash_prefix(
+    partial: &mut dyn PartialFile,
+    length: u64,
+    digest: &mut dyn Digest,
+) -> Result<(), Error> {
+    let unreadable =
+        |_: io::Error| Error::new(ErrorKind::FileSystem, "cannot read the partial file");
+    partial.seek(SeekFrom::Start(0)).map_err(unreadable)?;
+    let mut buffer = vec![0u8; TRANSFER_CHUNK];
+    let mut left = length;
+    while left > 0 {
+        let want = usize::try_from(left).map_or(buffer.len(), |left| left.min(buffer.len()));
+        let read = partial.read(&mut buffer[..want]).map_err(unreadable)?;
+        if read == 0 {
+            return Err(Error::new(
+                ErrorKind::Integrity,
+                "the partial file is shorter than its state",
+            ));
+        }
+        digest.update(&buffer[..read]);
+        left -= read as u64;
+    }
+    partial.seek(SeekFrom::Start(length)).map_err(unreadable)?;
+    Ok(())
+}
+
+/// Downloads one plain file into `partial`, resuming when `partial` holds a valid earlier state (MIG-032R, ADR-0009).
+///
+/// * A stored state is used only if the source answers with the bytes from its offset (`start == offset`) and the
+///   same validator; a refused resume restarts once from zero.
+/// * The bytes of an earlier run count for the digest and the progress before the new bytes arrive.
+/// * On failure the caller keeps or discards the partial file as stated in [`Stopped::keep`]: a cancellation and an
+///   integrity failure always discard; a network failure keeps the bytes if a validator is stored.
+fn download_plain(
+    source: &dyn RepositorySource,
+    partial: &mut dyn PartialFile,
+    key: &PartialKey,
+    digest: &mut dyn Digest,
+    cancel: &CancelToken,
+    on_bytes: &mut dyn FnMut(u64),
+) -> Result<(), Stopped> {
+    let mut resume = partial.stored();
+    let mut opened = loop {
+        let (offset, if_range) = match &resume {
+            Some(stored) => (stored.offset, Some(stored.validator.as_str())),
+            None => (0, None),
+        };
+        match source.open(&key.path, key.size, offset, if_range) {
+            Ok(opened) => break opened,
+            Err(error) if error.kind() == ErrorKind::Integrity && resume.is_some() => {
+                // The server refused the resume: the stored bytes are no longer usable. Ask once more from zero.
+                resume = None;
+                partial
+                    .restart(None)
+                    .map_err(|error| Stopped { error, keep: false })?;
+            }
+            Err(error) => {
+                let keep = error.kind() == ErrorKind::Network;
+                return Err(Stopped { error, keep });
+            }
+        }
+    };
+
+    // Only a strong validator may ever be stored (ADR-0009, section 1); a weaker one counts as none.
+    opened.validator = opened.validator.take().filter(|v| is_strong_validator(v));
+
+    let remaining = key.size.saturating_sub(opened.start);
+    if opened.start > 0 {
+        let Some(stored) = resume.as_ref() else {
+            return Err(Stopped {
+                error: Error::new(ErrorKind::Integrity, "resume without a stored state"),
+                keep: false,
+            });
+        };
+        if opened.start != stored.offset
+            || opened.validator.as_deref() != Some(stored.validator.as_str())
+        {
+            return Err(Stopped {
+                error: Error::new(
+                    ErrorKind::Integrity,
+                    "resume refused: the answer does not match the stored state",
+                ),
+                keep: false,
+            });
+        }
+        hash_prefix(partial, opened.start, digest)
+            .map_err(|error| Stopped { error, keep: false })?;
+        on_bytes(opened.start);
+    } else {
+        partial
+            .restart(opened.validator.as_deref())
+            .map_err(|error| Stopped { error, keep: false })?;
+    }
+
+    let mut hashing = Hashing {
+        out: &mut *partial,
+        digest: &mut *digest,
+    };
+    match copy_body(&mut *opened.body, remaining, &mut hashing, cancel, on_bytes) {
+        Ok(copied) if copied == remaining => Ok(()),
+        // A clean end before the announced size is not a dropped connection (that is a read error, handled below). It
+        // is treated like the old contract (ADR-0007): the source is wrong, so nothing is kept (ADR-0009, section 5).
+        Ok(_) => Err(Stopped {
+            error: Error::new(
+                ErrorKind::Integrity,
+                "the source delivers less data than announced",
+            ),
+            keep: false,
+        }),
+        Err(error) => {
+            let keep = error.kind() == ErrorKind::Network;
+            Err(Stopped { error, keep })
+        }
+    }
+}
+
+/// Installs one plain file through a resumable partial file (MIG-032R, ADR-0009): download, verify the complete
+/// content (size and hash, including the bytes of earlier runs), then commit atomically. The target is untouched
+/// until the commit.
+fn install_plain(
+    source: &dyn RepositorySource,
+    store: &mut dyn LocalStore,
+    hasher: &dyn Hasher,
+    cancel: &CancelToken,
+    path: &RelativePath,
+    entry: &FileEntry,
+    on_bytes: &mut dyn FnMut(u64),
+) -> Result<(), Error> {
+    let key = PartialKey {
+        source: source.identity().to_owned(),
+        path: path.clone(),
+        size: entry.size,
+    };
+    let mut partial = store.partial(&key)?;
+    let mut digest = hasher.digest(entry.hash.algorithm());
+    if let Err(stopped) =
+        download_plain(source, &mut *partial, &key, &mut *digest, cancel, on_bytes)
+    {
+        if stopped.keep {
+            partial.keep();
+        } else {
+            partial.discard();
+        }
+        return Err(stopped.error);
+    }
+    if digest.finish() != entry.hash {
+        partial.discard();
+        return Err(integrity(path, "checksum differs"));
+    }
+    partial.commit_to(path)
 }
 
 fn integrity(path: &RelativePath, what: &str) -> Error {

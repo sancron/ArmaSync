@@ -47,10 +47,14 @@ use fs4::FileExt;
 
 use armasync_core::{
     CancelToken, ContentHash, Digest, Error, ErrorKind, HashAlgorithm, Hasher, LocalFile,
-    LocalStore, RelativePath, Spool, StagedFile, TRANSFER_CHUNK,
+    LocalStore, PartialFile, PartialKey, RelativePath, Spool, StagedFile, TRANSFER_CHUNK,
 };
 
 use crate::memory::Sha256Hasher;
+
+mod partial;
+
+pub use partial::{PARTIAL_MAX_AGE, PARTIAL_PREFIX};
 
 /// Prefix of temporary staging files; names with this prefix belong to the adapter.
 pub const STAGING_PREFIX: &str = ".armasync-";
@@ -296,6 +300,17 @@ impl LocalDirectory {
                 }
                 continue;
             }
+            if name.starts_with(partial::PARTIAL_PREFIX) {
+                // Resumable partial files (MIG-032R) are kept for a later run. Under the exclusive lock an orphan
+                // (no partner file) or a very old one can never be continued and is removed.
+                if self.lock.is_some()
+                    && metadata.is_file()
+                    && partial::is_removable(&entry.path(), &metadata)
+                {
+                    let _ = fs::remove_file(entry.path());
+                }
+                continue;
+            }
             if name.starts_with(STAGING_PREFIX) {
                 continue;
             }
@@ -497,6 +512,12 @@ impl LocalStore for LocalDirectory {
             file: Some(file),
             path,
         }))
+    }
+
+    /// See [`LocalStore::partial`] and the module notes of `partial`: the partial file lives next to the target and
+    /// needs the exclusive lock.
+    fn partial(&mut self, key: &PartialKey) -> Result<Box<dyn PartialFile + '_>, Error> {
+        Ok(Box::new(partial::open(self, key)?))
     }
 }
 

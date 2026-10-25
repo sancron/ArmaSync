@@ -41,8 +41,7 @@ pub trait RepositorySource {
     ///   The source never retries by re-sending bytes (resume is a later, separate capability);
     /// * returns the number of bytes written, which equals `expected_size` on success.
     ///
-    /// The default implementation reads the file with [`RepositorySource::read`] and copies it in chunks; network
-    /// adapters override it to stream.
+    /// The default implementation streams the file through [`RepositorySource::open`] from the start.
     ///
     /// # Errors
     /// See above.
@@ -57,9 +56,165 @@ pub trait RepositorySource {
         if cancel.is_cancelled() {
             return Err(Error::new(ErrorKind::Cancelled, "cancelled"));
         }
-        let data = self.read(path)?;
-        copy_in_chunks(&data, expected_size, out, cancel, progress)
+        let mut opened = self.open(path, expected_size, 0, None)?;
+        let written = copy_body(&mut *opened.body, expected_size, out, cancel, progress)?;
+        if written != expected_size {
+            return Err(Error::new(
+                ErrorKind::Integrity,
+                "the source delivers less data than announced",
+            ));
+        }
+        Ok(written)
     }
+
+    /// Stable name of this repository. It is part of the key of resumable partial files (MIG-032R, ADR-0009). An
+    /// empty name means the source cannot be resumed.
+    fn identity(&self) -> &str {
+        ""
+    }
+
+    /// Opens one file of the current revision, starting at `offset` when that is possible (MIG-032R, ADR-0009).
+    ///
+    /// * `expected_size` is the announced size of the whole file (it bounds the time allowed for the body).
+    /// * `offset == 0`: the whole file; `if_range` is ignored.
+    /// * `offset > 0` with `if_range = Some(validator)`: the source may answer with the bytes from `offset` on
+    ///   (`start == offset`) **only** if the file is still the one the validator names; any other answer must be
+    ///   `start == 0` with the whole file, or a refusal with [`ErrorKind::Integrity`] ("resume refused").
+    /// * `validator` is the strong validator of this answer, if the source has one.
+    ///
+    /// The body delivers exactly `expected_size - start` bytes; the caller checks length and hash. The default
+    /// implementation has no range support: it reads the whole file and answers with `start == 0`.
+    ///
+    /// # Errors
+    /// [`ErrorKind::Network`] for transport failures, [`ErrorKind::Integrity`] for a refused resume.
+    fn open(
+        &self,
+        path: &RelativePath,
+        expected_size: u64,
+        offset: u64,
+        if_range: Option<&str>,
+    ) -> Result<Opened, Error> {
+        let _ = (expected_size, offset, if_range);
+        let data = self.read(path)?;
+        Ok(Opened {
+            start: 0,
+            validator: None,
+            body: Box::new(std::io::Cursor::new(data)),
+        })
+    }
+}
+
+/// An answer of [`RepositorySource::open`]: where the body starts, its validator and the body itself.
+pub struct Opened {
+    /// First byte the body delivers: the requested offset (resumed) or 0 (whole file).
+    pub start: u64,
+    /// Strong validator of this answer, if the source sent one. Only a strong validator may be stored for resume.
+    pub validator: Option<String>,
+    /// The bytes from `start` on.
+    pub body: Box<dyn Read>,
+}
+
+impl std::fmt::Debug for Opened {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Opened")
+            .field("start", &self.start)
+            .field("validator", &self.validator)
+            .finish_non_exhaustive()
+    }
+}
+
+/// Whether `value` is a **strong** entity tag that may serve as a resume validator (ADR-0009): quoted, without the
+/// weak prefix `W/`, visible ASCII only (spaces allowed inside the quotes), at most 256 bytes.
+#[must_use]
+pub fn is_strong_validator(value: &str) -> bool {
+    value.len() >= 2
+        && value.len() <= 256
+        && value.starts_with('"')
+        && value.ends_with('"')
+        && value[1..value.len() - 1]
+            .bytes()
+            .all(|b| b == b'"' || (0x20..=0x7e).contains(&b))
+        && !value[1..value.len() - 1].contains('"')
+}
+
+/// Copies at most `expected` bytes from `body` to `out` in chunks of at most [`TRANSFER_CHUNK`]; `cancel` is
+/// checked before each chunk, `progress` is called after each chunk. Returns the number of bytes copied: equal to
+/// `expected` on success, less if the body ends early (the caller decides how to handle that).
+///
+/// # Errors
+/// [`ErrorKind::Cancelled`]; [`ErrorKind::Integrity`] if the body holds more data than `expected`;
+/// [`ErrorKind::Network`] if reading the body fails; [`ErrorKind::FileSystem`] if `out` fails.
+pub fn copy_body(
+    body: &mut dyn Read,
+    expected: u64,
+    out: &mut dyn Write,
+    cancel: &CancelToken,
+    progress: &mut dyn FnMut(u64),
+) -> Result<u64, Error> {
+    let mut buffer = vec![0u8; TRANSFER_CHUNK];
+    let mut copied: u64 = 0;
+    while copied < expected {
+        if cancel.is_cancelled() {
+            return Err(Error::new(ErrorKind::Cancelled, "cancelled"));
+        }
+        let want =
+            usize::try_from(expected - copied).map_or(TRANSFER_CHUNK, |w| w.min(TRANSFER_CHUNK));
+        let read = match body.read(&mut buffer[..want]) {
+            Ok(0) => return Ok(copied),
+            Ok(read) => read,
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(_) => {
+                return Err(Error::new(
+                    ErrorKind::Network,
+                    "the connection was lost during the transfer",
+                ));
+            }
+        };
+        out.write_all(&buffer[..read])
+            .map_err(|_| Error::new(ErrorKind::FileSystem, "cannot write the received data"))?;
+        copied += read as u64;
+        progress(read as u64);
+    }
+    // The announced size is reached: anything more is a protocol violation.
+    let mut probe = [0u8; 1];
+    loop {
+        match body.read(&mut probe) {
+            Ok(0) => return Ok(copied),
+            Ok(_) => {
+                return Err(Error::new(
+                    ErrorKind::Integrity,
+                    "the source delivers more data than announced",
+                ));
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
+            Err(_) => {
+                return Err(Error::new(
+                    ErrorKind::Network,
+                    "the connection was lost during the transfer",
+                ));
+            }
+        }
+    }
+}
+
+/// Identity of a resumable transfer: one file of one repository at one announced size (ADR-0009).
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct PartialKey {
+    /// [`RepositorySource::identity`] of the source. Never empty for a resumable transfer.
+    pub source: String,
+    /// The transferred object: the file itself, or its packed copy `<file>.zip` (ADR-0008).
+    pub path: RelativePath,
+    /// The size the object is announced with.
+    pub size: u64,
+}
+
+/// What an earlier run left behind for a [`PartialKey`]: the valid bytes and the validator they belong to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoredPartial {
+    /// Number of valid bytes at the start of the partial file (`0 < offset < size`).
+    pub offset: u64,
+    /// The strong validator of the answer these bytes came from.
+    pub validator: String,
 }
 
 /// Largest number of bytes a transfer writes between progress and cancellation checks.
@@ -172,6 +327,20 @@ pub trait LocalStore {
     fn free_space(&self) -> Result<Option<u64>, Error> {
         Ok(None)
     }
+
+    /// Opens the resumable partial file for `key` (MIG-032R, ADR-0009). It holds the transferred object while it
+    /// arrives, possibly over several runs. It is never visible under its final name and never listed.
+    ///
+    /// Contract:
+    /// * opening reads the state of an earlier run; [`PartialFile::stored`] reports it only if it matches `key`
+    ///   exactly and carries a strong validator, otherwise the transfer starts from zero;
+    /// * the handle decides the fate of the bytes: [`PartialFile::keep`] (also on drop) leaves them for a later run,
+    ///   [`PartialFile::discard`] removes them, [`PartialFile::commit_to`] makes them the target;
+    /// * requires the exclusive lock of the destination, like every change.
+    ///
+    /// # Errors
+    /// File-system failures.
+    fn partial(&mut self, key: &PartialKey) -> Result<Box<dyn PartialFile + '_>, Error>;
 }
 
 /// A temporary file that holds a packed archive (see [`LocalStore::spool`]). The archive is written first, then read
@@ -179,6 +348,35 @@ pub trait LocalStore {
 pub trait Spool: Read + Write + Seek {}
 
 impl<T: Read + Write + Seek> Spool for T {}
+
+/// A resumable partial file (MIG-032R, ADR-0009). Writes go to the current position; reads serve the bytes that were
+/// written. The file is only ever moved to a target by [`PartialFile::commit_to`], after the caller verified the
+/// complete content.
+pub trait PartialFile: Read + Write + Seek {
+    /// The state an earlier run left for this key, if it can be continued (see [`LocalStore::partial`]). Fixed when the
+    /// file was opened.
+    fn stored(&self) -> Option<StoredPartial>;
+
+    /// Empties the file and stores `validator` for the bytes that follow (`None`: nothing can be resumed later).
+    ///
+    /// # Errors
+    /// File-system failures.
+    fn restart(&mut self, validator: Option<&str>) -> Result<(), Error>;
+
+    /// Leaves the bytes and their state on disk for a later run. Without a stored validator the bytes are removed
+    /// instead, because they could never be continued safely.
+    fn keep(self: Box<Self>);
+
+    /// Removes the bytes and their state at once (cancellation, integrity failure, end of a verified archive).
+    fn discard(self: Box<Self>);
+
+    /// Makes the complete, verified file the content of `target` **atomically**, like [`StagedFile::commit`]. The
+    /// state is removed. If this fails, `target` keeps its old content and the bytes are removed.
+    ///
+    /// # Errors
+    /// [`ErrorKind::FileSystem`].
+    fn commit_to(self: Box<Self>, target: &RelativePath) -> Result<(), Error>;
+}
 
 /// Unpacks a packed archive (ADR-0008). The core only states the contract; the archive format lives in an adapter.
 ///

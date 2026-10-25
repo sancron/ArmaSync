@@ -586,6 +586,7 @@ fn packed_repository(content: &[u8], archive: Vec<u8>) -> Published {
         sync: tree_file(&root),
         files,
         trickle: false,
+        ..Published::default()
     }
 }
 
@@ -660,6 +661,7 @@ fn large_repository(content: &[u8]) -> Published {
         sync: tree_file(&root),
         files,
         trickle: true,
+        ..Published::default()
     }
 }
 
