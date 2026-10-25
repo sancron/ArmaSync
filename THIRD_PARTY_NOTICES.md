@@ -20,6 +20,8 @@ Aufgenommen in `armasync-adapters`: `ureq` 3.4.2 mit `rustls` und `platform-veri
 
 **Nachtrag MIG-032A (2026-10-19):** `ctrlc` 3.5.2 (MIT OR Apache-2.0; Ctrl+C-Behandlung der CLI) mit `windows-sys` (bereits aufgeführt) bzw. `nix` (MIT, nur Unix); keine weiteren Normalabhängigkeiten.
 
+**Nachtrag MIG-030E (2026-10-25, ADR-0008):** `zip` 7.3.0 (MIT; MSRV 1.83; Feature `deflate-flate2`, ohne AES/bzip2/zstd/lzma/ppmd/xz/zopfli) in `armasync-adapters` zum Entpacken gepackter Blätter; zusätzlich `typed-path` 0.12.4 (MIT OR Apache-2.0), `simd-adler32` 0.3.10 (MIT); `flate2` 1.1.10 (MIT OR Apache-2.0) mit `miniz_oxide` 0.9.1 (MIT OR Zlib OR Apache-2.0), `crc32fast` 1.5.2 (MIT OR Apache-2.0), `adler2` 2.0.1 (0BSD OR MIT OR Apache-2.0). Nur Entwicklung (Tests): `zip` mit Schreibfunktion im selben Crate. Zip-Version 9.x verworfen (MSRV 1.88). Keine Rechtsberatung; die vollständige Release-BOM bleibt offen (RQ-06).
+
 **Nachtrag MIG-030H (2026-10-19):** `fs4` 1.1.0 (MIT OR Apache-2.0; Dateisperren) in `armasync-adapters`; keine weiteren Normalabhängigkeiten.
 
 Neue Übernahmen erhalten Original-Commit/URL, Lizenz, Rechtebeleg, Zielpfad und Prüfdatum. Vor Rust-Release vollständigen Bericht aus Cargo.lock und ausgelieferten Assets/Systembestandteilen erzeugen. Die Java-Credits stimmen nicht vollständig mit Gradle überein und sind keine verlässliche Abhängigkeitsinventur.

@@ -48,6 +48,7 @@ fn run_apply(
             source,
             store,
             hasher: &hasher,
+            unpacker: &armasync_adapters::archive::ZipUnpacker,
             sink: &mut sink,
             cancel,
         };
@@ -384,6 +385,7 @@ fn cancel_in_the_middle_leaves_only_complete_files_and_a_cancelled_state() {
             source: &source,
             store: &mut store,
             hasher: &hasher,
+            unpacker: &armasync_adapters::archive::ZipUnpacker,
             sink: &mut sink,
             cancel: &token,
         };

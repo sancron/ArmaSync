@@ -5,12 +5,12 @@
 //! deterministically. They are test and prototype adapters, not a persistence layer.
 
 use std::collections::BTreeMap;
-use std::io::{self, Write};
+use std::io::{self, Cursor, Write};
 
 use armasync_core::{
     CancelToken, ContentHash, Digest as CoreDigest, Error, ErrorKind, EventSink, FileEntry,
     HashAlgorithm, Hasher, LocalFile, LocalStore, Manifest, OperationEvent, RelativePath,
-    RepositorySource, StagedFile, copy_in_chunks,
+    RepositorySource, Spool, StagedFile, copy_in_chunks,
 };
 use sha1::Sha1;
 use sha2::{Digest, Sha256};
@@ -287,6 +287,10 @@ impl LocalStore for InMemoryStore {
             .remove(path)
             .map(|_| ())
             .ok_or_else(|| Error::new(ErrorKind::FileSystem, format!("not found: {path}")))
+    }
+
+    fn spool(&mut self, _expected_size: u64) -> Result<Box<dyn Spool>, Error> {
+        Ok(Box::new(Cursor::new(Vec::new())))
     }
 }
 

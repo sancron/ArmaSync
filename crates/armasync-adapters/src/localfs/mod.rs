@@ -37,7 +37,7 @@
 //! removed).
 
 use std::fs::{self, File, OpenOptions};
-use std::io::{self, Read, Write};
+use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -47,7 +47,7 @@ use fs4::FileExt;
 
 use armasync_core::{
     CancelToken, ContentHash, Digest, Error, ErrorKind, HashAlgorithm, Hasher, LocalFile,
-    LocalStore, RelativePath, StagedFile, TRANSFER_CHUNK,
+    LocalStore, RelativePath, Spool, StagedFile, TRANSFER_CHUNK,
 };
 
 use crate::memory::Sha256Hasher;
@@ -467,6 +467,74 @@ impl LocalStore for LocalDirectory {
             Ok(_) => fs::remove_file(&target).map_err(|e| fs_error("delete", relative, &e)),
             Err(e) => Err(fs_error("delete", relative, &e)),
         }
+    }
+
+    /// The spool lives in the destination root (same file system, reserved prefix, never listed). Free space is not
+    /// checked in advance: the standard library has no portable query, so a full disk fails on write.
+    fn spool(&mut self, _expected_size: u64) -> Result<Box<dyn Spool>, Error> {
+        self.require_lock()?;
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_or(0, |d| d.as_nanos());
+        let path = self.root.join(format!(
+            "{STAGING_PREFIX}spool-{}-{}-{nanos}{STAGING_SUFFIX}",
+            std::process::id(),
+            COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .map_err(|e| fs_error("create a temporary archive file in", "the destination", &e))?;
+        Ok(Box::new(LocalSpool {
+            file: Some(file),
+            path,
+        }))
+    }
+}
+
+/// A temporary archive file. It is removed when dropped; on Windows the handle is closed first, because an open file
+/// cannot be deleted there.
+struct LocalSpool {
+    file: Option<File>,
+    path: PathBuf,
+}
+
+impl LocalSpool {
+    fn handle(&mut self) -> io::Result<&mut File> {
+        self.file
+            .as_mut()
+            .ok_or_else(|| io::Error::other("the archive file is closed"))
+    }
+}
+
+impl Read for LocalSpool {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        self.handle()?.read(buffer)
+    }
+}
+
+impl Write for LocalSpool {
+    fn write(&mut self, data: &[u8]) -> io::Result<usize> {
+        self.handle()?.write(data)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.handle()?.flush()
+    }
+}
+
+impl Seek for LocalSpool {
+    fn seek(&mut self, position: SeekFrom) -> io::Result<u64> {
+        self.handle()?.seek(position)
+    }
+}
+
+impl Drop for LocalSpool {
+    fn drop(&mut self) {
+        self.file = None;
+        let _ = fs::remove_file(&self.path);
     }
 }
 

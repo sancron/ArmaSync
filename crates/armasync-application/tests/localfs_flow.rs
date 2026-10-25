@@ -75,6 +75,7 @@ fn sync(
         source,
         store: &mut store,
         hasher: &hasher,
+        unpacker: &armasync_adapters::archive::ZipUnpacker,
         sink,
         cancel,
     };
@@ -271,6 +272,7 @@ fn cancellation_leaves_finished_files_in_place_and_nothing_partial() {
             source: &source,
             store: &mut store,
             hasher: &hasher,
+            unpacker: &armasync_adapters::archive::ZipUnpacker,
             sink: &mut sink,
             cancel: &cancel,
         };

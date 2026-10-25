@@ -17,6 +17,7 @@
 use std::path::{Path, PathBuf};
 
 use armasync_adapters::Sha256Hasher;
+use armasync_adapters::archive::ZipUnpacker;
 use armasync_adapters::http::{HttpConfig, HttpRepository, HttpSnapshot};
 use armasync_adapters::localfs::LocalDirectory;
 use armasync_adapters::sync_meta::SyncMetadata;
@@ -165,10 +166,12 @@ pub fn execute(
 ) -> Result<ApplyReport, Error> {
     let mut store = LocalDirectory::open_exclusive(&prepared.destination)?;
     let hasher = Sha256Hasher;
+    let unpacker = ZipUnpacker;
     let mut context = SyncContext {
         source: &prepared.source,
         store: &mut store,
         hasher: &hasher,
+        unpacker: &unpacker,
         sink,
         cancel,
     };

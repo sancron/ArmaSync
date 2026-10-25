@@ -14,6 +14,8 @@ armasync-core.workspace = true
 [dev-dependencies]
 # Test-only: in-memory adapters prove the ports. The production dependency direction stays application -> core.
 armasync-adapters.workspace = true
+# Test-only: archives for the packed-file tests are generated, never taken from a real repository.
+zip = { version = "7.3.0", default-features = false, features = ["deflate-flate2"] }
 
 [lints]
 workspace = true

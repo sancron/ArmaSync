@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Ports: what the application layer needs from the outside world. Adapters implement them.
 
-use std::io::Write;
+use std::io::{Read, Seek, Write};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -153,6 +153,46 @@ pub trait LocalStore {
     /// # Errors
     /// File-system failures.
     fn delete(&mut self, path: &RelativePath) -> Result<(), Error>;
+
+    /// Creates a temporary read/write file for a packed archive (ADR-0008). It holds the complete archive while it is
+    /// unpacked; it lives on the destination's file system, is invisible to [`LocalStore::list`] and is removed when
+    /// the handle is dropped. Its name never collides with a repository file.
+    ///
+    /// # Errors
+    /// File-system failures.
+    fn spool(&mut self, expected_size: u64) -> Result<Box<dyn Spool>, Error>;
+}
+
+/// A temporary file that holds a packed archive (see [`LocalStore::spool`]). The archive is written first, then read
+/// back from the start.
+pub trait Spool: Read + Write + Seek {}
+
+impl<T: Read + Write + Seek> Spool for T {}
+
+/// Unpacks a packed archive (ADR-0008). The core only states the contract; the archive format lives in an adapter.
+///
+/// Contract:
+/// * the archive must contain **exactly one** regular file; folders, links, encrypted entries and unsupported
+///   compression methods are refused; the entry name is validated as a [`RelativePath`] but never used as the
+///   destination path (the manifest decides where the file goes);
+/// * the entry must announce exactly `expected_size` bytes; never more than `expected_size` bytes are written, and a
+///   longer or shorter entry fails with [`ErrorKind::Integrity`] or [`ErrorKind::Format`];
+/// * a damaged archive (checksum of the entry, structure, truncation) fails; nothing else is written after the first
+///   error;
+/// * `cancel` is checked before and during writing ([`ErrorKind::Cancelled`]);
+/// * returns the number of bytes written, equal to `expected_size` on success. The caller still verifies the hash.
+pub trait ArchiveReader {
+    /// Writes the unpacked file of `archive` to `out`.
+    ///
+    /// # Errors
+    /// See the contract above.
+    fn extract_single(
+        &self,
+        archive: &mut dyn Spool,
+        expected_size: u64,
+        out: &mut dyn Write,
+        cancel: &CancelToken,
+    ) -> Result<u64, Error>;
 }
 
 /// A file being written into staging (see [`LocalStore::begin`]). Bytes are written with [`Write`].

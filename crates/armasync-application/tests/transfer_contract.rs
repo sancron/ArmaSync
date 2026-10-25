@@ -35,6 +35,7 @@ fn run(
             source,
             store,
             hasher: &hasher,
+            unpacker: &armasync_adapters::archive::ZipUnpacker,
             sink: &mut sink,
             cancel,
         };
@@ -103,6 +104,7 @@ fn cancellation_in_the_middle_of_a_transfer_leaves_the_existing_file_untouched()
             source: &source,
             store: &mut store,
             hasher: &hasher,
+            unpacker: &armasync_adapters::archive::ZipUnpacker,
             sink: &mut sink,
             cancel: &cancel,
         };
@@ -433,6 +435,10 @@ impl LocalStore for CountingStore {
     fn delete(&mut self, _p: &RelativePath) -> Result<(), Error> {
         Ok(())
     }
+
+    fn spool(&mut self, _expected_size: u64) -> Result<Box<dyn armasync_core::Spool>, Error> {
+        Ok(Box::new(std::io::Cursor::new(Vec::new())))
+    }
 }
 
 #[test]
@@ -476,6 +482,7 @@ fn cancelling_a_huge_transfer_stops_it_early() {
             source: &source,
             store: &mut store,
             hasher: &hasher,
+            unpacker: &armasync_adapters::archive::ZipUnpacker,
             sink: &mut sink,
             cancel: &cancel,
         };

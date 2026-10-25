@@ -11,13 +11,13 @@
 //! * cancellation is checked between files and yields the `Cancelled` state, never success,
 //! * every state change is reported as a typed [`OperationEvent`].
 
-use std::io::{self, Write};
+use std::io::{self, Seek, SeekFrom, Write};
 
 use armasync_core::{
-    CancelToken, Digest, EVENT_SCHEMA_VERSION, Error, ErrorKind, EventSink, FileEntry,
-    HashAlgorithm, Hasher, JobState, LocalStore, Manifest, OperationEvent, OperationId, Phase,
-    PlanOptions, Progress, RelativePath, RepositorySource, StagedFile, SyncPlan, SyncStep,
-    plan_sync,
+    ARCHIVE_SUFFIX, ArchiveReader, CancelToken, Digest, EVENT_SCHEMA_VERSION, Error, ErrorKind,
+    EventSink, FileEntry, HashAlgorithm, Hasher, JobState, LocalStore, Manifest, OperationEvent,
+    OperationId, Phase, PlanOptions, Progress, RelativePath, RepositorySource, StagedFile,
+    SyncPlan, SyncStep, plan_sync,
 };
 
 /// Progress events during a transfer are emitted at most once per this many bytes (and at the end of each file).
@@ -86,20 +86,59 @@ impl Write for Tee<'_> {
 
 /// Streams one file into staging, verifies size and hash, and commits it atomically.
 ///
-/// Any failure (network, cancellation, wrong size or hash, full disk, failed commit) drops the staging file and
-/// leaves an existing target untouched.
+/// A plain file is streamed from the repository straight into staging. A packed file (`archive_size` is `Some`,
+/// ADR-0008) is first downloaded completely as `<path>.zip` into a spool file, then unpacked into staging by
+/// `unpacker`; only the unpacked bytes are verified and committed.
+///
+/// Any failure (network, cancellation, wrong size or hash, damaged archive, full disk, failed commit) drops the
+/// staging and spool files and leaves an existing target untouched.
+#[allow(clippy::too_many_arguments)]
 fn install(
     source: &dyn RepositorySource,
     store: &mut dyn LocalStore,
     hasher: &dyn Hasher,
+    unpacker: &dyn ArchiveReader,
     cancel: &CancelToken,
     path: &RelativePath,
     entry: &FileEntry,
+    archive_size: Option<u64>,
     on_bytes: &mut dyn FnMut(u64),
 ) -> Result<(), Error> {
+    let Some(archive_size) = archive_size else {
+        let mut stage = store.begin(path, entry.size)?;
+        let mut digest = hasher.digest(entry.hash.algorithm());
+        let (fetched, written, overflow) = {
+            let mut tee = Tee {
+                stage: &mut *stage,
+                digest: &mut *digest,
+                written: 0,
+                limit: entry.size,
+                overflow: false,
+            };
+            let fetched = source.fetch(path, entry.size, &mut tee, cancel, on_bytes);
+            (fetched, tee.written, tee.overflow)
+        };
+        if let Err(error) = fetched {
+            return Err(if overflow {
+                integrity(path, "longer than announced")
+            } else {
+                error
+            });
+        }
+        return verify_and_commit(stage, digest, entry, path, written);
+    };
+
+    let archive_path = RelativePath::parse(&format!("{path}{ARCHIVE_SUFFIX}"))
+        .map_err(|_| Error::new(ErrorKind::Format, format!("no archive name for {path}")))?;
+    let mut spool = store.spool(archive_size)?;
+    source.fetch(&archive_path, archive_size, &mut spool, cancel, on_bytes)?;
+    spool
+        .seek(SeekFrom::Start(0))
+        .map_err(|_| Error::new(ErrorKind::FileSystem, "cannot read back the archive"))?;
+
     let mut stage = store.begin(path, entry.size)?;
     let mut digest = hasher.digest(entry.hash.algorithm());
-    let (fetched, written, overflow) = {
+    let (unpacked, written, overflow) = {
         let mut tee = Tee {
             stage: &mut *stage,
             digest: &mut *digest,
@@ -107,27 +146,39 @@ fn install(
             limit: entry.size,
             overflow: false,
         };
-        let fetched = source.fetch(path, entry.size, &mut tee, cancel, on_bytes);
-        (fetched, tee.written, tee.overflow)
+        let unpacked = unpacker.extract_single(&mut *spool, entry.size, &mut tee, cancel);
+        (unpacked, tee.written, tee.overflow)
     };
-    let integrity = |what: &str| {
-        Error::new(
-            ErrorKind::Integrity,
-            format!("verification failed for {path} ({what}); file left unchanged"),
-        )
-    };
-    if let Err(error) = fetched {
+    if let Err(error) = unpacked {
         return Err(if overflow {
-            integrity("longer than announced")
+            integrity(path, "longer than announced")
         } else {
             error
         });
     }
+    verify_and_commit(stage, digest, entry, path, written)
+}
+
+fn integrity(path: &RelativePath, what: &str) -> Error {
+    Error::new(
+        ErrorKind::Integrity,
+        format!("verification failed for {path} ({what}); file left unchanged"),
+    )
+}
+
+/// The checks shared by both transfer routes: size first, then hash, then the atomic commit.
+fn verify_and_commit(
+    stage: Box<dyn StagedFile + '_>,
+    digest: Box<dyn Digest>,
+    entry: &FileEntry,
+    path: &RelativePath,
+    written: u64,
+) -> Result<(), Error> {
     if written != entry.size {
-        return Err(integrity("size differs"));
+        return Err(integrity(path, "size differs"));
     }
     if digest.finish() != entry.hash {
-        return Err(integrity("checksum differs"));
+        return Err(integrity(path, "checksum differs"));
     }
     stage.commit()
 }
@@ -140,6 +191,8 @@ pub struct SyncContext<'a> {
     pub store: &'a mut dyn LocalStore,
     /// Hash implementation used to verify downloads.
     pub hasher: &'a dyn Hasher,
+    /// Unpacks the packed copies the repository publishes (ADR-0008).
+    pub unpacker: &'a dyn ArchiveReader,
     /// Receiver of operation events.
     pub sink: &'a mut dyn EventSink,
     /// Cooperative cancellation.
@@ -263,9 +316,10 @@ pub fn apply(
 
     for step in &plan.steps {
         match step {
-            SyncStep::Download { size, .. } | SyncStep::Replace { size, .. } => {
+            SyncStep::Download { path, size, .. } | SyncStep::Replace { path, size, .. } => {
                 progress.files_total += 1;
-                progress.bytes_total += size;
+                // A packed file transfers its archive, which is what the progress counts.
+                progress.bytes_total += manifest.archive_size(path).unwrap_or(*size);
             }
             SyncStep::Delete { .. } => progress.files_total += 1,
             SyncStep::Keep { .. } => {}
@@ -306,9 +360,11 @@ pub fn apply(
             context.source,
             &mut *context.store,
             context.hasher,
+            context.unpacker,
             context.cancel,
             path,
             entry,
+            manifest.archive_size(path),
             &mut |bytes| {
                 file_bytes += bytes;
                 since_emit += bytes;

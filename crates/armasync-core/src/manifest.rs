@@ -7,6 +7,10 @@ use std::fmt;
 use crate::hash::ContentHash;
 use crate::path::RelativePath;
 
+/// Suffix of the packed copy a server publishes next to an entry: the entry `a/b.pbo` is downloaded from `a/b.pbo.zip`
+/// (ADR-0008).
+pub const ARCHIVE_SUFFIX: &str = ".zip";
+
 /// One file of a repository revision.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileEntry {
@@ -29,6 +33,8 @@ pub enum ManifestError {
     CaseCollision(RelativePath, RelativePath),
     /// A path is used both as a file and as a directory of another entry.
     FileDirectoryConflict(RelativePath),
+    /// A packed archive is announced for a path that has no entry.
+    ArchiveWithoutEntry(RelativePath),
 }
 
 impl fmt::Display for ManifestError {
@@ -39,6 +45,9 @@ impl fmt::Display for ManifestError {
             Self::CaseCollision(a, b) => write!(f, "paths '{a}' and '{b}' differ only by case"),
             Self::FileDirectoryConflict(path) => {
                 write!(f, "'{path}' is both a file and a directory")
+            }
+            Self::ArchiveWithoutEntry(path) => {
+                write!(f, "archive announced for '{path}', which has no entry")
             }
         }
     }
@@ -51,6 +60,7 @@ impl std::error::Error for ManifestError {}
 pub struct Manifest {
     revision: String,
     entries: Vec<FileEntry>,
+    archives: BTreeMap<RelativePath, u64>,
 }
 
 impl Manifest {
@@ -95,7 +105,33 @@ impl Manifest {
                 return Err(ManifestError::FileDirectoryConflict(conflict));
             }
         }
-        Ok(Self { revision, entries })
+        Ok(Self {
+            revision,
+            entries,
+            archives: BTreeMap::new(),
+        })
+    }
+
+    /// Marks entries the server publishes packed as `<path>` + [`ARCHIVE_SUFFIX`]. The value is the size of that
+    /// archive in bytes; the entry's own size and hash always describe the unpacked file.
+    ///
+    /// # Errors
+    /// [`ManifestError::ArchiveWithoutEntry`] if an archive names a path without entry.
+    pub fn with_archives(
+        mut self,
+        archives: BTreeMap<RelativePath, u64>,
+    ) -> Result<Self, ManifestError> {
+        if let Some(path) = archives.keys().find(|path| self.get(path).is_none()) {
+            return Err(ManifestError::ArchiveWithoutEntry(path.clone()));
+        }
+        self.archives = archives;
+        Ok(self)
+    }
+
+    /// Size of the packed archive of `path`, if the server publishes this entry packed.
+    #[must_use]
+    pub fn archive_size(&self, path: &RelativePath) -> Option<u64> {
+        self.archives.get(path).copied()
     }
 
     /// The revision identifier.
@@ -167,5 +203,30 @@ mod tests {
             ManifestError::FileDirectoryConflict(_)
         ));
         assert!(Manifest::new("r", vec![entry("a-b"), entry("a/b.pbo")]).is_ok());
+    }
+
+    #[test]
+    fn archives_are_announced_for_existing_entries_only() {
+        use std::collections::BTreeMap;
+
+        let path = RelativePath::parse("a/b.pbo").unwrap();
+        let manifest = Manifest::new("r", vec![entry("a/b.pbo")]).unwrap();
+        assert_eq!(manifest.archive_size(&path), None);
+
+        let mut archives = BTreeMap::new();
+        archives.insert(path.clone(), 42);
+        let packed = manifest.with_archives(archives).unwrap();
+        assert_eq!(packed.archive_size(&path), Some(42));
+        assert_eq!(packed.entries().len(), 1, "the entry itself is unchanged");
+
+        let mut dangling = BTreeMap::new();
+        dangling.insert(RelativePath::parse("x.pbo").unwrap(), 1);
+        assert!(matches!(
+            Manifest::new("r", vec![entry("a/b.pbo")])
+                .unwrap()
+                .with_archives(dangling)
+                .unwrap_err(),
+            ManifestError::ArchiveWithoutEntry(_)
+        ));
     }
 }

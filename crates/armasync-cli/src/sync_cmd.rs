@@ -184,7 +184,7 @@ fn metadata_warning_text(warning: &SyncWarning) -> String {
             "a folder with an unsafe name was left out with {files_left_out} file(s): '{shown}' ({reason})"
         ),
         SyncWarning::CompressedFileUnsupported(path) => {
-            format!("compressed file not supported yet, left untouched: {path}")
+            format!("compressed file without a usable archive size, left untouched: {path}")
         }
         SyncWarning::ServerInfoPathIgnored => {
             "a folder path of the server information was ignored (not a safe path)".to_owned()

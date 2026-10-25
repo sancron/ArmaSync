@@ -62,6 +62,7 @@ fn run(source: &Sha1Repository, store: &mut InMemoryStore) -> Result<(), Error> 
         source,
         store,
         hasher: &hasher,
+        unpacker: &armasync_adapters::archive::ZipUnpacker,
         sink: &mut sink,
         cancel: &cancel,
     };

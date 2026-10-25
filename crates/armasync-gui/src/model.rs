@@ -12,6 +12,7 @@ use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
+use armasync_adapters::archive::ZipUnpacker;
 use armasync_adapters::{InMemoryRepository, InMemoryStore, Sha256Hasher};
 use armasync_application::sync::{ApplyReport, SyncContext, apply, plan};
 use armasync_core::{
@@ -779,6 +780,7 @@ fn run_job(
     let options = PlanOptions::default();
     let planned = plan(&source, &store, &options)?;
     let hasher = Sha256Hasher;
+    let unpacker = ZipUnpacker;
     let mut sink = ChannelSink {
         sender: sender.clone(),
         on_event: Box::new({
@@ -790,6 +792,7 @@ fn run_job(
         source: &source,
         store: &mut store,
         hasher: &hasher,
+        unpacker: &unpacker,
         sink: &mut sink,
         cancel,
     };

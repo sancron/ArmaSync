@@ -9,6 +9,9 @@
     missing_debug_implementations
 )]
 
+pub mod synthetic;
+
+use std::collections::BTreeMap;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::path::PathBuf;
@@ -70,6 +73,18 @@ pub struct Behavior {
     /// Like `trickle_pbo`, but 500 ms between the pieces (about twenty seconds): time enough to send Ctrl+C from a
     /// helper process.
     pub very_slow_pbo: bool,
+    /// Replaces the MIG-001 metadata and payloads by a synthetic repository (see [`Published`]) when set.
+    pub published: Option<Published>,
+}
+
+/// A synthetic repository served instead of the MIG-001 fixtures (MIG-030E tests): its own `.a3s/sync` stream and
+/// any files below `/repo` (for example packed copies `<name>.zip`). All content is invented for the tests.
+#[derive(Clone, Default)]
+pub struct Published {
+    /// The gzip-compressed `.a3s/sync` stream.
+    pub sync: Vec<u8>,
+    /// Files below `/repo`, by their path (no leading slash).
+    pub files: BTreeMap<String, Vec<u8>>,
 }
 
 /// Requests seen by a server: (target, lower-case headers).
@@ -144,6 +159,9 @@ fn reply(stream: &mut impl Write, status: &str, body: &[u8]) {
 }
 
 fn handle(stream: &mut impl Write, target: &str, behavior: &Behavior) {
+    if let Some(published) = &behavior.published {
+        return handle_published(stream, target, published);
+    }
     match target {
         "/repo/.a3s/sync" => reply(stream, "200 OK", &fixture("sync")),
         "/repo/.a3s/serverinfo" => reply(stream, "200 OK", &fixture("serverinfo")),
@@ -194,13 +212,40 @@ Content-Length: 8193
     }
 }
 
+fn handle_published(stream: &mut impl Write, target: &str, published: &Published) {
+    match target {
+        "/repo/.a3s/sync" => reply(stream, "200 OK", &published.sync),
+        "/repo/.a3s/serverinfo" => reply(stream, "200 OK", &fixture("serverinfo")),
+        other => match other
+            .strip_prefix("/repo/")
+            .and_then(|path| published.files.get(path))
+        {
+            Some(body) => reply(stream, "200 OK", body),
+            None => reply(stream, "404 Not Found", b""),
+        },
+    }
+}
+
 /// Starts a plain HTTP repository at `/repo` publishing the MIG-001 `small` metadata.
 #[must_use]
 pub fn serve() -> Server {
+    serve_with(Behavior::default())
+}
+
+/// Starts a plain HTTP repository at `/repo` publishing the given synthetic repository.
+#[must_use]
+pub fn serve_published(published: Published) -> Server {
+    serve_with(Behavior {
+        published: Some(published),
+        ..Behavior::default()
+    })
+}
+
+fn serve_with(initial: Behavior) -> Server {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();
     let stop = Arc::new(AtomicBool::new(false));
-    let behavior = Arc::new(Mutex::new(Behavior::default()));
+    let behavior = Arc::new(Mutex::new(initial));
     let requests = Arc::new(Mutex::new(Vec::new()));
     let (stop2, behavior2, requests2) = (stop.clone(), behavior.clone(), requests.clone());
     thread::spawn(move || {

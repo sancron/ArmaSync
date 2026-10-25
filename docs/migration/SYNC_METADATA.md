@@ -25,7 +25,7 @@ Der relative Pfad einer Datei ist der Namensweg von der Wurzel (ohne `racine`) m
 | --- | --- | --- |
 | Pfad, Größe, SHA-1 je Datei | `sync` | `FileEntry` des Core-Manifests (Hashart `Sha1`, nur Integrität des Altprotokolls, **keine Authentizität**) |
 | Revision | `serverinfo.revision` (+ `buildDate`) | `Manifest::revision`, Neuvalidierung des Plans vor `apply` (ADR-0004) |
-| `compressed`, `compressedSize` | `sync` | im ersten Schritt als **nicht unterstützt** markiert (Warnung, kein stilles Überspringen); Entpacken folgt in MIG-030E |
+| `compressed`, `compressedSize` | `sync` | **MIG-030E (ADR-0008):** mit `compressedSize` von 1 Byte bis 2 GiB wird das Blatt als entpackte Datei installiert; das Archiv `<name>.zip` (exakt `compressedSize` Bytes) wird in eine Spool-Datei geladen, genau ein Eintrag mit Stored oder Deflate entpackt und Größe und SHA-1 geprüft. Ohne nutzbare Größe (`0`, zu groß): nicht unterstützt (Warnung, nie geladen, nie gelöscht) |
 | `hidden` (und `serverinfo.hiddenFolderPaths`) | `sync`, `serverinfo` | Ordner, in denen fremde lokale Dateien nie als „extra“ gelöscht werden |
 | `markAsAddon` | `sync` | Gruppierung der Pläne nach Addon (Anzeige) |
 | lokale Dateien: Pfad, Größe, SHA-1 | Scan des Zielverzeichnisses (MIG-030C) | `LocalFile`; Datei „veraltet“, wenn sie fehlt oder ihr SHA-1 vom Server abweicht (Verhaltensbeschreibung der Baseline) |
@@ -45,7 +45,7 @@ Löschen: Nur im bestätigten verwalteten Zielbereich und nur bei ausdrückliche
 
 - Keine echten Repositories (> 10 000 Dateien) und keine historischen Dateiversionen; Größen-/Zeitverhalten der Grenzen ist ungemessen.
 - `hiddenFolderPaths` (serverinfo) und `hidden` (Baum) sind beide beobachtet; ihr Zusammenspiel bei echten Servern ist nicht belegt. Der erste Schritt behandelt beide als „nie Fremddateien löschen“.
-- Verhalten bei `.zip`-Blättern (Entpacken, Größenprüfung der entpackten Datei) ist nur aus Quellcode und Fixtures ohne ZIP-Nutzlast bekannt.
+- Verhalten bei `.zip`-Blättern: das **Format echter Server-Archive ist nicht belegt** (Eintragsname, Anzahl der Einträge, Kompressionsmethode). Die MIG-001-Fixtures enthalten keine ZIP-Nutzlast. Entpacken ist nur mit selbst erzeugten Archiven getestet (ADR-0008); die Grenzen dort sind konservativ gewählt, keine Beobachtung.
 - Case-Sensitivity-Verhalten auf Linux (Altclient vergleicht Namen ohne Beachtung der Schreibung) ist nicht geprüft (Linux-Prüfung zurückgestellt, siehe Prüfregel).
 
 ## Rechte (RQ-01 und andere)

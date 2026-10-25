@@ -13,8 +13,10 @@ use std::sync::atomic::Ordering;
 use std::thread;
 use std::time::{Duration, Instant};
 
+use armasync_testkit::synthetic::{Item, TestDir, TestFile, tree_file};
 use armasync_testkit::{
-    BIKEY, Behavior, PBO, Server, ZIP, bikey, hang_up_server, pbo, serve, serve_tls,
+    BIKEY, Behavior, PBO, Published, Server, ZIP, bikey, hang_up_server, pbo, serve,
+    serve_published, serve_tls,
 };
 
 // ---- helpers --------------------------------------------------------------------------------------------------
@@ -196,7 +198,7 @@ fn plan_shows_the_work_and_changes_nothing() {
     assert!(stdout.contains("2 to download"), "{stdout}");
     assert!(stdout.contains(&format!("download {PBO}")), "{stdout}");
     assert!(
-        stdout.contains("compressed file not supported yet"),
+        stdout.contains("compressed file without a usable archive size"),
         "{stdout}"
     );
     assert!(
@@ -759,4 +761,166 @@ fn ctrl_c_stops_a_running_synchronisation_cleanly_with_exit_code_130() {
         text(&recovery.stderr)
     );
     assert_eq!(read(&env, PBO), pbo());
+}
+
+// ---- packed (ZIP) files over the loopback server (MIG-030E, ADR-0008) ------------------------------------------
+//
+// The archives and the metadata are generated here; no real repository content is involved.
+
+const PACKED: &str = "@packed/packed.pbo";
+
+fn packed_content() -> Vec<u8> {
+    (0..150_000u32)
+        .map(|i| (i % 239) as u8 ^ (i / 13) as u8)
+        .collect()
+}
+
+fn deflated_zip(entries: &[(&str, &[u8])]) -> Vec<u8> {
+    use std::io::{Cursor, Write};
+    let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
+    for (name, data) in entries {
+        writer
+            .start_file(
+                *name,
+                zip::write::SimpleFileOptions::default()
+                    .compression_method(zip::CompressionMethod::Deflated),
+            )
+            .unwrap();
+        writer.write_all(data).unwrap();
+    }
+    writer.finish().unwrap().into_inner()
+}
+
+fn sha1_hex(data: &[u8]) -> String {
+    use armasync_core::{HashAlgorithm, Hasher};
+    armasync_adapters::Sha256Hasher
+        .hash(HashAlgorithm::Sha1, data)
+        .hex()
+        .to_owned()
+}
+
+/// A repository whose `.a3s/sync` announces `PACKED` as compressed with `archive_size`, and serves `archive` as
+/// `PACKED` + `.zip`.
+fn packed_repository(content: &[u8], archive: Vec<u8>, archive_size: i64) -> Published {
+    let mut file = TestFile::new("packed.pbo", content.len() as i64);
+    file.sha1 = sha1_hex(content).as_str().into();
+    file.compressed = true;
+    file.compressed_size = archive_size;
+    let addon = TestDir {
+        name: "@packed".to_owned(),
+        hidden: false,
+        addon: true,
+        items: vec![Item::File(file)],
+    };
+    let root = TestDir::new("racine", vec![Item::Dir(addon)]);
+    let mut files = std::collections::BTreeMap::new();
+    files.insert(format!("{PACKED}.zip"), archive);
+    Published {
+        sync: tree_file(&root),
+        files,
+    }
+}
+
+#[test]
+fn a_packed_file_is_downloaded_unpacked_verified_and_installed() {
+    let content = packed_content();
+    let archive = deflated_zip(&[("packed.pbo", &content)]);
+    let server = serve_published(packed_repository(
+        &content,
+        archive.clone(),
+        archive.len() as i64,
+    ));
+    let env = http_env(&server);
+    fs::create_dir_all(env.dest.join("@packed")).unwrap();
+
+    let out = sync(&env, "run", &[]);
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+    assert_eq!(read(&env, PACKED), content);
+    assert_eq!(
+        files(&env.dest),
+        [PACKED],
+        "no archive and no temporary file is left behind"
+    );
+    assert_eq!(server.requested(".zip"), 1);
+
+    // A second run finds the file up to date and downloads nothing.
+    let again = sync(&env, "run", &[]);
+    assert_eq!(again.status.code(), Some(0), "{}", text(&again.stderr));
+    assert_eq!(server.requested(".zip"), 1);
+}
+
+#[test]
+fn a_damaged_packed_file_is_refused_and_the_existing_file_stays() {
+    let content = packed_content();
+    let mut archive = deflated_zip(&[("packed.pbo", &content)]);
+    let middle = archive.len() / 2;
+    archive[middle] ^= 0xff;
+    let server = serve_published(packed_repository(
+        &content,
+        archive.clone(),
+        archive.len() as i64,
+    ));
+    let env = http_env(&server);
+    fs::create_dir_all(env.dest.join("@packed")).unwrap();
+    fs::write(env.dest.join(PACKED), b"the old version").unwrap();
+
+    let out = sync(&env, "run", &[]);
+    assert_eq!(out.status.code(), Some(6), "{}", text(&out.stderr));
+    assert!(
+        text(&out.stderr).contains("the archive is damaged"),
+        "{}",
+        text(&out.stderr)
+    );
+    assert_eq!(read(&env, PACKED), b"the old version");
+    assert_eq!(
+        files(&env.dest),
+        [PACKED],
+        "no partial file and no temporary file"
+    );
+}
+
+#[test]
+fn a_packed_entry_with_a_traversal_name_is_refused_and_nothing_escapes() {
+    let content = packed_content();
+    let archive = deflated_zip(&[("../escape.pbo", &content)]);
+    let server = serve_published(packed_repository(
+        &content,
+        archive.clone(),
+        archive.len() as i64,
+    ));
+    let env = http_env(&server);
+    fs::create_dir_all(env.dest.join("@packed")).unwrap();
+
+    let out = sync(&env, "run", &[]);
+    assert_ne!(out.status.code(), Some(0), "{}", text(&out.stdout));
+    assert!(
+        text(&out.stderr).contains("not a safe relative path"),
+        "{}",
+        text(&out.stderr)
+    );
+    assert!(
+        !env.root.join("escape.pbo").exists(),
+        "the entry name must never leave the destination"
+    );
+    assert!(files(&env.dest).is_empty(), "{:?}", files(&env.dest));
+}
+
+#[test]
+fn a_packed_file_announced_above_the_size_limit_is_left_out_without_a_download() {
+    let content = packed_content();
+    let archive = deflated_zip(&[("packed.pbo", &content)]);
+    // 3 GiB announced: above the accepted maximum, so the entry is not installable and nothing is fetched.
+    let announced = 3 * 1024 * 1024 * 1024_i64;
+    let server = serve_published(packed_repository(&content, archive, announced));
+    let env = http_env(&server);
+
+    let out = sync(&env, "run", &[]);
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+    assert!(
+        text(&out.stdout).contains("compressed file without a usable archive size"),
+        "{}",
+        text(&out.stdout)
+    );
+    assert_eq!(server.requested(".zip"), 0, "the archive is not downloaded");
+    assert!(files(&env.dest).is_empty());
 }

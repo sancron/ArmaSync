@@ -4,12 +4,15 @@
 //!
 //! The readers in `armasync-compat` return names exactly as published; here every name goes through the core's
 //! [`RelativePath`] validation. An entry with an unsafe name is **left out with a warning** and is never
-//! downloaded; a structurally broken file rejects the whole document. Entries this version cannot install yet
-//! (compressed variants) are left out of the manifest with a warning **and listed in
+//! downloaded; a structurally broken file rejects the whole document.
+//!
+//! Compressed entries (MIG-030E, ADR-0008) are installable when the published archive size is known and within
+//! [`MAX_PACKED_BYTES`]: they stay in the manifest as the unpacked file and are marked with their archive size. A
+//! compressed entry without a usable archive size is left out with a warning **and listed in
 //! [`SyncMetadata::unsupported`]**: a caller that deletes extra local files must keep those paths, because the
 //! uncompressed file may exist locally. Nothing here touches the network or the file system.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use armasync_compat::{
     Limits, ServerInfo, SyncDirectory, SyncTree, parse_serverinfo, parse_sync_tree,
@@ -17,6 +20,8 @@ use armasync_compat::{
 use armasync_core::{
     ContentHash, Error, ErrorKind, FileEntry, HashAlgorithm, Manifest, PlanOptions, RelativePath,
 };
+
+use crate::archive::MAX_PACKED_BYTES;
 
 impl SyncMetadata {
     /// Plan options for this repository: extra-file deletion as requested within `managed_roots`, **never** in the
@@ -60,7 +65,7 @@ pub enum SyncWarning {
         /// Number of files below it that were left out.
         files_left_out: usize,
     },
-    /// The server stores this file compressed; installing compressed files is not supported yet.
+    /// The server stores this file compressed, but its archive size is unknown or too large; it is left out.
     CompressedFileUnsupported(RelativePath),
     /// A folder-path entry of the server information is not a safe relative path and is ignored.
     ServerInfoPathIgnored,
@@ -86,8 +91,8 @@ pub struct SyncMetadata {
     pub manifest: Manifest,
     /// Observations about left-out or ignored entries.
     pub warnings: Vec<SyncWarning>,
-    /// Paths of files that exist on the server in a form this version cannot install (compressed). They are not in
-    /// the manifest; **extra-file deletion must keep them**.
+    /// Paths of files that exist on the server in a form this version cannot install (compressed without a usable
+    /// archive size). They are not in the manifest; **extra-file deletion must keep them**.
     pub unsupported: Vec<RelativePath>,
     /// Folders in which local extras must never be deleted (folders the server marks hidden, and the hidden
     /// folder paths of the server information).
@@ -119,6 +124,7 @@ fn count_files(dir: &SyncDirectory) -> usize {
 
 struct Collector {
     entries: Vec<FileEntry>,
+    archives: BTreeMap<RelativePath, u64>,
     warnings: Vec<SyncWarning>,
     unsupported: Vec<RelativePath>,
     protected: Vec<RelativePath>,
@@ -142,10 +148,13 @@ impl Collector {
                 continue;
             };
             if file.compressed {
-                self.warnings
-                    .push(SyncWarning::CompressedFileUnsupported(path.clone()));
-                self.unsupported.push(path);
-                continue;
+                if file.compressed_size == 0 || file.compressed_size > MAX_PACKED_BYTES {
+                    self.warnings
+                        .push(SyncWarning::CompressedFileUnsupported(path.clone()));
+                    self.unsupported.push(path);
+                    continue;
+                }
+                self.archives.insert(path.clone(), file.compressed_size);
             }
             // `parse_sync_tree` guarantees 40 hexadecimal digits.
             let Ok(hash) = ContentHash::new(HashAlgorithm::Sha1, &file.sha1) else {
@@ -189,6 +198,7 @@ pub fn metadata_from_tree(
 ) -> Result<SyncMetadata, Error> {
     let mut collector = Collector {
         entries: Vec::new(),
+        archives: BTreeMap::new(),
         warnings: Vec::new(),
         unsupported: Vec::new(),
         protected: Vec::new(),
@@ -200,12 +210,14 @@ pub fn metadata_from_tree(
             Err(_) => collector.warnings.push(SyncWarning::ServerInfoPathIgnored),
         }
     }
-    let manifest = Manifest::new(revision, collector.entries).map_err(|e| {
-        Error::new(
-            ErrorKind::Format,
-            format!("the published file list is not usable: {e}"),
-        )
-    })?;
+    let manifest = Manifest::new(revision, collector.entries)
+        .and_then(|manifest| manifest.with_archives(collector.archives))
+        .map_err(|e| {
+            Error::new(
+                ErrorKind::Format,
+                format!("the published file list is not usable: {e}"),
+            )
+        })?;
     let protected: BTreeSet<RelativePath> = collector.protected.into_iter().collect();
     Ok(SyncMetadata {
         manifest,

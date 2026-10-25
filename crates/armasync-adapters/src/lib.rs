@@ -8,6 +8,7 @@
 
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+pub mod archive;
 pub mod credentials;
 mod fsutil;
 pub mod http;
