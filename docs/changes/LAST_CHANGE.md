@@ -1,5 +1,14 @@
 # Letzte integrierte Änderung
 
+**2026-10-25 · MIG-042 (Schritt 4a) · Claude · Upload in der CLI: Vorschau, Bestätigung, gemeinsame Workflow-Verdrahtung** (nach `development`, Fast-Forward)
+
+* **MIG-042, Schritt 4a** ([Bericht](2026-10-25-MIG-042-S4A.md), [Handoff](../handoffs/MIG-042-S4A.md), [ADR-0014](../adr/0014-upload-cli.md), [Task](../tasks/MIG-042-S4A.md)): `upload plan` (nur Vorschau) und `upload publish --yes`; Verdrahtung in `armasync-workflow::upload`; Kennwort nur aus der Umgebung; Adressen mit Zugangsdaten werden abgelehnt; Exitcodes und JSON nach CLI-Vertrag. Der Loopback-WebDAV-Server liegt jetzt in `armasync-testkit`.
+* **Tests:** Workflow 9/9, CLI 8/8, CLI-Prozesstest 5/5 gegen den Loopback-Server über anonymes HTTP (Exitcode, Ausgabe, veröffentlichter Zeiger).
+* **Prüfungen (finaler Stand, Windows):** fmt, Clippy `-D warnings`, Workspace-Test (61 Suiten) und MSRV 1.85 (55 Suiten) jeweils Exitcode 0; Markdown-Links 191 Dateien, 0 defekt; `git diff --check` Exitcode 0.
+* **Offen:** GUI (4b) und Fortschritt pro Datei (4c).
+
+Vorheriger Stand:
+
 **2026-10-25 · MIG-042 (Schritt 3b) · Claude · Upload-Ausschlüsse: feste Regeln, Vorschau mit Gründen** (nach `development`, Fast-Forward)
 
 * **MIG-042, Schritt 3b** ([Bericht](2026-10-25-MIG-042-S3B.md), [Handoff](../handoffs/MIG-042-S3B.md), [ADR-0013](../adr/0013-upload-exclusions.md), [Task](../tasks/MIG-042.md)): Teildateien und interne Daten werden nie hochgeladen; ausdrückliche Ausschlüsse als validierte Pfade; die Vorschau zeigt jede ausgeschlossene Datei mit Grund und ungenutzte Regeln; die Quelle wird rein lesend gelistet. **Benutzerformat: Option A entschieden** (explizite Pfade; Ordner komponentenweise, `cache` trifft `cache-backup` nicht). Muster und Regeldatei bleiben spätere Entscheidungen (ADR-0013).
