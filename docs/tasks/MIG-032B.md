@@ -1,6 +1,6 @@
 # MIG-032B — Freiplatzprüfung und Ende-zu-Ende-Abbruch für große und komprimierte Downloads
 
-- Status: **geplant** (vorbereitet 2026-10-25, noch nicht zugewiesen oder begonnen). Integrator: Claude. Basis-Branch `development` @ Stand nach MIG-030E-Integration (siehe [LAST_CHANGE](../changes/LAST_CHANGE.md)).
+- Status: **in Arbeit** (reserviert 2026-10-25). Eigentümer und Integrator: Claude. Basis-Branch `development`, Basis-SHA `603909e11b0f9b15f9eff0d9ff4f22a3b7ef8ac4`. Eigener Branch `claude/mig-032b-freiplatz` (Hauptcheckout).
 - Teil von: MIG-032 (Fehlerfälle, Resume, Authentifizierung). Abgegrenzt: **Resume** ist eigener Umfang [MIG-032R](MIG-032R.md); **Authentifizierung** ist ausgesetzt (siehe unten).
 - Voraussetzungen: MIG-030E integriert ([Bericht](../changes/2026-10-25-MIG-030E.md), [ADR-0008](../adr/0008-packed-files-zip.md)), MIG-032A (Abbruch-Pfad, Konsolensignal belegt), [LOCAL_FS_THREATS](../migration/LOCAL_FS_THREATS.md), [CLI_CONTRACT](../migration/CLI_CONTRACT.md).
 
