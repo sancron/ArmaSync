@@ -8,6 +8,7 @@
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 pub mod exclusion;
+pub mod progress;
 pub mod revision;
 pub mod sync;
 pub mod upload;

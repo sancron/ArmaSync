@@ -16,6 +16,7 @@ use armasync_core::{
 };
 
 use crate::exclusion::{Exclusion, partition};
+use crate::progress::UploadObserver;
 use crate::upload;
 
 /// Schema name of the revision manifest.
@@ -143,6 +144,35 @@ pub fn publish_with_rules(
     rules: &ExclusionRules,
     cancel: &CancelToken,
 ) -> Result<PublishReport, Error> {
+    publish_inner(source, target, hasher, rules, cancel, None)
+}
+
+/// As [`publish_with_rules`], and reports the publication to `observer` (ADR-0016). Exactly one terminal event ends
+/// the events: `Finished` on success, `Cancelled` on cancellation, `Failed` with the error category otherwise.
+///
+/// # Errors
+/// As [`publish_with_rules`].
+pub fn publish_observed(
+    source: &dyn LocalSource,
+    target: &dyn RemoteTarget,
+    hasher: &dyn Hasher,
+    rules: &ExclusionRules,
+    cancel: &CancelToken,
+    observer: &UploadObserver,
+) -> Result<PublishReport, Error> {
+    let result = publish_inner(source, target, hasher, rules, cancel, Some(observer));
+    observer.end(&result);
+    result
+}
+
+fn publish_inner(
+    source: &dyn LocalSource,
+    target: &dyn RemoteTarget,
+    hasher: &dyn Hasher,
+    rules: &ExclusionRules,
+    cancel: &CancelToken,
+    observer: Option<&UploadObserver>,
+) -> Result<PublishReport, Error> {
     let split = partition(source, rules, cancel)?;
     let revision = Revision::build(&split.included, hasher)?;
     let directory = format!("revisions/{}", revision.id);
@@ -186,9 +216,14 @@ pub fn publish_with_rules(
             &scoped,
             cancel,
         )?;
-        let uploaded = upload::apply(&plan, source, &scoped, cancel)?;
+        if let Some(observer) = observer {
+            observer.start(plan.files, plan.bytes);
+        }
+        let uploaded = upload::apply_observed(&plan, source, &scoped, cancel, observer)?;
         report.files_uploaded = uploaded.files_created + uploaded.files_replaced;
         check_cancel(cancel)?;
+    } else if let Some(observer) = observer {
+        observer.start(0, 0);
     }
     // Every file is read back and checked before anything that names the revision is written (step 3a, ADR-0012).
     verify_files(target, &directory, &revision.files, hasher, cancel)?;

@@ -22,15 +22,17 @@ use std::fmt;
 use std::hash::{Hash, Hasher as _};
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::mpsc::{self, Receiver, TryRecvError};
+use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 use std::thread::{self, JoinHandle};
 
 use armasync_adapters::http::HttpConfig;
 use armasync_application::revision::PublishReport;
 use armasync_application::upload::{UploadPlan, UploadStep};
 use armasync_core::exclusion::ExclusionReason;
-use armasync_core::{CancelToken, Error, ErrorKind};
-use armasync_workflow::upload::{UploadRequest, preview, publish};
+use armasync_core::{
+    CancelToken, Error, ErrorKind, OperationId, UploadEvent, UploadEventKind, UploadEventSink,
+};
+use armasync_workflow::upload::{UploadRequest, preview, publish_observed};
 
 use crate::sync_screen::format_bytes;
 
@@ -239,6 +241,50 @@ enum JobKind {
 enum Outcome {
     Plan(Result<UploadPlan, Error>),
     Published(Result<PublishReport, Error>),
+    /// One event of a running publication (ADR-0016); the result follows it.
+    Event(UploadEvent),
+}
+
+/// What the progress view shows of a running publication (ADR-0016). Built from the typed events only.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ProgressView {
+    /// Revision files completed.
+    pub files_done: u64,
+    /// Revision files to upload.
+    pub files_total: u64,
+    /// Bytes completed, including the running file.
+    pub bytes_done: u64,
+    /// Bytes to upload.
+    pub bytes_total: u64,
+    /// Path of the file that is being sent, relative to the revision.
+    pub current: Option<String>,
+}
+
+impl ProgressView {
+    fn record(&mut self, event: &UploadEvent) {
+        self.files_done = event.progress.files_done;
+        self.files_total = event.progress.files_total;
+        self.bytes_done = event.progress.bytes_done;
+        self.bytes_total = event.progress.bytes_total;
+        match &event.kind {
+            UploadEventKind::FileStarted { path, .. } => self.current = Some(path.to_string()),
+            UploadEventKind::FileFinished { .. } => self.current = None,
+            _ => {}
+        }
+    }
+}
+
+/// Sends the events of a publication to the screen and wakes the window (ADR-0016).
+struct EventChannel {
+    sender: Sender<Outcome>,
+    repaint: Arc<dyn Fn() + Send + Sync>,
+}
+
+impl UploadEventSink for EventChannel {
+    fn emit(&mut self, event: UploadEvent) {
+        let _ = self.sender.send(Outcome::Event(event));
+        (self.repaint)();
+    }
 }
 
 struct Job {
@@ -263,6 +309,8 @@ pub struct UploadScreen {
     published: Option<PublishView>,
     error: Option<String>,
     job: Option<Job>,
+    progress: Option<ProgressView>,
+    operations: u64,
     repaint: Arc<dyn Fn() + Send + Sync>,
 }
 
@@ -289,8 +337,16 @@ impl UploadScreen {
             published: None,
             error: None,
             job: None,
+            progress: None,
+            operations: 0,
             repaint: Arc::new(repaint),
         }
+    }
+
+    /// The progress of the running publication, if one runs (ADR-0016).
+    #[must_use]
+    pub fn progress(&self) -> Option<&ProgressView> {
+        self.progress.as_ref()
     }
 
     /// The current stage.
@@ -408,29 +464,43 @@ impl UploadScreen {
         self.confirmed = false;
     }
 
-    /// Takes a finished result from the worker, if there is one. Called once per frame.
+    /// Takes everything the worker sent since the last frame: progress events, then the result if it is ready. Called
+    /// once per frame; it never waits.
     pub fn poll(&mut self) {
-        let Some(job) = self.job.as_ref() else {
+        loop {
+            let Some(job) = self.job.as_ref() else {
+                return;
+            };
+            let outcome = match job.receiver.try_recv() {
+                Ok(Outcome::Event(event)) => {
+                    self.progress
+                        .get_or_insert_with(ProgressView::default)
+                        .record(&event);
+                    continue;
+                }
+                Ok(outcome) => outcome,
+                Err(TryRecvError::Empty) => return,
+                Err(TryRecvError::Disconnected) => match job.kind {
+                    JobKind::Preview => Outcome::Plan(Err(unexpected_end())),
+                    JobKind::Publish => Outcome::Published(Err(unexpected_end())),
+                },
+            };
+            self.finish_job(outcome);
             return;
-        };
-        let received = job.receiver.try_recv();
-        let kind = job.kind;
-        let fingerprint = job.fingerprint;
-        let outcome = match received {
-            Ok(outcome) => outcome,
-            Err(TryRecvError::Empty) => return,
-            Err(TryRecvError::Disconnected) => match kind {
-                JobKind::Preview => Outcome::Plan(Err(unexpected_end())),
-                JobKind::Publish => Outcome::Published(Err(unexpected_end())),
-            },
-        };
+        }
+    }
+
+    fn finish_job(&mut self, outcome: Outcome) {
         let Some(mut job) = self.job.take() else {
             return;
         };
+        let fingerprint = job.fingerprint;
+        self.progress = None;
         if let Some(handle) = job.handle.take() {
             let _ = handle.join();
         }
         match outcome {
+            Outcome::Event(_) => {}
             Outcome::Plan(Ok(plan)) => {
                 self.preview = Some(PreviewView::from_plan(&plan));
                 self.preview_fingerprint = Some(fingerprint);
@@ -476,10 +546,22 @@ impl UploadScreen {
         let cancel = CancelToken::new();
         let worker_cancel = cancel.clone();
         let repaint = Arc::clone(&self.repaint);
+        let events = EventChannel {
+            sender: sender.clone(),
+            repaint: Arc::clone(&repaint),
+        };
+        self.operations += 1;
+        let operation = OperationId::new(self.operations);
+        self.progress = None;
         let handle = thread::spawn(move || {
             let outcome = match kind {
                 JobKind::Preview => Outcome::Plan(preview(&request, &worker_cancel)),
-                JobKind::Publish => Outcome::Published(publish(&request, &worker_cancel)),
+                JobKind::Publish => Outcome::Published(publish_observed(
+                    &request,
+                    &worker_cancel,
+                    operation,
+                    Box::new(events),
+                )),
             };
             let _ = sender.send(outcome);
             repaint();

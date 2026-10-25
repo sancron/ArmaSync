@@ -209,3 +209,55 @@ fn reset_returns_to_editing_and_keeps_the_form() {
     assert!(!screen.form.source.is_empty());
     fs::remove_dir_all(root).ok();
 }
+
+#[test]
+fn a_running_publication_shows_bytes_and_the_current_file_and_clears_afterwards() {
+    let root = tree("progress");
+    // Large enough that the worker is still sending while the test samples the progress view.
+    fs::write(root.join("big.bin"), vec![7_u8; 16 * 1024 * 1024]).unwrap();
+    let server = start(false, false, "");
+    let mut screen = screen_for(&root, &server);
+    preview_and_settle(&mut screen);
+    screen.set_confirmed(true);
+    screen.request_publish();
+
+    let started = Instant::now();
+    let mut samples = Vec::new();
+    while screen.is_busy() {
+        assert!(started.elapsed() < Duration::from_secs(60), "timed out");
+        screen.poll();
+        if let Some(progress) = screen.progress() {
+            samples.push(progress.clone());
+        }
+        thread::sleep(Duration::from_millis(1));
+    }
+    assert_eq!(
+        screen.stage(),
+        UploadStage::Published,
+        "{:?}",
+        screen.error()
+    );
+
+    assert!(
+        samples.iter().any(|p| p.bytes_done > 0),
+        "no byte progress was seen"
+    );
+    assert!(
+        samples
+            .iter()
+            .any(|p| p.current.as_deref() == Some("big.bin")),
+        "the running file was not named"
+    );
+    // The counters never go back, and the bar's total is the plan's total.
+    let mut previous = 0;
+    for progress in &samples {
+        assert!(progress.bytes_done >= previous);
+        previous = progress.bytes_done;
+        assert_eq!(progress.files_total, 3);
+    }
+    assert!(
+        screen.progress().is_none(),
+        "progress clears with the result"
+    );
+    fs::remove_dir_all(root).ok();
+}

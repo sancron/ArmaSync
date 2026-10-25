@@ -4,11 +4,17 @@
 
 use std::io::Write;
 use std::path::PathBuf;
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
+use std::thread;
+use std::time::Duration;
 
 use armasync_adapters::http::HttpConfig;
+use armasync_application::revision::PublishReport;
 use armasync_core::exclusion::ExclusionReason;
-use armasync_core::{CancelToken, Error, ErrorKind};
-use armasync_workflow::upload::{UploadRequest, preview, publish};
+use armasync_core::{
+    CancelToken, Error, ErrorKind, OperationId, UploadEvent, UploadEventKind, UploadEventSink,
+};
+use armasync_workflow::upload::{UploadRequest, preview, publish_observed};
 use serde_json::{Value, json};
 
 use crate::{ExitStatus, JSON_SCHEMA_VERSION};
@@ -63,7 +69,8 @@ pub fn run(
         http: HttpConfig::default(),
     };
     if args.publish {
-        match publish(&request, cancel) {
+        let show_progress = !json_output && !quiet;
+        match publish_with_progress(&request, cancel, show_progress, stderr) {
             Ok(report) => {
                 let result = json!({
                     "revision": report.revision,
@@ -120,6 +127,84 @@ pub fn run(
             Err(error) => report_error(command, &error, json_output, stdout, stderr),
         }
     }
+}
+
+/// How often the waiting loop checks whether the publication has ended.
+const POLL: Duration = Duration::from_millis(50);
+
+/// Sends the events of one publication to the waiting thread (ADR-0016).
+struct ChannelSink(mpsc::Sender<UploadEvent>);
+
+impl UploadEventSink for ChannelSink {
+    fn emit(&mut self, event: UploadEvent) {
+        let _ = self.0.send(event);
+    }
+}
+
+/// Runs the publication on its own thread and, when `show` is set, writes one line per file to `stderr` as the
+/// events arrive. Stdout and the exit status never depend on the events.
+fn publish_with_progress(
+    request: &UploadRequest,
+    cancel: &CancelToken,
+    show: bool,
+    stderr: &mut dyn Write,
+) -> Result<PublishReport, Error> {
+    let (sender, receiver) = mpsc::channel();
+    thread::scope(|scope| {
+        let worker = scope.spawn(move || {
+            publish_observed(
+                request,
+                cancel,
+                OperationId::new(1),
+                Box::new(ChannelSink(sender)),
+            )
+        });
+        wait_for_events(&worker, &receiver, show, stderr);
+        worker.join().unwrap_or_else(|_| {
+            Err(Error::new(
+                ErrorKind::Integrity,
+                "the publication stopped unexpectedly; the target may need a check",
+            ))
+        })
+    })
+}
+
+fn wait_for_events(
+    worker: &thread::ScopedJoinHandle<'_, Result<PublishReport, Error>>,
+    receiver: &Receiver<UploadEvent>,
+    show: bool,
+    stderr: &mut dyn Write,
+) {
+    loop {
+        match receiver.recv_timeout(POLL) {
+            Ok(event) => report_event(&event, show, stderr),
+            Err(RecvTimeoutError::Timeout) if worker.is_finished() => break,
+            Err(RecvTimeoutError::Timeout) => {}
+            Err(RecvTimeoutError::Disconnected) => break,
+        }
+    }
+    while let Ok(event) = receiver.try_recv() {
+        report_event(&event, show, stderr);
+    }
+}
+
+fn report_event(event: &UploadEvent, show: bool, stderr: &mut dyn Write) {
+    if !show {
+        return;
+    }
+    let line = match &event.kind {
+        UploadEventKind::FileStarted { path, size } => format!(
+            "{}/{} uploading {path} ({size} bytes)",
+            event.progress.files_done + 1,
+            event.progress.files_total
+        ),
+        UploadEventKind::FileFinished { path } => format!(
+            "{}/{} uploaded {path}",
+            event.progress.files_done, event.progress.files_total
+        ),
+        _ => return,
+    };
+    let _ = writeln!(stderr, "{line}");
 }
 
 fn excluded_json(exclusions: &[armasync_application::exclusion::Exclusion]) -> Vec<Value> {

@@ -10,10 +10,11 @@ use armasync_adapters::Sha256Hasher;
 use armasync_adapters::http::HttpConfig;
 use armasync_adapters::localfs::LocalDirectory;
 use armasync_adapters::webdav::{BasicCredentials, WebDavClient};
+use armasync_application::progress::UploadObserver;
 use armasync_application::revision::{self, PublishReport};
 use armasync_application::upload::{self, UploadPlan};
 use armasync_core::exclusion::ExclusionRules;
-use armasync_core::{CancelToken, Error, ErrorKind, RelativePath};
+use armasync_core::{CancelToken, Error, ErrorKind, OperationId, RelativePath, UploadEventSink};
 
 /// What an upload needs from a frontend. The password is held in memory only for the operation; it is never printed,
 /// logged or stored (ADR-0014).
@@ -69,6 +70,33 @@ pub fn publish(request: &UploadRequest, cancel: &CancelToken) -> Result<PublishR
         &prepared.rules,
         cancel,
     )
+}
+
+/// As [`publish`], and reports the progress to `sink` as typed events (ADR-0016). The events never contain the
+/// password, the address, absolute paths or error texts.
+///
+/// # Errors
+/// As [`publish`].
+pub fn publish_observed(
+    request: &UploadRequest,
+    cancel: &CancelToken,
+    operation: OperationId,
+    sink: Box<dyn UploadEventSink>,
+) -> Result<PublishReport, Error> {
+    let observer = UploadObserver::new(operation, sink);
+    // A refusal before the publication starts is an operation too: it ends with a `Failed` event (ADR-0016).
+    let result = prepare(request).and_then(|prepared| {
+        revision::publish_observed(
+            &prepared.source,
+            &prepared.target,
+            &Sha256Hasher,
+            &prepared.rules,
+            cancel,
+            &observer,
+        )
+    });
+    observer.end(&result);
+    result
 }
 
 /// Parses the exclusions of a request. Each must be a safe relative path (ADR-0013).

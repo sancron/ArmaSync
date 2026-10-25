@@ -19,6 +19,7 @@ pub mod path;
 pub mod plan;
 pub mod port;
 pub mod product;
+pub mod upload_event;
 
 pub use credential::{Credential, CredentialStore, Secret};
 pub use error::{Error, ErrorKind};
@@ -37,4 +38,7 @@ pub use port::{
     ArchiveReader, CancelToken, Digest, Hasher, InventoryEntry, LocalSource, LocalStore, Opened,
     OpenedSource, PartialFile, PartialKey, RemoteTarget, RepositorySource, SourceFile, Spool,
     StagedFile, StoredPartial, TRANSFER_CHUNK, copy_body, copy_in_chunks, is_strong_validator,
+};
+pub use upload_event::{
+    UPLOAD_EVENT_SCHEMA_VERSION, UploadEvent, UploadEventKind, UploadEventSink, UploadProgress,
 };

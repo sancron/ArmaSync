@@ -117,12 +117,46 @@ fn show_actions(screen: &mut UploadScreen, ui: &mut egui::Ui) {
         }
         if busy {
             ui.spinner();
-            ui.label("Vorgang läuft … (kein Fortschritt pro Datei; Abbruch ist jederzeit möglich)");
+            ui.label("Vorgang läuft … Abbruch ist jederzeit möglich.");
             if ui.button(CANCEL_LABEL).clicked() {
                 screen.cancel();
             }
         }
     });
+    if busy {
+        show_progress(screen, ui);
+    }
+}
+
+/// The progress of a running publication, in words and as a bar (ADR-0016). The words carry the information; the bar
+/// only repeats it. The text is not a live region, so the screen reader does not announce every file.
+fn show_progress(screen: &UploadScreen, ui: &mut egui::Ui) {
+    let Some(progress) = screen.progress() else {
+        ui.label("Die Veröffentlichung wird vorbereitet.");
+        return;
+    };
+    let fraction = if progress.bytes_total == 0 {
+        1.0
+    } else {
+        // The ratio only steers the bar; the exact figures are in the text below.
+        (progress.bytes_done as f64 / progress.bytes_total as f64).clamp(0.0, 1.0) as f32
+    };
+    ui.add(
+        egui::ProgressBar::new(fraction)
+            .text(format!(
+                "{} von {} übertragen",
+                format_bytes(progress.bytes_done),
+                format_bytes(progress.bytes_total)
+            ))
+            .desired_width(520.0),
+    );
+    ui.label(format!(
+        "Dateien: {} von {} fertig.",
+        progress.files_done, progress.files_total
+    ));
+    if let Some(current) = &progress.current {
+        ui.label(format!("Gerade wird übertragen: {current}"));
+    }
 }
 
 fn show_preview(screen: &mut UploadScreen, ui: &mut egui::Ui, error: egui::Color32) {

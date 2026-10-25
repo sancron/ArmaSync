@@ -14,6 +14,7 @@ use armasync_core::{
 };
 
 use crate::exclusion::{Exclusion, partition};
+use crate::progress::{CountingReader, UploadObserver};
 
 /// One step of an upload plan.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -179,6 +180,18 @@ pub fn apply(
     target: &dyn RemoteTarget,
     cancel: &CancelToken,
 ) -> Result<UploadReport, Error> {
+    apply_observed(plan, source, target, cancel, None)
+}
+
+/// As [`apply`], and reports each file to `observer` (ADR-0016): the start and end of every file and the bytes read
+/// for it. Folder steps produce no file events.
+pub(crate) fn apply_observed(
+    plan: &UploadPlan,
+    source: &dyn LocalSource,
+    target: &dyn RemoteTarget,
+    cancel: &CancelToken,
+    observer: Option<&UploadObserver>,
+) -> Result<UploadReport, Error> {
     let mut report = UploadReport::default();
     for step in &plan.steps {
         check_cancel(cancel)?;
@@ -194,16 +207,27 @@ pub fn apply(
                 size,
                 replace,
             } => {
-                let opened = source.open(path).map_err(|error| stopped(cancel, error))?;
+                let mut opened = source.open(path).map_err(|error| stopped(cancel, error))?;
                 if opened.size != *size {
                     return Err(Error::new(
                         ErrorKind::Integrity,
                         format!("'{path}' changed since the plan was made; create a new plan"),
                     ));
                 }
+                if let Some(observer) = observer {
+                    observer.file_started(path, *size);
+                    opened.content = Box::new(CountingReader::new(
+                        opened.content,
+                        observer.clone(),
+                        path.clone(),
+                    ));
+                }
                 target
                     .upload(path, opened, cancel)
                     .map_err(|error| stopped(cancel, error))?;
+                if let Some(observer) = observer {
+                    observer.file_finished(path);
+                }
                 if *replace {
                     report.files_replaced += 1;
                 } else {

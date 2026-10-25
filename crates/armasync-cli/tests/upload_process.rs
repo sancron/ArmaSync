@@ -209,3 +209,41 @@ fn the_pointer_stays_unchanged_when_the_source_cannot_be_read() {
     assert_eq!(output.status.code(), Some(5), "{}", text(&output.stderr));
     assert!(server.file("current.json").is_none());
 }
+
+#[test]
+fn text_mode_prints_one_line_per_file_on_stderr_and_the_result_on_stdout() {
+    let root = source("progress-text");
+    let server = start(false, false, "");
+    let output = armasync(&[
+        "upload",
+        "publish",
+        "--source",
+        root.to_str().unwrap(),
+        "--target",
+        &target(&server),
+        "--yes",
+    ]);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stderr: {}\nstdout: {}",
+        text(&output.stderr),
+        text(&output.stdout)
+    );
+    // Progress goes to stderr, one line when a file starts and one when it is complete, in the plan's order (ADR-0016).
+    assert_eq!(
+        text(&output.stderr).lines().collect::<Vec<_>>(),
+        [
+            "1/2 uploading a.txt (13 bytes)",
+            "1/2 uploaded a.txt",
+            "2/2 uploading docs/b.txt (4 bytes)",
+            "2/2 uploaded docs/b.txt",
+        ]
+    );
+    assert!(
+        text(&output.stdout).contains("revision"),
+        "{}",
+        text(&output.stdout)
+    );
+    fs::remove_dir_all(root).ok();
+}
