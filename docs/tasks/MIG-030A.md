@@ -1,6 +1,6 @@
 # MIG-030A — Sync-Metadaten-Leser, SHA-1 und Manifest-Abbildung
 
-- Status: reviewbereit (2026-10-19). Eigentümer und Integrator: Claude.
+- Status: **integriert** (2026-10-19; siehe [Board](README.md)). Eigentümer und Integrator: Claude.
 - Basis: `development`, `729d6818755add721d04ee59d5e7d986871cfd39` (Stand nach Integration der Vorprüfung; Vorgänger `4831fa1` mit grüner CI).
 - Branch/Worktree: `claude/mig-030a-sync-metadata`, `../ArmaSync-claude-mig-030a`.
 - Verträge: [ADR-0006](../adr/0006-sync-metadata-and-http-transport.md), [SYNC_METADATA](../migration/SYNC_METADATA.md), [ADR-0003](../adr/0003-legacy-formats.md).

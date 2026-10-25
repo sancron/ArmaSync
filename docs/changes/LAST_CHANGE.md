@@ -1,5 +1,13 @@
 # Letzte integrierte Änderung
 
+**2026-10-25 · MIG-040A · Claude · Planung FTP/FTPS, SFTP und WebDAV (ADR-0010, vorgeschlagen)** (nach `development`, Fast-Forward)
+
+* **MIG-040A** ([Bericht](2026-10-25-MIG-040A.md), [Handoff](../handoffs/MIG-040A.md), [ADR-0010](../adr/0010-ftp-sftp-webdav-contract.md)): Planung für P4, keine Protokollimplementierung und keine neue Abhängigkeit. Empfohlene Reihenfolge WebDAV (MIG-040B) → FTP/FTPS (MIG-040C) → SFTP (MIG-040D). Benannt: MSRV-Konflikt (`suppaftp` 1.88, `russh` 1.89 gegenüber 1.85), async-Laufzeitfrage, acht offene Entscheidungen.
+* **Abgleich:** Statusangaben in STATUS, Board, Roadmap, Changelog, Blockerliste und den Taskdateien MIG-030E und MIG-032A korrigiert; alle lokalen Markdown-Links geprüft.
+* **Nicht geprüft:** Builds der Kandidaten, echte Server, WSL/Linux (zurückgestellt), GitHub-CI (pausiert).
+
+Vorheriger Stand:
+
 **2026-10-25 · MIG-032R2 · Claude · Härtung der Teildateien, zwei Review-Runden** (nach `development`, Fast-Forward)
 
 * **MIG-032R2** ([Bericht](2026-10-25-MIG-032R2.md), [Handoff](../handoffs/MIG-032R2.md), [Task](../tasks/MIG-032R2.md)): Ein vorhandener Teilnamen wird nie mehr zum Schreiben geöffnet. Frischer Start entfernt den Eintrag und legt neu an; Fortsetzen kopiert die gültigen Bytes lesend in eine neue Datei; der Zustand wird über eine Temp-Datei ersetzt. Öffnen verweigert Links; drei Sentinel-Tests belegen, dass externe Dateien unverändert bleiben.

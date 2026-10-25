@@ -1,6 +1,6 @@
 # Release-Blocker
 
-Stand: 2026-10-19. Liste dessen, was ein Release (Windows oder Linux) **verhindert**, bis es behoben und nachgewiesen ist. Sie ergänzt [STATUS](STATUS.md) und die Rechtefragen ([RIGHTS_QUESTIONS](../tasks/RIGHTS_QUESTIONS.md)); Einträge werden nur mit Nachweis (Commit, Prüfprotokoll) geschlossen.
+Stand: 2026-10-25 (MIG-032R, MIG-032R2 und MIG-040A ändern keine Blocker; RB-01 bis RB-06 bleiben offen). Liste dessen, was ein Release (Windows oder Linux) **verhindert**, bis es behoben und nachgewiesen ist. Sie ergänzt [STATUS](STATUS.md) und die Rechtefragen ([RIGHTS_QUESTIONS](../tasks/RIGHTS_QUESTIONS.md)); Einträge werden nur mit Nachweis (Commit, Prüfprotokoll) geschlossen.
 
 | ID | Blocker | Betrifft | Schließen durch |
 | --- | --- | --- | --- |

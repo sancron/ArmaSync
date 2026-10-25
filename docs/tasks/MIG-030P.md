@@ -1,6 +1,6 @@
 # MIG-030P — Vertrag: Streaming-Übertragung, Staging, Schutzpfade (Ports)
 
-- Status: reviewbereit (2026-10-19). Eigentümer und Integrator: Claude. Der Name `MIG-030P` ("Ports") ist der nächste freie Name der Familie MIG-030; er geht MIG-030B/C voraus.
+- Status: **integriert** (2026-10-19; siehe [Board](README.md)). Eigentümer und Integrator: Claude. Der Name `MIG-030P` ("Ports") ist der nächste freie Name der Familie MIG-030; er geht MIG-030B/C voraus.
 - Basis: `development` @ `89f1fd49f84b1687353914a9dbbb0bfebcb18120` (GitHub-CI pausiert, PROC-002). Branch/Worktree `claude/mig-030p-ports`, `../ArmaSync-claude-mig-030p`.
 - Verträge: [ADR-0007](../adr/0007-transfer-ports.md) (gilt vor Adaptern), [ADR-0006](../adr/0006-sync-metadata-and-http-transport.md).
 - Schreibbereich: `crates/armasync-core/src/{port,plan,lib}.rs`, `crates/armasync-core/tests/transfer_contract.rs`, `crates/armasync-application/src/sync.rs` und Tests, `crates/armasync-adapters/src/memory.rs`, `crates/armasync-adapters/src/sync_meta/mod.rs` (Hilfsfunktion `plan_options`) und Tests, Doku. Keine neuen Abhängigkeiten, kein Netzwerk, kein Dateisystemadapter.

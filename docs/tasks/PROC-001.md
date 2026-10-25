@@ -1,6 +1,6 @@
 # PROC-001 — Prüfregel: Windows lokal, Ubuntu-CI getrennt, WSL zum Schluss
 
-- Status: reviewbereit (2026-10-19).
+- Status: **integriert** (2026-10-19; siehe [LAST_CHANGE](../changes/LAST_CHANGE.md)).
 - Eigentümer und Integrator: Claude.
 - Basis: `development`, `8e3b25d421d1f7c03830ed85d970e34f34f7a46e` (= `origin/development`; CI für diesen Commit laut `gh run view` erfolgreich, [Run 39255913370](https://github.com/sancron/ArmaSync/actions/runs/39255913370)).
 - Branch/Worktree: `claude/proc-001-test-policy`, `../ArmaSync-claude-proc-001`.
