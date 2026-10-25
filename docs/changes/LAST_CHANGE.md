@@ -1,5 +1,15 @@
 # Letzte integrierte Änderung
 
+**2026-10-25 · MIG-042 A11Y-SERVER · Claude · Manueller Upload-Prüfserver für die Screenreader-Prüfung** (nach `development`, Fast-Forward)
+
+* **MIG-042 A11Y-SERVER** ([Bericht](2026-10-25-MIG-042-A11Y-SERVER.md), [Handoff](../handoffs/MIG-042-A11Y-SERVER.md), [Task](../tasks/MIG-042-A11Y-SERVER.md), [Anleitung](../migration/UPLOAD_TEST_SERVER.md)): Modus `start_manual` des Testkit-WebDAV-Servers. Startbar über `cargo run -p armasync-testkit --example upload_webdav`; bindet an `127.0.0.1` mit dynamischem Port; anonym; Speicher nur im Arbeitsspeicher; Grenzen 64 MiB je Datei, 256 MiB insgesamt, 200 Dateien; Pfadprüfung; keine Testrouten. Beenden mit `q`.
+* **Tests:** `manual_webdav` 9/9; Prozesslauf mit `curl.exe` und CLI-Veröffentlichung gegen den laufenden Server; Beenden ohne Restprozess; bestehende Adaptertests unverändert grün.
+* **Prüfungen (finaler Stand, Windows):** fmt, Clippy `-D warnings`, Workspace (65 Suiten) und MSRV 1.85 ohne GUI (57 Suiten) jeweils Exitcode 0; Markdown-Links 0 defekt; `git diff --check` Exitcode 0.
+* **Gate:** P1-Zugänglichkeitsgate (RB-02) bleibt **geschlossen**. NVDA, Narrator, Orca, Sicht- und Tastaturprüfung sind **nicht ausgeführt**; der Server führt sie nicht aus.
+* **Offen:** der manuelle Lauf der Schritte U8 bis U24 am Fenster; Sichtprüfung S1 bis S6; NVDA-Lauf U1 bis U27; Orca und Linux-Sichtprüfung bis zur Linux-Abschlussvalidierung.
+
+Vorheriger Stand:
+
 **2026-10-25 · MIG-042 A11Y · Claude · Prüfprotokoll für die Upload-Ansicht (Dokumentation)** (nach `development`, Fast-Forward)
 
 * **MIG-042 A11Y** ([Bericht](2026-10-25-MIG-042-A11Y.md), [Handoff](../handoffs/MIG-042-A11Y.md), [Task](../tasks/MIG-042-A11Y.md), [Protokoll](../migration/GUI_UPLOAD_SCREENREADER_PROTOCOL.md)): Ergänzung zum GUI-Prüfprotokoll für Vorschau, Bestätigung, Kennwort, laufenden Upload, Ansagen, Tastatur und Darstellung. Automatisierte Abdeckung und manuelle Schritte sind getrennt; Ergebnisfelder für bestanden, fehlgeschlagen oder nicht geprüft.

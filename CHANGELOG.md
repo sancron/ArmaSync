@@ -2,6 +2,7 @@
 
 ## Unreleased — Rust-Migrationsvorbereitung (2026-10-25)
 
+- MIG-042 A11Y-SERVER: Manueller Upload-Prüfserver für die Screenreader-Prüfung (Werkzeug im Testkit, [Anleitung](docs/migration/UPLOAD_TEST_SERVER.md)). Nur 127.0.0.1, anonym, Speicher im Arbeitsspeicher, begrenzte Größen und Pfade. Das P1-Zugänglichkeitsgate bleibt geschlossen.
 - MIG-042 A11Y: Prüfprotokoll für die Upload-Ansicht ([GUI_UPLOAD_SCREENREADER_PROTOCOL](docs/migration/GUI_UPLOAD_SCREENREADER_PROTOCOL.md)). Das P1-Zugänglichkeitsgate bleibt geschlossen; NVDA und Sichtprüfung sind nicht ausgeführt.
 - MIG-042 (Schritt 4c): Fortschritt pro Datei in CLI und GUI ([ADR-0016](docs/adr/0016-upload-progress-events.md)). Versionierter Ereignistyp mit Beginn und Ende je Datei, übertragenen Bytes, Summen, Abschluss, Abbruch und Fehler; im Textmodus der CLI eine Zeile je Datei auf stderr; in der GUI eine Fortschrittsleiste. Keine Zugangsdaten, keine absoluten Pfade und keine Adressen in Ereignissen. Parallelität und Resume bleiben aus.
 - MIG-042 (Schritt 4b): Upload-Ansicht in der GUI ([ADR-0015](docs/adr/0015-upload-gui.md)). Vorschau mit Ein- und Ausschlüssen samt Grund; Veröffentlichen erst nach ausdrücklicher Bestätigung und nur bei unveränderten Eingaben; Abbrechen über den vorhandenen Abbruchmechanismus; Ergebnis und Fehler in Worten. Dieselben Workflow-Funktionen wie die CLI. Kennwort nur für die Sitzung. Fortschritt pro Datei folgt in 4c.

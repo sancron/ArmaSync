@@ -42,7 +42,7 @@ Diese Tests laufen unter Windows mit `cargo test -p armasync-gui`. Sie sind **ke
 
 ## 2. Manuell: Windows, NVDA
 
-**Vorbereitung.** Build-SHA notieren; `cargo build -p armasync-gui`; starten mit `target\debug\armasync-gui.exe`; NVDA starten und die Sprachanzeige aktivieren. Testdaten: ein Quellordner mit `a.txt`, `docs\b.txt` und `.armasync-lock`, dazu eine Datei `big.bin` von etwa 16 MiB für den Fortschritt. Zielserver: ein lokaler WebDAV-Server ohne Anmeldung auf `127.0.0.1` (`http://127.0.0.1:<port>/dav`). **Offen:** Ein solcher Server ist für die manuelle Prüfung noch nicht als Hilfsprogramm vorhanden; der Testkit-Server ist nur im Test verfügbar. Ohne Zielserver lassen sich die Schritte U8 bis U24 nicht ausführen; sie sind dann „nicht geprüft“. Den Server nicht durch Installation fremder Software herstellen, ohne dies zu entscheiden.
+**Vorbereitung.** Build-SHA notieren; `cargo build -p armasync-gui`; starten mit `target\debug\armasync-gui.exe`; NVDA starten und die Sprachanzeige aktivieren. Testdaten: ein Quellordner mit `a.txt`, `docs\b.txt` und `.armasync-lock`, dazu eine Datei `big.bin` von etwa 16 MiB für den Fortschritt. Zielserver: der manuelle Upload-Prüfserver aus dem Testkit (nur 127.0.0.1, anonym, kein Produktcode, Speicher nur im Arbeitsspeicher). Start, Adresse und Beenden: [UPLOAD_TEST_SERVER](UPLOAD_TEST_SERVER.md). Die Adresse für die GUI lautet `http://127.0.0.1:<port>/dav`, Benutzername und Kennwort bleiben leer. **Der Server ermöglicht nur die Prüfung; er führt weder die Nutzung eines Lesegeräts noch die Sicht- oder Tastaturprüfung aus.**
 
 Die Ansagen sind Erwartungen, die sinngemäß gelten; der genaue Wortlaut hängt von NVDA ab. Jede Abweichung ist ein Befund.
 
