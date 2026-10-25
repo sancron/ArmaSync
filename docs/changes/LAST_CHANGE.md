@@ -1,5 +1,13 @@
 # Letzte integrierte Änderung
 
+**2026-10-25 · MIG-042 (Schritt 3b) · Claude · Upload-Ausschlüsse: feste Regeln, Vorschau mit Gründen** (nach `development`, Fast-Forward)
+
+* **MIG-042, Schritt 3b** ([Bericht](2026-10-25-MIG-042-S3B.md), [Handoff](../handoffs/MIG-042-S3B.md), [ADR-0013](../adr/0013-upload-exclusions.md), [Task](../tasks/MIG-042.md)): Teildateien und interne Daten werden nie hochgeladen; ausdrückliche Ausschlüsse als validierte Pfade; die Vorschau zeigt jede ausgeschlossene Datei mit Grund und ungenutzte Regeln; die Quelle wird rein lesend gelistet. **Das Benutzerformat für Ausschlussregeln ist blockiert** (Produktentscheidung, ADR-0013, Optionen A, B, C).
+* **Tests:** Core-Modultests, 9 Anwendungstests, 4 Ende-zu-Ende-Tests am echten Ordner mit Loopback-Server.
+* **Prüfungen (finaler Stand, Windows):** fmt, Clippy `-D warnings`, Workspace-Test (58 Suiten) und MSRV 1.85 (52 Suiten) jeweils Exitcode 0; Markdown-Links 187 Dateien, 0 defekt; `git diff --check` Exitcode 0.
+
+Vorheriger Stand:
+
 **2026-10-25 · MIG-042 (Schritt 3a) · Claude · Rückleseprüfung vor der Veröffentlichung** (nach `development`, Fast-Forward)
 
 * **MIG-042, Schritt 3a** ([Bericht](2026-10-25-MIG-042-S3A.md), [Handoff](../handoffs/MIG-042-S3A.md), [ADR-0012](../adr/0012-revisions-and-publication.md) Nachtrag, [Task](../tasks/MIG-042.md)): Jede Datei der Revision wird über den Ziel-Port zurückgelesen und auf Größe und SHA-256 geprüft. Erst danach folgen `manifest.json` und `current.json`. Fehlende, verkürzte, veränderte oder nicht lesbare Dateien sowie Abbruch lassen den Zeiger unverändert. **Keine atomare Veröffentlichung behauptet.**
