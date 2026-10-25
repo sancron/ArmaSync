@@ -1,6 +1,10 @@
 # ArmaSync · Lynxnode.it — Changelog
 
-## Unreleased — Rust-Migrationsvorbereitung (2026-10-19)
+## Unreleased — Rust-Migrationsvorbereitung (2026-10-25)
+
+- MIG-030E integriert: komprimierte Blätter mit bekannter Archivgröße werden sicher entpackt und installiert (ein Eintrag, Stored/Deflate, 2 GiB, Verhältnis 1032:1, SHA-1-Prüfung vor dem atomaren Commit); Blätter ohne nutzbare Archivgröße bleiben unsupported. Echte Serverarchive nicht belegt ([ADR-0008](docs/adr/0008-packed-files-zip.md)).
+- GUI-Hinweis zu komprimierten Dateien an CLI/JSON angeglichen (gleicher Code `compressed-file-unsupported`).
+- MIG-032A: Windows-Ende-zu-Ende-Test des Ctrl+C-Abbruchs bestanden (Exitcode 130, unveränderte Zieldatei, keine Temp-Datei, Folgelauf).
 
 - Projekt analysiert und vollständiges Baseline-Dateiinventar erstellt.
 - Modulare Rust-Zielarchitektur, P0–P7-Upgradeplan, GUI-/CLI-Anforderungen, Datenimport, Branding und AGPLv3-Ziel dokumentiert.

@@ -8,7 +8,7 @@ Statuswerte: `offen`, `in Arbeit`, `implementiert`, `verifiziert`, `N/A`. Eine F
 | --- | --- | --- | --- | --- |
 | F01 | Repository-CRUD, Import/Autoconfig; RepositoryService, ConnectionService | P2 | GUI/CLI nutzen denselben Store; Geheimnisse getrennt | offen |
 | F02 | GZIP/Java-Serialisierung, verschlüsselte Konfiguration; A3SFilesAccessor | P0/P2 | Offline-Import plus direkter Metadatenparser, schema- und datenverlustgeprüft | offen (Fixtures/Inventar: MIG-001 integriert, [FORMAT_INVENTORY](FORMAT_INVENTORY.md)) |
-| F03 | Lokaler Scan, Modvergleich, Dateicache | P2/P3 | deterministischer SyncPlan, Case-/Unicode-/Symlinkregeln | offen (Vertrag und In-Memory-Plan/Apply: MIG-011 integriert, [ADR-0004](../adr/0004-core-contracts.md); echter Scan/FS-Adapter fehlt) |
+| F03 | Lokaler Scan, Modvergleich, Dateicache | P2/P3 | deterministischer SyncPlan, Case-/Unicode-/Symlinkregeln | teilweise (Scan, Plan und Apply über CLI und GUI gegen Loopback unter Windows, MIG-030C/D/E/031; gepackte Blätter mit Archivgröße synthetisch geprüft, echte Serverarchive nicht belegt; Linux gesperrt, RB-01) |
 | F04 | HTTP(S)-Download, Range/Resume, Proxy | P3 | echter GUI/CLI-Download, TLS, Abbruch/Resume, Server ohne Range | offen (Matrix/Testserver: [TRANSPORT_MATRIX](TRANSPORT_MATRIX.md), MIG-003 integriert) |
 | F05 | FTP/FTPS-Download/-Upload | P4 | vorhandene Modi interoperabel; bekannte FTPS-Einschränkung gesondert prüfen | offen (Matrix/Testserver: [TRANSPORT_MATRIX](TRANSPORT_MATRIX.md), MIG-003 integriert) |
 | F06 | SFTP-Transfer | P4 | Passwort sowie geplante Schlüsseloption bewerten, Host-Key-Validierung | offen (Matrix/Testserver: [TRANSPORT_MATRIX](TRANSPORT_MATRIX.md), MIG-003 integriert) |
