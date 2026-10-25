@@ -2,6 +2,7 @@
 
 ## Unreleased — Rust-Migrationsvorbereitung (2026-10-25)
 
+- MIG-042 (Schritt 1, Upload): Ports `LocalSource` und `RemoteTarget` im Core ([ADR-0011](docs/adr/0011-upload-contract.md)); `upload::plan` ändert nichts, `upload::apply` führt Ordner und Dateien in Planreihenfolge aus, bricht vor jedem Schritt und während jedes Uploads ab und löscht nichts. Lokale Quelle und WebDAV-Ziel sind angebunden. Noch nicht in CLI/GUI verdrahtet; Metadaten, Revisionen und Ausschlüsse folgen.
 - MIG-040B (WebDAV-Upload): Client mit OPTIONS, PROPFIND, MKCOL, PUT und DELETE über `reqwest` 0.13.5 (MIT OR Apache-2.0, Option b in [ADR-0010](docs/adr/0010-ftp-sftp-webdav-contract.md)); Basic-Zugangsdaten nur über HTTPS und nur an die Herkunft der Basis-Adresse; Weiterleitungen auf andere Herkunft abgelehnt; schreibende Methoden folgen keinen Weiterleitungen. Noch nicht in Sync verdrahtet (MIG-042).
 - MIG-040A (Planung, keine Implementierung): [ADR-0010](docs/adr/0010-ftp-sftp-webdav-contract.md) (angenommen am 2026-10-25) legt die Reihenfolge WebDAV → FTP/FTPS → SFTP, den Transportvertrag, Authentifizierungs-, TLS- und Host-Key-Regeln, Fehlerfälle, einen Testserver-Vorschlag und die offenen Entscheidungen fest. Keine neue Abhängigkeit.
 - Statusangaben zu MIG-030E, MIG-032A, MIG-032B, MIG-032R und MIG-032R2 in Board, Roadmap und Taskdateien angeglichen.

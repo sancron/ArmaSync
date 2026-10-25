@@ -1,5 +1,14 @@
 # Letzte integrierte Änderung
 
+**2026-10-25 · MIG-042 (Schritt 1) · Claude · Upload-Vertrag und Plan/Apply mit WebDAV-Ziel und lokaler Quelle** (nach `development`, Fast-Forward)
+
+* **MIG-042, Schritt 1** ([Bericht](2026-10-25-MIG-042.md), [Handoff](../handoffs/MIG-042.md), [ADR-0011](../adr/0011-upload-contract.md), [Task](../tasks/MIG-042.md)): Core-Ports `LocalSource` und `RemoteTarget`; Anwendungsschicht `upload::plan` (ändert nichts) und `upload::apply` (Planreihenfolge, Abbruch vor jedem Schritt und während jedes Uploads, Größenprüfung gegen den Plan, keine Löschungen); `LocalDirectory` als Quelle mit den Scan-Schutzregeln; `WebDavClient` als Ziel mit Streaming-Upload und Abbruch.
+* **Tests:** 20 WebDAV-Tests (Timeout, Abbruch, Redirect, Auth, Zertifikate), 8 Ablauf-Tests mit echter Quelle und Loopback (Abbruch mitten im Transfer ohne Teildatei), 7 Anwendungstests mit Fakes.
+* **Prüfungen (Windows, finaler Stand):** fmt bestanden; Clippy `-D warnings` Exitcode 0; `cargo test --workspace --locked` Exitcode 0 (53 Suiten, 0 Fehler); `cargo +1.85.0 test --workspace --exclude armasync-gui --locked` Exitcode 0; Markdown-Links 179 Dateien, 0 defekt; `git diff --check` fehlerfrei.
+* **Offen:** Metadaten-Build, Revisionen, Ausschlüsse, Ereignisse, Parallelität, Wiederaufnahme, Read-back-Verifikation und CLI/GUI-Verdrahtung (MIG-042, Schritte 2 bis 4). TLS-Stacks bleiben getrennt (ADR-0011). Keine Linux-/WSL-Läufe, keine GitHub-Actions, keine echten Server.
+
+Vorheriger Stand:
+
 **2026-10-25 · MIG-040B · Claude · WebDAV-Upload mit OPTIONS, PROPFIND, MKCOL, PUT und DELETE über `reqwest`** (nach `development`, Fast-Forward)
 
 * **MIG-040B** ([Bericht](2026-10-25-MIG-040B.md), [Handoff](../handoffs/MIG-040B.md), [ADR-0010](../adr/0010-ftp-sftp-webdav-contract.md)): Die Blockade aus dem ersten Schritt ist aufgelöst. Entschieden wurde Option b: `reqwest` 0.13.5 (MIT OR Apache-2.0, MSRV 1.85.0, blockierend, Features `blocking` und `rustls`). Der Client folgt keinen Redirects selbst; Basic-Zugangsdaten nur über HTTPS und nur an die Herkunft der Basisadresse, bei jeder Anfrage und jedem Redirect geprüft.
