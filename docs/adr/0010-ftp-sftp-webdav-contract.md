@@ -1,6 +1,6 @@
 # ADR-0010 — FTP/FTPS, SFTP und WebDAV: Reihenfolge, Vertrag und offene Entscheidungen (MIG-040A)
 
-Datum: 2026-10-25. Status: **vorgeschlagen**. Die Reihenfolge und der Schnitt der Folgetasks gelten erst nach Bestätigung durch den Projektverantwortlichen; für die Folgetasks sind die in „Offene Entscheidungen“ genannten Punkte vor Implementierungsbeginn zu klären. Bezug: [TRANSPORT_MATRIX](../migration/TRANSPORT_MATRIX.md), [FEATURE_PARITY](../migration/FEATURE_PARITY.md) (F05–F07, F11), [ADR-0005](0005-credentials-and-data-paths.md), [ADR-0006](0006-sync-metadata-and-http-transport.md), [ADR-0007](0007-transfer-ports.md), [ADR-0009](0009-resume-range.md), [RELEASE_BLOCKERS](../migration/RELEASE_BLOCKERS.md), [RIGHTS_QUESTIONS](../tasks/RIGHTS_QUESTIONS.md) (RQ-06).
+Datum: 2026-10-25. Status: **angenommen** (Bestätigung durch den Projektverantwortlichen am 2026-10-25) für Priorisierung, gemeinsamen Vertrag, Authentifizierungs- und TLS-Regeln sowie Entscheidung 4. **Offen** bleiben die Entscheidungen 1, 2, 3 und 5 bis 8; sie blockieren nur die jeweils in „Blockaden“ genannten Folgetasks. Bezug: [TRANSPORT_MATRIX](../migration/TRANSPORT_MATRIX.md), [FEATURE_PARITY](../migration/FEATURE_PARITY.md) (F05–F07, F11), [ADR-0005](0005-credentials-and-data-paths.md), [ADR-0006](0006-sync-metadata-and-http-transport.md), [ADR-0007](0007-transfer-ports.md), [ADR-0009](0009-resume-range.md), [RELEASE_BLOCKERS](../migration/RELEASE_BLOCKERS.md), [RIGHTS_QUESTIONS](../tasks/RIGHTS_QUESTIONS.md) (RQ-06).
 
 ## Kontext
 
@@ -46,7 +46,7 @@ F11 (Parallelität, Session-Reuse, Limits) ist kein eigener Protokollumfang, son
 
 | Protokoll | Zulässige Arten in Phase 1 | Regeln |
 | --- | --- | --- |
-| WebDAV | HTTP Basic (über HTTPS) | Basic nur über TLS; bei `http` nur mit ausdrücklicher Nutzerentscheidung (siehe offene Entscheidung). Kein Digest/NTLM in Phase 1. |
+| WebDAV | HTTP Basic (über HTTPS) | Basic nur über TLS (Entscheidung 4). Anonyme Zugriffe über `http` sind möglich, solange keine Zugangsdaten gesendet werden. Kein Digest/NTLM in Phase 1. |
 | FTP/FTPS | USER/PASS | Bei reinem FTP Warnung; Zugangsdaten nie in Prozessargumenten oder Logs. |
 | SFTP | Passwort | Schlüsselauthentifizierung erst nach ADR-0005 (persistente Schlüssel/Credentials). |
 
@@ -71,12 +71,22 @@ Grundsatz: nur Loopback, synthetische Zugangsdaten, selbst erzeugte Zertifikate,
 - **FTP/FTPS:** Ein Python-FTP-Server ist nicht in der Standardbibliothek. Kandidat `pyftpdlib` (MIT, Version und Wartung zu prüfen) als Test-Abhängigkeit; ihre Lizenz und Version gehören in die Lizenzdokumentation. Alternative: Rust-Testserver im Testkit (kein neuer Fremdcode, aber Aufwand).
 - **SFTP:** Kandidaten: OpenSSH-Server (Windows-Feature „OpenSSH-Server“, BSD-Lizenz; Installation benötigt Administratorrechte und ist deshalb ein Entscheidungspunkt), oder ein Rust-Testserver mit `russh` (Abhängigkeit siehe oben). Lizenz und MSRV des Testwerkzeugs sind ebenfalls zu dokumentieren.
 
+## Entscheidung 4: Umsetzungsregeln (WebDAV, MIG-040B)
+
+- Zugangsdaten werden nur für Basis-Adressen mit `https://` angenommen. Eine `http://`-Adresse mit Zugangsdaten wird beim Anlegen des Clients abgelehnt, bevor eine Verbindung entsteht.
+- Zugangsdaten werden nur an die Herkunft (Schema, Host, Port) der Basis-Adresse gesendet. Das wird bei jeder Anfrage geprüft, auch bei jeder Weiterleitung.
+- Weiterleitungen auf eine andere Herkunft (anderer Host, anderer Port, anderes Schema, insbesondere `https` → `http`) werden abgelehnt, ohne das Ziel zu verbinden. Das gilt unabhängig davon, ob Zugangsdaten vorhanden sind.
+- Schreibende Methoden (`PUT`, `MKCOL`, `DELETE`) folgen keinen Weiterleitungen und brechen mit Fehler ab. Lesende Methoden ohne Körper (`OPTIONS`, `PROPFIND`) folgen Weiterleitungen nur innerhalb derselben Herkunft.
+- Zugangsdaten erscheinen nie in Fehlermeldungen oder Debug-Ausgaben. Der Basic-Header wird nur in TLS-Anfragen gesetzt.
+- Keine neue Abhängigkeit: die Base64-Kodierung für den Basic-Header und die Existenzprüfung über Statuscodes (ohne Auswertung des XML-Körpers) sind im Adapter umgesetzt.
+- Uploads kommen nur aus Dateien mit bekannter Länge, damit `Content-Length` gesetzt wird.
+
 ## Offene Entscheidungen (Projektverantwortlicher)
 
 1. **MSRV:** `suppaftp` (1.88) und `russh` (1.89) liegen über dem Workspace-MSRV 1.85. Optionen: (a) MSRV anheben auf mindestens 1.89 (Auswirkung: [RUST_TOOLCHAIN](../migration/RUST_TOOLCHAIN.md), CI-MSRV-Job, Begründung in ADR-0006); (b) ältere, mit 1.85 bauende Versionen pinnen (zu prüfen); (c) eigene Protokollschicht auf `ureq`/`rustls` (FTP/FTPS-Befehlsebene wäre eigener Code, Sicherheitsrisiko). Empfehlung: (b) zuerst prüfen; (a) nur mit neuer Entscheidung.
 2. **SFTP-Bibliothek und Laufzeit:** `ssh2` (synchron, C-Abhängigkeit) oder `russh` (asynchron, Tokio im Adapter, rein Rust). Die Wahl hängt an Entscheidung 1 und am Windows-Build von libssh2/OpenSSL.
 3. **Plaintext-FTP:** Ist reines FTP ohne TLS als Option zugelassen (mit Warnung und Opt-in), oder nur FTPS? Empfehlung: nur FTPS und FTP nur mit ausdrücklichem Opt-in pro Repository.
-4. **WebDAV über `http`:** Ist Basic-Auth über unverschlüsseltes HTTP erlaubt? Empfehlung: nein, außer mit Opt-in pro Repository.
+4. **WebDAV über `http`: ENTSCHIEDEN (2026-10-25): nein.** HTTP Basic Auth ist nur über HTTPS erlaubt; es gibt keine Opt-in-Ausnahme für unverschlüsseltes HTTP. Anonyme Zugriffe über HTTP bleiben möglich, solange keine Zugangsdaten gesendet werden. Umsetzungsregeln siehe Abschnitt „Entscheidung 4: Umsetzungsregeln“.
 5. **Persistenz des SFTP-Host-Key-Vertrauensspeichers:** Format und Ort (neue Datei unter den Datenverzeichnissen, ADR-0005).
 6. **Schlüsselauthentifizierung SFTP:** erst nach ADR-0005 (Schlüsselbund bzw. Dateiberechtigungen). Bis dahin nur Passwort.
 7. **Testwerkzeuge:** Zulassung von `pyftpdlib` bzw. OpenSSH als Testabhängigkeit und Installationsrechte auf dem Windows-Entwicklungsrechner.
@@ -84,7 +94,7 @@ Grundsatz: nur Loopback, synthetische Zugangsdaten, selbst erzeugte Zertifikate,
 
 ## Blockaden
 
-- **MIG-040B (WebDAV)** ist durch diese ADR nicht blockiert, sofern Entscheidung 4 (Basic über `http`) mit „nein“ beantwortet ist und XML-Parsing ohne neue Abhängigkeit oder mit einer geprüften Lizenz umgesetzt wird.
+- **MIG-040B (WebDAV)**: nicht blockiert (Entscheidung 4 ist getroffen). Umsetzung ohne neue Abhängigkeit und ohne XML-Auswertung; siehe Umsetzungsregeln.
 - **MIG-040C (FTP/FTPS)** ist blockiert durch Entscheidungen 1, 3, 7.
 - **MIG-040D (SFTP)** ist blockiert durch Entscheidungen 1, 2, 5, 6, 7.
 - Keine Protokollimplementierung vor Bestätigung dieser ADR.
