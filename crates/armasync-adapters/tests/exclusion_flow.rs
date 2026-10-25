@@ -5,6 +5,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 mod support;
+use support::trust;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -72,7 +73,7 @@ fn the_preview_shows_every_exclusion_and_only_the_rest_reaches_the_server() {
     let root = tree("preview");
     let source = LocalDirectory::new(&root).unwrap();
     let server = start(true, true, "");
-    let target = WebDavClient::new(&server.https(), server.trust(), Some(credentials())).unwrap();
+    let target = WebDavClient::new(&server.https(), trust(&server), Some(credentials())).unwrap();
     let cancel = CancelToken::new();
 
     let plan = upload::plan_with_rules(&source, &target, &rules(), &cancel).unwrap();
@@ -123,7 +124,7 @@ fn listing_and_previewing_a_folder_changes_nothing_in_it() {
     let before = listing(&root);
     let source = LocalDirectory::new(&root).unwrap();
     let server = start(true, true, "");
-    let target = WebDavClient::new(&server.https(), server.trust(), Some(credentials())).unwrap();
+    let target = WebDavClient::new(&server.https(), trust(&server), Some(credentials())).unwrap();
     let plan = upload::plan_with_rules(&source, &target, &rules(), &CancelToken::new()).unwrap();
     assert!(
         plan.exclusions
@@ -139,7 +140,7 @@ fn a_published_revision_contains_no_excluded_file() {
     let root = tree("revision");
     let source = LocalDirectory::new(&root).unwrap();
     let server = start(true, true, "");
-    let target = WebDavClient::new(&server.https(), server.trust(), Some(credentials())).unwrap();
+    let target = WebDavClient::new(&server.https(), trust(&server), Some(credentials())).unwrap();
     let report = revision::publish_with_rules(
         &source,
         &target,
@@ -174,7 +175,7 @@ fn a_rule_that_matches_nothing_is_reported_in_the_preview() {
     let root = tree("unused");
     let source = LocalDirectory::new(&root).unwrap();
     let server = start(true, true, "");
-    let target = WebDavClient::new(&server.https(), server.trust(), Some(credentials())).unwrap();
+    let target = WebDavClient::new(&server.https(), trust(&server), Some(credentials())).unwrap();
     let rules = ExclusionRules::new([path("does-not-exist")]);
     let plan = upload::plan_with_rules(&source, &target, &rules, &CancelToken::new()).unwrap();
     assert_eq!(plan.unused_rules, [path("does-not-exist")]);

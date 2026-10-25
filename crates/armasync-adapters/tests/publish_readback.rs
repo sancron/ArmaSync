@@ -5,6 +5,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 mod support;
+use support::trust;
 
 use std::cell::Cell;
 use std::fs;
@@ -90,7 +91,7 @@ fn published_first_revision(
 fn a_corrupted_remote_file_blocks_the_pointer_and_the_next_run_recovers() {
     let root = tree("corrupt", &[("x.txt", b"version one")]);
     let server = start(true, true, "");
-    let target = WebDavClient::new(&server.https(), server.trust(), Some(credentials())).unwrap();
+    let target = WebDavClient::new(&server.https(), trust(&server), Some(credentials())).unwrap();
     let (_, old_pointer) = published_first_revision(&server, &root, &target);
 
     fs::write(root.join("x.txt"), b"version two, longer").unwrap();
@@ -120,7 +121,7 @@ fn a_corrupted_remote_file_blocks_the_pointer_and_the_next_run_recovers() {
 fn a_truncated_remote_file_is_reported_as_a_size_difference() {
     let root = tree("truncated", &[("x.txt", b"version one")]);
     let server = start(true, true, "");
-    let target = WebDavClient::new(&server.https(), server.trust(), Some(credentials())).unwrap();
+    let target = WebDavClient::new(&server.https(), trust(&server), Some(credentials())).unwrap();
     let (_, old_pointer) = published_first_revision(&server, &root, &target);
 
     fs::write(root.join("x.txt"), b"version two, longer").unwrap();
@@ -141,7 +142,7 @@ fn a_truncated_remote_file_is_reported_as_a_size_difference() {
 fn a_missing_remote_file_blocks_the_pointer_and_no_manifest_is_written() {
     let root = tree("missing", &[("x.txt", b"version one")]);
     let server = start(true, true, "");
-    let target = WebDavClient::new(&server.https(), server.trust(), Some(credentials())).unwrap();
+    let target = WebDavClient::new(&server.https(), trust(&server), Some(credentials())).unwrap();
     let (first, old_pointer) = published_first_revision(&server, &root, &target);
 
     fs::write(root.join("x.txt"), b"version two, longer").unwrap();
@@ -172,7 +173,7 @@ fn a_missing_remote_file_blocks_the_pointer_and_no_manifest_is_written() {
 fn a_read_error_during_the_read_back_is_a_transport_error_and_keeps_the_pointer() {
     let root = tree("read-error", &[("x.txt", b"version one")]);
     let server = start(true, true, "");
-    let target = WebDavClient::new(&server.https(), server.trust(), Some(credentials())).unwrap();
+    let target = WebDavClient::new(&server.https(), trust(&server), Some(credentials())).unwrap();
     let (_, old_pointer) = published_first_revision(&server, &root, &target);
 
     fs::write(root.join("x.txt"), b"version two, longer").unwrap();
@@ -196,7 +197,7 @@ fn a_cancellation_during_the_read_back_keeps_the_pointer() {
         &[("a.txt", b"alpha"), ("b.txt", b"beta")],
     );
     let server = start(true, true, "");
-    let target = WebDavClient::new(&server.https(), server.trust(), Some(credentials())).unwrap();
+    let target = WebDavClient::new(&server.https(), trust(&server), Some(credentials())).unwrap();
     let (_, old_pointer) = published_first_revision(&server, &root, &target);
 
     fs::write(root.join("a.txt"), b"alpha, changed").unwrap();
@@ -218,7 +219,7 @@ fn a_cancellation_during_the_read_back_keeps_the_pointer() {
 fn a_damaged_stored_file_of_a_complete_revision_blocks_the_pointer_switch() {
     let root = tree("damaged-complete", &[("x.txt", b"stable content")]);
     let server = start(true, true, "");
-    let target = WebDavClient::new(&server.https(), server.trust(), Some(credentials())).unwrap();
+    let target = WebDavClient::new(&server.https(), trust(&server), Some(credentials())).unwrap();
     let (first, pointer) = published_first_revision(&server, &root, &target);
 
     // The revision is complete, but a stored file was altered afterwards.

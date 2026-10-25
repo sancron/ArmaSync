@@ -16,6 +16,7 @@ mod import_cmd;
 pub mod interrupt;
 mod list_cmd;
 mod sync_cmd;
+mod upload_cmd;
 
 /// Version of the JSON envelope schema.
 pub const JSON_SCHEMA_VERSION: u32 = 1;
@@ -95,6 +96,8 @@ enum Command {
     Profile(ProfileArgs),
     /// Plan or run a synchronisation of a repository into a destination folder.
     Sync(SyncCommandArgs),
+    /// Preview (`plan`) or publish (`publish --yes`) a local folder as a revision on a WebDAV target.
+    Upload(UploadArgs),
 }
 
 #[derive(Debug, Args)]
@@ -177,6 +180,52 @@ impl SyncRunOptions {
             false
         }
     }
+}
+
+#[derive(Debug, Args)]
+struct UploadArgs {
+    #[command(subcommand)]
+    command: UploadCommand,
+}
+
+#[derive(Debug, Subcommand)]
+enum UploadCommand {
+    /// Show what an upload would send and what is excluded, and why. Writes nothing to the target.
+    Plan(UploadOptions),
+    /// Publish the folder as a revision. Requires `--yes`; without it nothing is published.
+    Publish(UploadPublishOptions),
+}
+
+#[derive(Debug, Args)]
+struct UploadOptions {
+    /// The local folder to upload.
+    #[arg(long, value_name = "DIR")]
+    source: PathBuf,
+    /// The WebDAV folder address, `https://…`. It must not contain a user name, a password, a query or a fragment.
+    #[arg(long, value_name = "URL")]
+    target: String,
+    /// The user name for Basic authentication (HTTPS only).
+    #[arg(long, value_name = "NAME")]
+    user: Option<String>,
+    /// The environment variable that holds the password. A password is never accepted as an argument.
+    #[arg(
+        long,
+        value_name = "VARIABLE",
+        default_value = "ARMASYNC_UPLOAD_PASSWORD"
+    )]
+    password_env: String,
+    /// Exclude a file or a folder (relative to the source folder); repeatable.
+    #[arg(long = "exclude", value_name = "PATH")]
+    exclude: Vec<String>,
+}
+
+#[derive(Debug, Args)]
+struct UploadPublishOptions {
+    #[command(flatten)]
+    options: UploadOptions,
+    /// Confirm the publication. Without this flag nothing is published.
+    #[arg(long)]
+    yes: bool,
 }
 
 #[derive(Debug, Args)]
@@ -289,6 +338,27 @@ where
                 config: options.config,
             };
             sync_cmd::run(&args, cli.json, cli.quiet, stdout, stderr, cancel)
+        }
+        Command::Upload(UploadArgs { command }) => {
+            let (publish, confirmed, options) = match command {
+                UploadCommand::Plan(options) => (false, false, options),
+                UploadCommand::Publish(publish) => (true, publish.yes, publish.options),
+            };
+            // The password comes from the environment only, and only when a user name was given.
+            let password = options
+                .user
+                .as_ref()
+                .and_then(|_| std::env::var(&options.password_env).ok());
+            let args = upload_cmd::UploadArgs {
+                publish,
+                confirmed,
+                source: options.source,
+                target: options.target,
+                user: options.user,
+                password,
+                exclusions: options.exclude,
+            };
+            upload_cmd::run(&args, cli.json, cli.quiet, stdout, stderr, cancel)
         }
         Command::Profile(ProfileArgs {
             command: ProfileCommand::List(args),

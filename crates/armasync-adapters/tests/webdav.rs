@@ -5,6 +5,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 mod support;
+use support::trust;
 
 use std::fs::File;
 use std::io::Cursor;
@@ -100,7 +101,7 @@ fn anonymous_folder_creation_and_upload_over_plain_http_send_no_authorization() 
 #[test]
 fn basic_auth_round_trip_over_https_carries_the_header_on_every_request() {
     let server = start(true, true, "");
-    let client = WebDavClient::new(&server.https(), server.trust(), Some(credentials())).unwrap();
+    let client = WebDavClient::new(&server.https(), trust(&server), Some(credentials())).unwrap();
     client.capabilities().unwrap();
     client.make_collection(&path("docs")).unwrap();
     assert!(client.exists(&path("docs")).unwrap());
@@ -132,7 +133,7 @@ fn basic_auth_round_trip_over_https_carries_the_header_on_every_request() {
 fn a_wrong_password_is_refused_without_echoing_it() {
     let server = start(true, true, "");
     let wrong = BasicCredentials::new(USER, "wrong-secret-value").unwrap();
-    let client = WebDavClient::new(&server.https(), server.trust(), Some(wrong)).unwrap();
+    let client = WebDavClient::new(&server.https(), trust(&server), Some(wrong)).unwrap();
     let error = client.capabilities().unwrap_err();
     assert_eq!(error.kind(), ErrorKind::Network);
     assert!(
@@ -148,7 +149,7 @@ fn a_wrong_password_is_refused_without_echoing_it() {
 #[test]
 fn make_collection_creates_a_folder_and_accepts_an_existing_one() {
     let server = start(true, true, "");
-    let client = WebDavClient::new(&server.https(), server.trust(), Some(credentials())).unwrap();
+    let client = WebDavClient::new(&server.https(), trust(&server), Some(credentials())).unwrap();
     client.make_collection(&path("docs")).unwrap();
     client.make_collection(&path("docs")).unwrap();
     assert!(client.exists(&path("docs")).unwrap());
@@ -158,7 +159,7 @@ fn make_collection_creates_a_folder_and_accepts_an_existing_one() {
 #[test]
 fn make_collection_without_a_parent_folder_is_a_file_system_error() {
     let server = start(true, true, "");
-    let client = WebDavClient::new(&server.https(), server.trust(), Some(credentials())).unwrap();
+    let client = WebDavClient::new(&server.https(), trust(&server), Some(credentials())).unwrap();
     let error = client.make_collection(&path("missing/sub")).unwrap_err();
     assert_eq!(error.kind(), ErrorKind::FileSystem, "{error}");
 }
@@ -169,7 +170,7 @@ fn make_collection_without_a_parent_folder_is_a_file_system_error() {
 fn write_requests_do_not_follow_redirects() {
     let server = start(true, true, "");
     server.folder("docs");
-    let client = WebDavClient::new(&server.https(), server.trust(), Some(credentials())).unwrap();
+    let client = WebDavClient::new(&server.https(), trust(&server), Some(credentials())).unwrap();
     let mut file = File::open(scratch_file("redirected.bin", b"data")).unwrap();
     let error = client
         .put(&path("redirect/same/docs/x.bin"), &mut file)
@@ -187,7 +188,7 @@ fn write_requests_do_not_follow_redirects() {
 #[test]
 fn a_redirected_folder_creation_is_not_followed() {
     let server = start(true, true, "");
-    let client = WebDavClient::new(&server.https(), server.trust(), Some(credentials())).unwrap();
+    let client = WebDavClient::new(&server.https(), trust(&server), Some(credentials())).unwrap();
     let error = client
         .make_collection(&path("redirect/same/newdir"))
         .unwrap_err();
@@ -200,7 +201,7 @@ fn a_redirected_folder_creation_is_not_followed() {
 fn same_origin_redirect_keeps_the_credentials_for_read_requests() {
     let server = start(true, true, "");
     let base = format!("https://{}/dav/redirect/same", server.addr);
-    let client = WebDavClient::new(&base, server.trust(), Some(credentials())).unwrap();
+    let client = WebDavClient::new(&base, trust(&server), Some(credentials())).unwrap();
     client.capabilities().unwrap();
     let seen = server.seen();
     let followed = seen
@@ -216,7 +217,7 @@ fn a_cross_origin_redirect_never_receives_credentials() {
     let target = format!("https://{}/dav/docs", other.addr);
     let server = start(true, true, &target);
     let base = format!("https://{}/dav/redirect/cross", server.addr);
-    let client = WebDavClient::new(&base, server.trust(), Some(credentials())).unwrap();
+    let client = WebDavClient::new(&base, trust(&server), Some(credentials())).unwrap();
     let error = client.exists(&path("docs")).unwrap_err();
     assert_eq!(error.kind(), ErrorKind::Network);
     assert!(error.message().contains("refused"), "{error}");
@@ -230,7 +231,7 @@ fn a_redirect_from_https_to_http_is_refused_and_the_plain_target_is_never_contac
     let target = format!("http://{}/dav/docs", plain.addr);
     let server = start(true, true, &target);
     let base = format!("https://{}/dav/redirect/cross", server.addr);
-    let client = WebDavClient::new(&base, server.trust(), Some(credentials())).unwrap();
+    let client = WebDavClient::new(&base, trust(&server), Some(credentials())).unwrap();
     let error = client.capabilities().unwrap_err();
     assert_eq!(error.kind(), ErrorKind::Network);
     assert!(plain.seen().is_empty(), "{:?}", plain.seen());
@@ -242,7 +243,7 @@ fn a_redirect_from_https_to_http_is_refused_and_the_plain_target_is_never_contac
 fn full_disk_locked_and_missing_parent_map_to_file_system_errors() {
     let server = start(true, true, "");
     server.folder("docs");
-    let client = WebDavClient::new(&server.https(), server.trust(), Some(credentials())).unwrap();
+    let client = WebDavClient::new(&server.https(), trust(&server), Some(credentials())).unwrap();
     let mut file = File::open(scratch_file("failure.bin", b"x")).unwrap();
     for target in ["docs/full.bin", "docs/locked.bin", "missing/x.bin"] {
         let error = client.put(&path(target), &mut file).unwrap_err();
@@ -254,7 +255,7 @@ fn short_limits(server: &support::Server) -> HttpConfig {
     HttpConfig {
         response_timeout: Duration::from_secs(1),
         min_body_timeout: Duration::from_secs(1),
-        ..server.trust()
+        ..trust(server)
     }
 }
 
@@ -302,7 +303,7 @@ fn an_upload_to_a_silent_server_times_out_within_the_limit() {
 fn an_upload_started_after_cancellation_is_reported_as_cancelled_and_stores_nothing() {
     let server = start(true, true, "");
     server.folder("docs");
-    let client = WebDavClient::new(&server.https(), server.trust(), Some(credentials())).unwrap();
+    let client = WebDavClient::new(&server.https(), trust(&server), Some(credentials())).unwrap();
     let cancel = CancelToken::new();
     cancel.cancel();
     let source = OpenedSource {

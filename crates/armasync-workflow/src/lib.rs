@@ -14,6 +14,8 @@
 //!
 //! The crate has no GUI and no terminal dependency and contains no sync algorithm of its own.
 
+pub mod upload;
+
 use std::path::{Path, PathBuf};
 
 use armasync_adapters::Sha256Hasher;

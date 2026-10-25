@@ -458,3 +458,6 @@ pub fn hang_up_server() -> (SocketAddr, Arc<AtomicBool>) {
     });
     (addr, stop)
 }
+
+/// Loopback WebDAV-like server for the upload tests (ADR-0010, ADR-0011).
+pub mod webdav;

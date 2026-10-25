@@ -5,6 +5,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 mod support;
+use support::trust;
 
 use std::fs;
 use std::io::Read;
@@ -118,7 +119,7 @@ fn a_publication_writes_files_manifest_and_pointer_and_the_pointer_verifies() {
     );
     let source = LocalDirectory::new(&root).unwrap();
     let server = start(true, true, "");
-    let target = WebDavClient::new(&server.https(), server.trust(), Some(credentials())).unwrap();
+    let target = WebDavClient::new(&server.https(), trust(&server), Some(credentials())).unwrap();
     let report = publish(&source, &target, &CancelToken::new()).unwrap();
 
     assert!(!report.revision_was_complete);
@@ -154,7 +155,7 @@ fn publishing_the_same_content_again_uploads_nothing_and_keeps_the_pointer() {
     let root = tree("same", &[("x.txt", b"same content")]);
     let source = LocalDirectory::new(&root).unwrap();
     let server = start(true, true, "");
-    let target = WebDavClient::new(&server.https(), server.trust(), Some(credentials())).unwrap();
+    let target = WebDavClient::new(&server.https(), trust(&server), Some(credentials())).unwrap();
     let first = publish(&source, &target, &CancelToken::new()).unwrap();
     let puts_after_first = server.puts();
     let before = server.file("current.json").unwrap();
@@ -174,7 +175,7 @@ fn changed_content_publishes_a_new_revision_keeps_the_old_one_and_archives_the_o
     let root = tree("changed", &[("x.txt", b"version one")]);
     let source = LocalDirectory::new(&root).unwrap();
     let server = start(true, true, "");
-    let target = WebDavClient::new(&server.https(), server.trust(), Some(credentials())).unwrap();
+    let target = WebDavClient::new(&server.https(), trust(&server), Some(credentials())).unwrap();
     let first = publish(&source, &target, &CancelToken::new()).unwrap();
     let old_pointer = server.file("current.json").unwrap();
 
@@ -215,7 +216,7 @@ fn cancelling_while_the_files_upload_keeps_the_previous_pointer_and_the_next_run
     let root = tree("cancel", &[("small.txt", b"small")]);
     let source = LocalDirectory::new(&root).unwrap();
     let server = start(true, true, "");
-    let target = WebDavClient::new(&server.https(), server.trust(), Some(credentials())).unwrap();
+    let target = WebDavClient::new(&server.https(), trust(&server), Some(credentials())).unwrap();
     let first = publish(&source, &target, &CancelToken::new()).unwrap();
     let old_pointer = server.file("current.json").unwrap();
 
@@ -251,7 +252,7 @@ fn a_failure_while_writing_the_pointer_keeps_the_previous_one_and_is_reported() 
     let root = tree("pointer-failure", &[("x.txt", b"first")]);
     let source = LocalDirectory::new(&root).unwrap();
     let server = start(true, true, "");
-    let target = WebDavClient::new(&server.https(), server.trust(), Some(credentials())).unwrap();
+    let target = WebDavClient::new(&server.https(), trust(&server), Some(credentials())).unwrap();
     publish(&source, &target, &CancelToken::new()).unwrap();
     let old_pointer = server.file("current.json").unwrap();
 
@@ -274,7 +275,7 @@ fn an_existing_revision_with_different_content_is_refused_and_nothing_changes() 
     let root = tree("conflict", &[("x.txt", b"content")]);
     let source = LocalDirectory::new(&root).unwrap();
     let server = start(true, true, "");
-    let target = WebDavClient::new(&server.https(), server.trust(), Some(credentials())).unwrap();
+    let target = WebDavClient::new(&server.https(), trust(&server), Some(credentials())).unwrap();
     let first = publish(&source, &target, &CancelToken::new()).unwrap();
     let pointer = server.file("current.json").unwrap();
 

@@ -4,6 +4,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 mod support;
+use support::trust;
 
 use std::fs;
 use std::io::Read;
@@ -35,7 +36,7 @@ fn bytes_of(size: usize, seed: u8) -> Vec<u8> {
 }
 
 fn client(server: &support::Server) -> WebDavClient {
-    WebDavClient::new(&server.https(), server.trust(), Some(credentials())).unwrap()
+    WebDavClient::new(&server.https(), trust(server), Some(credentials())).unwrap()
 }
 
 /// Wraps a source and requests cancellation once `after` bytes of one file were read: a cancellation during the
