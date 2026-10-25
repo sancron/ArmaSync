@@ -1,0 +1,35 @@
+# MIG-042, Schritt 4b — Upload in der GUI (Vorschau, Bestätigung, Zustände)
+
+- Status: **integriert** (2026-10-25, Fast-Forward nach `development`; Fortschritt pro Datei 4c offen). Eigentümer und Integrator: Claude. Basis `52bf119` (`origin/development`, Stand nach Schritt 4a). Branch `claude/mig-042-s4b-gui`.
+- Freigabe durch den Projektverantwortlichen für Schritt 4b auf `origin/development` @ `52bf119`, mit eigener Taskdatei, Branch, Bericht und Handoff.
+- Vorgaben, eingehalten:
+  - Die GUI nutzt ausschließlich `armasync_workflow::upload::{preview, publish}`. Keine Upload-Regel in `armasync-gui`.
+  - Vorschau mit eingeschlossenen und ausgeschlossenen Dateien samt Grund und ungenutzten Regeln, bevor etwas geschrieben wird.
+  - Ausdrückliche Bestätigung vor jeder Veröffentlichung (beschriftetes Kontrollkästchen; kein modaler Dialog).
+  - Laufender Zustand mit Abbrechen über den vorhandenen `CancelToken`; das Fenster bleibt bedienbar, die Arbeit läuft im Worker.
+  - Nur indeterminierter Fortschritt (Spinner mit Text); Fortschritt pro Datei ist 4c.
+  - Zugangsdaten nur über HTTPS (Workflow lehnt HTTP mit Zugangsdaten und Adressen mit Zugangsdaten vor jeder Verbindung ab); Kennwort nur für die Sitzung, nach jeder Veröffentlichung geleert, nie ausgegeben.
+  - Der Workflow-Ereigniskanal wurde nicht verändert.
+  - Zugänglichkeit: beschriftete Felder, höfliche Live-Region für die Statuszeile, Fehler mit Präfix „Fehler:“, Themen hell und dunkel, Fehlerfarbe mit mindestens 4,5:1.
+  - Windows-Prüfungen; keine WSL-/Linux-Läufe; keine GitHub-Actions; `testing`, `master`, `legacy` unverändert.
+- Entscheidung: [ADR-0015](../adr/0015-upload-gui.md) (angenommen für 4b).
+- Zerlegung von MIG-042 Schritt 4 (unverändert gegenüber 4a):
+  - **4a** (integriert): CLI und gemeinsame Verdrahtung.
+  - **4b (dieser Task):** GUI-Ansicht.
+  - **4c** (offen): Fortschritt pro Datei in CLI und GUI; setzt einen Ereigniskanal in `revision::publish` voraus.
+- Schreibbereich:
+  - `crates/armasync-gui/src/upload_screen.rs` (neu, Verhalten), `crates/armasync-gui/src/upload_ui.rs` (neu, Darstellung), `crates/armasync-gui/src/ui.rs` (neue Ansicht „Upload“, Abfrage, Navigation), `crates/armasync-gui/src/lib.rs` (Module).
+  - `crates/armasync-gui/tests/upload_screen.rs` (8 Verhaltenstests), `crates/armasync-gui/tests/upload_ui.rs` (5 AccessKit-, Tastatur-, Themen- und Kontrasttests).
+  - `docs/adr/0015-upload-gui.md`, Taskdatei, Bericht, Handoff, Integratordokumente.
+- Ziele: Vorschau, Bestätigung, Veröffentlichung, Abbruch und Ergebnis/Fehler in der GUI; Zustände, die die Bedienung nicht blockieren; Barrierefreiheit im AccessKit-Baum und in der Tastaturbedienung nachweisbar.
+- Nicht im Scope: Fortschritt pro Datei (4c); Ereigniskanal-Änderungen; Parallelität; Resume; Legacy-Schreibformat (ADR-0003); dauerhafte Zugangsdaten (ADR-0005); echte Server; Screenreader-Läufe; Linux-/WSL-Läufe; GitHub-Actions.
+- Abnahmekriterien und Prüfungen (Windows):
+  - GUI-Verhaltenstests 8/8 gegen den Loopback-Server über anonymes HTTP (Vorschau mit Gründen ohne Schreibzugriff, Gate der Bestätigung, veraltete Vorschau, Abbruch lässt keinen Zeiger, HTTP-Zugangsdaten und Adresse mit Zugangsdaten ohne Verbindung, Status- und Rücksetzverhalten).
+  - GUI-Darstellungstests 5/5 (AccessKit-Namen, Live-Region, Tastatur-Auslösung, Vorschau-Wörter, beide Themen, Kontrast).
+  - Bestehende GUI-Suiten grün.
+  - fmt, Clippy `-D warnings` (Workspace), Workspace-Test, MSRV 1.85 ohne GUI, Markdown-Links, `git diff --check`.
+- Blocker und offene Punkte:
+  - Fortschritt pro Datei fehlt (4c).
+  - Kein Screenreader-Lauf; die Tests prüfen den AccessKit-Baum, nicht das Verhalten echter Lesegeräte.
+  - Das Löschen des Kennworts nach einer Veröffentlichung ist im Code belegt, aber nicht automatisiert getestet: Der Loopback-Server verlangt HTTP, und Zugangsdaten über HTTP werden abgelehnt. Eine Test-Wurzel oder ein TLS-Bypass wurde bewusst nicht hinzugefügt.
+  - Keine Interoperabilität mit echten WebDAV-Servern; keine atomare Veröffentlichung behauptet.

@@ -1,5 +1,14 @@
 # Letzte integrierte Änderung
 
+**2026-10-25 · MIG-042 (Schritt 4b) · Claude · Upload in der GUI: Vorschau, ausdrückliche Bestätigung, Zustände** (nach `development`, Fast-Forward)
+
+* **MIG-042, Schritt 4b** ([Bericht](2026-10-25-MIG-042-S4B.md), [Handoff](../handoffs/MIG-042-S4B.md), [ADR-0015](../adr/0015-upload-gui.md), [Task](../tasks/MIG-042-S4B.md)): Ansicht „Upload“ in `armasync-gui`; Vorschau mit Gründen; Veröffentlichen nur nach Bestätigung; Veraltung bei geänderten Eingaben; laufender Zustand mit Abbrechen über `CancelToken`; nur indeterminierter Fortschritt. Gemeinsame Verdrahtung mit der CLI in `armasync-workflow::upload`. Kennwort nur für die Sitzung, nach jeder Veröffentlichung geleert.
+* **Tests:** GUI `upload_screen` 8/8 (Loopback, anonymes HTTP), `upload_ui` 5/5 (AccessKit, Tastatur, beide Themen, Kontrast der Fehlerfarbe ≥ 4,5:1).
+* **Prüfungen (finaler Stand, Windows):** fmt, Clippy `-D warnings` und Workspace-Test (63 Suiten) jeweils Exitcode 0; MSRV 1.85 ohne GUI Exitcode 0 (55 Suiten); Markdown-Links 195 Dateien, 0 defekt; `git diff --check` Exitcode 0.
+* **Offen:** Fortschritt pro Datei (4c); kein Lesegerät (NVDA, Narrator, Orca) geprüft; Kennwort-Löschung nach Veröffentlichung nur im Code belegt.
+
+Vorheriger Stand:
+
 **2026-10-25 · MIG-042 (Schritt 4a) · Claude · Upload in der CLI: Vorschau, Bestätigung, gemeinsame Workflow-Verdrahtung** (nach `development`, Fast-Forward)
 
 * **MIG-042, Schritt 4a** ([Bericht](2026-10-25-MIG-042-S4A.md), [Handoff](../handoffs/MIG-042-S4A.md), [ADR-0014](../adr/0014-upload-cli.md), [Task](../tasks/MIG-042-S4A.md)): `upload plan` (nur Vorschau) und `upload publish --yes`; Verdrahtung in `armasync-workflow::upload`; Kennwort nur aus der Umgebung; Adressen mit Zugangsdaten werden abgelehnt; Exitcodes und JSON nach CLI-Vertrag. Der Loopback-WebDAV-Server liegt jetzt in `armasync-testkit`.
