@@ -24,6 +24,19 @@ Der Upload aus Schritt 1 schreibt Dateien direkt an ihre Zielpfade. Eine Veröff
 5. **Fehler und Abbruch.** Bis zum Schreiben des Zeigers bleibt der bisherige Zeiger unverändert. Ein Abbruch oder Fehler in Schritt 3 hinterlässt eine unvollständige Revision (ohne `manifest.json`), die bei der nächsten Veröffentlichung neu gefüllt wird; der Zeiger zeigt weiter auf die alte Revision. Scheitert das Schreiben des Zeigers, prüft der Vorgang per GET, ob der alte oder der neue Zeiger liegt. Ist keines von beiden vorhanden oder nicht lesbar, endet der Vorgang mit `Integrity` („Veröffentlichungszustand unbekannt; der vorherige Zeiger liegt in history/“).
 6. **Keine Löschungen.** Keine Revision, keine Datei und kein Zeiger wird gelöscht. Alte Revisionen bleiben liegen.
 
+## Nachtrag 2026-10-25 (MIG-042, Schritt 3a): Rückleseprüfung vor der Veröffentlichung
+
+Die Reihenfolge wird erweitert. Vor jedem Schreiben, das die Revision benennt, wird jede Datei der Revision über den Ziel-Port zurückgelesen:
+
+1. Die Revision wird übertragen (Dateien) oder als vollständig erkannt. **In jedem Fall** wird danach jede Datei gelesen: `fetch` mit dem angekündigten Größenlimit, dann Größe und SHA-256 gegen das Manifest.
+2. Erst wenn alle Dateien bestanden haben, wird `manifest.json` geschrieben und per GET zurückgelesen. Danach folgt der Zeiger.
+3. Fehlt eine Datei (`404` oder Lesen liefert nichts), ist sie zu lang oder zu kurz, oder ihr Hash weicht ab, endet der Vorgang mit `Integrity`; der Zeiger bleibt unverändert, und `manifest.json` wird für eine neue Revision nicht geschrieben.
+4. Schlägt ein Lesezugriff selbst fehl (Netzwerk, `500`), endet der Vorgang mit dem Transportfehler; der Zeiger bleibt unverändert.
+5. Ein Abbruch während der Rückleseprüfung endet mit `Cancelled`; der Zeiger bleibt unverändert.
+6. Die Prüfung gilt auch für eine als vollständig erkannte Revision: eine später beschädigte Datei darf den Zeiger nicht auf diese Revision umsetzen.
+
+Diese Prüfung verhindert, dass ein Zeiger auf eine Revision zeigt, deren Dateien der Server nicht fehlerfrei zurückgibt. Sie ersetzt keine Atomarität: Ein Server, der zwischen Rückleseprüfung und Zeiger-Schreiben eine Datei verändert, wird nicht erkannt, bis der nächste Lauf prüft.
+
 ## Atomarität (ausdrücklich nicht behauptet)
 
 WebDAV definiert kein atomares Ersetzen einer Datei über `PUT`. Ein Server kann nach einem Abbruch eine teilweise geschriebene Datei zurücklassen. Der Adapter kann deshalb **keine atomare Veröffentlichung zusagen**. Was der Ablauf stattdessen garantiert:
