@@ -1,6 +1,6 @@
 # MIG-032R — Resume mit `Range` und Validatorvertrag
 
-- Status: **in Arbeit** (reserviert 2026-10-25). Eigentümer und Integrator: Claude (Projektleitung, Hauptbearbeiter). Basis-Branch `development`, Basis-SHA `1d7049d795e9cc8b949f859b0c42afe70f16472f`. Eigener Branch `claude/mig-032r-resume` (Hauptcheckout). Bericht: [MIG-032R](../changes/2026-10-25-MIG-032R.md), Handoff: [MIG-032R](../handoffs/MIG-032R.md).
+- Status: **integriert** (Fast-Forward nach `development`, 2026-10-25; Windows-Prüfungen bestanden; siehe [Bericht](../changes/2026-10-25-MIG-032R.md)). Reserviert 2026-10-25. Eigentümer und Integrator: Claude (Projektleitung, Hauptbearbeiter). Basis-Branch `development`, Basis-SHA `1d7049d795e9cc8b949f859b0c42afe70f16472f`. Eigener Branch `claude/mig-032r-resume` (Hauptcheckout). Bericht: [MIG-032R](../changes/2026-10-25-MIG-032R.md), Handoff: [MIG-032R](../handoffs/MIG-032R.md).
 - Ziel: Ein unterbrochener Download darf nur dann mit `Range` fortgesetzt werden, wenn der Server nachweislich dieselbe Revision der Datei ausliefert. Fehlt dieser Nachweis, wird neu geladen.
 - Vertrag: [ADR-0009](../adr/0009-resume-range.md) (Zusatz zu ADR-0007). Der ADR wird vor der Implementierung geprüft und festgeschrieben.
 

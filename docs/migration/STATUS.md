@@ -1,6 +1,6 @@
 # Aktueller Migrationsstand
 
-Aktualisiert: **2026-10-25** (MIG-032B), Europe/Berlin. Diesen globalen Stand nur durch den jeweiligen Integrator ändern.
+Aktualisiert: **2026-10-25** (MIG-032R), Europe/Berlin. Diesen globalen Stand nur durch den jeweiligen Integrator ändern.
 
 ## Erreicht
 
@@ -35,6 +35,7 @@ Aktualisiert: **2026-10-25** (MIG-032B), Europe/Berlin. Diesen globalen Stand nu
 
 - MIG-030E (2026-10-25): gepackte Blätter (`compressed`) mit bekannter Archivgröße (1 Byte bis 2 GiB) werden installiert: Archiv `<name>.zip` in eine Spool-Datei, begrenztes Entpacken mit genau einem Eintrag (Stored/Deflate, keine Verzeichnisse, Links, Verschlüsselung, unsichere Namen), Größen- und SHA-1-Prüfung, atomarer Commit ([ADR-0008](../adr/0008-packed-files-zip.md), [Bericht](../changes/2026-10-25-MIG-030E.md), [Handoff](../handoffs/MIG-030E.md)). Dependency `zip` 7.3.0 (MIT, MSRV 1.83). Die GUI nennt nur noch Blätter ohne nutzbare Archivgröße als nicht unterstützt (gleicher Code `compressed-file-unsupported` wie CLI-JSON). Windows: fmt, clippy `-D warnings`, Workspace-Tests inkl. GUI bestanden, MSRV 1.85 bestanden. **Nicht belegt:** echtes Serverarchivformat, Linux/WSL, GitHub-CI (pausiert), Konsolen-/Abbruchtest für gepackte Downloads, Freiplatzprüfung (MIG-032B geplant).
 
+- MIG-032R (2026-10-25): Resume mit `Range` für gewöhnliche Dateien ([ADR-0009](../adr/0009-resume-range.md)). Nur starke ETags als Validator; `If-Range` und strenge 206-Prüfung (`Content-Range`, Gesamtgröße, Validator); verweigertes Resume einmal von Null; Teildaten im Zielordner unter der Zielsperre; Abbruch entfernt Teildaten, ein Netzabbruch behält sie. Gepackte Archive sind **nicht** fortsetzbar. Belegt gegen Loopback-Server, In-Memory und einen Ende-zu-Ende-Lauf über zwei Prozesse; Windows-Prüfungen bestanden. Echte Server, WSL/Linux und GitHub-CI offen beziehungsweise zurückgestellt.
 - MIG-032B (2026-10-25): Freiplatz-Vorabkontrolle (Port `free_space`, Standard unbekannt; Dateisystem über `fs4`; simulierter Platzbedarf inkl. Archiv und Gutschrift ersetzter Dateien; 16 MiB Reserve) und Abbruchtests in der GUI für große normale und gepackte Downloads (alte Datei bleibt, keine Reste). Windows: fmt, clippy, Workspace-Tests inkl. Ende-zu-Ende, MSRV 1.85 bestanden. **Nicht belegt:** Konsolen-Ctrl+C für diese Fälle, WSL/Linux, GitHub-CI (pausiert), echte Server, Unix-Freiplatzabfrage.
 
 ## Noch nicht erreicht
