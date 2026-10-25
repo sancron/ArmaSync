@@ -86,6 +86,51 @@ struct Options {
     require_auth: bool,
     /// Absolute target of the `/dav/redirect/cross` route.
     cross_target: String,
+    /// Set by [`start_manual`]: limits, strict paths and no test-only routes or faults.
+    manual: Option<ManualLimits>,
+    bounds: Bounds,
+}
+
+/// Size bounds of request reading. The test servers are unbounded; the manual server is bounded.
+#[derive(Clone, Copy)]
+struct Bounds {
+    max_head: usize,
+    max_body: usize,
+}
+
+const UNBOUNDED: Bounds = Bounds {
+    max_head: usize::MAX,
+    max_body: usize::MAX,
+};
+
+/// Largest request head the manual server reads before it refuses the request.
+const MANUAL_MAX_HEAD: usize = 64 * 1024;
+
+/// Limits of the manual upload server (`examples/upload_webdav.rs`). Everything is kept in memory.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ManualLimits {
+    /// Largest accepted `PUT` body in bytes (`413` above it).
+    pub max_file_bytes: u64,
+    /// Largest sum of all stored files in bytes (`507` above it).
+    pub max_total_bytes: u64,
+    /// Largest number of stored files (`507` above it).
+    pub max_files: usize,
+}
+
+impl Default for ManualLimits {
+    fn default() -> Self {
+        Self {
+            max_file_bytes: 64 * 1024 * 1024,
+            max_total_bytes: 256 * 1024 * 1024,
+            max_files: 200,
+        }
+    }
+}
+
+/// Why a request was not read: its head or its announced body is too large, or it is broken.
+enum Refused {
+    Broken,
+    TooLarge,
 }
 
 pub struct Server {
@@ -192,6 +237,38 @@ fn tls_config() -> (Arc<rustls::ServerConfig>, Vec<u8>) {
 
 /// Starts a WebDAV-like server on loopback. `require_auth` demands [`EXPECTED_AUTH`] on every request.
 pub fn start(tls: bool, require_auth: bool, cross_target: &str) -> Server {
+    serve(
+        tls,
+        Options {
+            require_auth,
+            cross_target: cross_target.to_owned(),
+            manual: None,
+            bounds: UNBOUNDED,
+        },
+    )
+}
+
+/// Starts the manual upload server (plain HTTP, anonymous, loopback only, dynamic port). It accepts the requests of a
+/// WebDAV upload (`OPTIONS`, `PROPFIND`, `MKCOL`, `PUT`, `GET`, `DELETE`) and nothing else: paths are checked and
+/// percent-decoded, `..` and separators are refused, and the limits of `limits` apply. It has no test-only routes and
+/// no fault injection. The files stay in memory and disappear when the server is dropped.
+pub fn start_manual(limits: ManualLimits) -> Server {
+    let bounds = Bounds {
+        max_head: MANUAL_MAX_HEAD,
+        max_body: usize::try_from(limits.max_file_bytes).unwrap_or(usize::MAX),
+    };
+    serve(
+        false,
+        Options {
+            require_auth: false,
+            cross_target: String::new(),
+            manual: Some(limits),
+            bounds,
+        },
+    )
+}
+
+fn serve(tls: bool, options: Options) -> Server {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();
     let (config, cert_der) = if tls {
@@ -202,10 +279,6 @@ pub fn start(tls: bool, require_auth: bool, cross_target: &str) -> Server {
     };
     let stop = Arc::new(AtomicBool::new(false));
     let state = Arc::new(Mutex::new(State::default()));
-    let options = Options {
-        require_auth,
-        cross_target: cross_target.to_owned(),
-    };
     let (stop2, state2) = (stop.clone(), state.clone());
     thread::spawn(move || {
         for incoming in listener.incoming() {
@@ -243,24 +316,27 @@ struct Request {
     body: Vec<u8>,
 }
 
-fn read_request<S: Read + Write>(stream: &mut S) -> Option<Request> {
+fn read_request<S: Read + Write>(stream: &mut S, bounds: Bounds) -> Result<Request, Refused> {
     let mut data = Vec::new();
     let mut buf = [0u8; 4096];
     let head_end = loop {
         if let Some(pos) = data.windows(4).position(|w| w == b"\r\n\r\n") {
             break pos + 4;
         }
-        let n = stream.read(&mut buf).ok()?;
+        if data.len() > bounds.max_head {
+            return Err(Refused::Broken);
+        }
+        let n = stream.read(&mut buf).map_err(|_| Refused::Broken)?;
         if n == 0 {
-            return None;
+            return Err(Refused::Broken);
         }
         data.extend_from_slice(&buf[..n]);
     };
     let head = String::from_utf8_lossy(&data[..head_end]).into_owned();
     let mut lines = head.split("\r\n");
-    let mut first = lines.next()?.split(' ');
-    let method = first.next()?.to_owned();
-    let target = first.next()?.to_owned();
+    let mut first = lines.next().ok_or(Refused::Broken)?.split(' ');
+    let method = first.next().ok_or(Refused::Broken)?.to_owned();
+    let target = first.next().ok_or(Refused::Broken)?.to_owned();
     let headers: Vec<(String, String)> = lines
         .take_while(|l| !l.is_empty())
         .filter_map(|l| l.split_once(": "))
@@ -275,19 +351,25 @@ fn read_request<S: Read + Write>(stream: &mut S) -> Option<Request> {
     let length: usize = header("content-length")
         .and_then(|v| v.parse().ok())
         .unwrap_or(0);
+    if length > bounds.max_body {
+        // Refused before any body byte is read or stored.
+        return Err(Refused::TooLarge);
+    }
     if header("expect").is_some_and(|v| v.eq_ignore_ascii_case("100-continue")) {
-        stream.write_all(b"HTTP/1.1 100 Continue\r\n\r\n").ok()?;
+        stream
+            .write_all(b"HTTP/1.1 100 Continue\r\n\r\n")
+            .map_err(|_| Refused::Broken)?;
     }
     let mut body = data[head_end..].to_vec();
     while body.len() < length {
-        let n = stream.read(&mut buf).ok()?;
+        let n = stream.read(&mut buf).map_err(|_| Refused::Broken)?;
         if n == 0 {
-            return None;
+            return Err(Refused::Broken);
         }
         body.extend_from_slice(&buf[..n]);
     }
     body.truncate(length);
-    Some(Request {
+    Ok(Request {
         method,
         target,
         authorization: header("authorization"),
@@ -310,8 +392,10 @@ fn respond(stream: &mut impl Write, status: &str, headers: &[(&str, String)], bo
 }
 
 fn handle<S: Read + Write>(stream: &mut S, state: &Mutex<State>, options: &Options) {
-    let Some(request) = read_request(stream) else {
-        return;
+    let request = match read_request(stream, options.bounds) {
+        Ok(request) => request,
+        Err(Refused::TooLarge) => return respond(stream, "413 Payload Too Large", &[], b""),
+        Err(Refused::Broken) => return,
     };
     state.lock().unwrap().seen.push(Seen {
         method: request.method.clone(),
@@ -323,23 +407,35 @@ fn handle<S: Read + Write>(stream: &mut S, state: &Mutex<State>, options: &Optio
         return respond(stream, "401 Unauthorized", &challenge, b"");
     }
     let target = request.target.as_str();
-    if target.starts_with("/dav/hang") {
+    // Test-only routes exist for the adapter tests; the manual server has none of them.
+    let testing = options.manual.is_none();
+    if testing && target.starts_with("/dav/hang") {
         // Never answers in time: the client's timeout must end the request.
         thread::sleep(Duration::from_secs(3));
         return respond(stream, "503 Service Unavailable", &[], b"");
     }
-    if let Some(rest) = target.strip_prefix("/dav/redirect/same") {
+    if let Some(rest) = target
+        .strip_prefix("/dav/redirect/same")
+        .filter(|_| testing)
+    {
         let location = vec![("Location", format!("/dav/{}", rest.trim_start_matches('/')))];
         return respond(stream, "302 Found", &location, b"");
     }
-    if target.starts_with("/dav/redirect/cross") {
+    if testing && target.starts_with("/dav/redirect/cross") {
         let location = vec![("Location", options.cross_target.clone())];
         return respond(stream, "302 Found", &location, b"");
     }
-    let Some(rel) = target.strip_prefix("/dav") else {
+    let Some(raw) = target.strip_prefix("/dav") else {
         return respond(stream, "404 Not Found", &[], b"");
     };
-    let rel = rel.trim_start_matches('/');
+    let decoded = match options.manual {
+        None => raw.trim_start_matches('/').to_owned(),
+        Some(_) => match manual_path(raw) {
+            Some(path) => path,
+            None => return respond(stream, "400 Bad Request", &[], b""),
+        },
+    };
+    let rel = decoded.as_str();
     let mut st = state.lock().unwrap();
     let parent = rel.rsplit_once('/').map_or("", |(parent, _)| parent);
     let parent_missing = !parent.is_empty() && !st.dirs.contains(parent);
@@ -375,9 +471,11 @@ fn handle<S: Read + Write>(stream: &mut S, state: &Mutex<State>, options: &Optio
         "PUT" => {
             if st.fail_put.as_deref() == Some(rel) {
                 respond(stream, "500 Internal Server Error", &[], b"");
-            } else if rel.contains("full") {
+            } else if manual_full(options, &st, rel, request.body.len())
+                || (testing && rel.contains("full"))
+            {
                 respond(stream, "507 Insufficient Storage", &[], b"");
-            } else if rel.contains("locked") {
+            } else if testing && rel.contains("locked") {
                 respond(stream, "423 Locked", &[], b"");
             } else if parent_missing || st.dirs.contains(rel) {
                 respond(stream, "409 Conflict", &[], b"");
@@ -425,6 +523,67 @@ fn handle<S: Read + Write>(stream: &mut S, state: &Mutex<State>, options: &Optio
         }
         _ => respond(stream, "405 Method Not Allowed", &[], b""),
     }
+}
+
+/// The path below `/dav` of a request to the manual server: one leading and one trailing `/` are dropped, the rest is
+/// percent-decoded and must be safe. `None` for a query, a fragment, a bad escape or an unsafe path.
+fn manual_path(raw: &str) -> Option<String> {
+    if raw.contains(['?', '#']) {
+        return None;
+    }
+    let raw = raw.strip_prefix('/').unwrap_or(raw);
+    let decoded = percent_decode(raw)?;
+    let decoded = decoded.strip_suffix('/').unwrap_or(&decoded).to_owned();
+    safe_rel(&decoded).then_some(decoded)
+}
+
+fn percent_decode(text: &str) -> Option<String> {
+    let bytes = text.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'%' {
+            let hex = std::str::from_utf8(bytes.get(index + 1..index + 3)?).ok()?;
+            out.push(u8::from_str_radix(hex, 16).ok()?);
+            index += 3;
+        } else {
+            out.push(bytes[index]);
+            index += 1;
+        }
+    }
+    String::from_utf8(out).ok()
+}
+
+/// A relative path that cannot leave the store: no empty, `.` or `..` segments, no separators or drive colons inside a
+/// segment, no control characters, no query or fragment characters, bounded lengths. The empty path (the root) is safe.
+fn safe_rel(rel: &str) -> bool {
+    if rel.is_empty() {
+        return true;
+    }
+    if rel.len() > 1024 {
+        return false;
+    }
+    rel.split('/').all(|segment| {
+        !segment.is_empty()
+            && segment != "."
+            && segment != ".."
+            && segment.len() <= 255
+            && !segment
+                .chars()
+                .any(|c| c.is_control() || matches!(c, '\\' | ':' | '?' | '#'))
+    })
+}
+
+/// Whether storing `size` bytes at `rel` would exceed the file count or the total size of the manual server.
+fn manual_full(options: &Options, st: &State, rel: &str, size: usize) -> bool {
+    let Some(limits) = &options.manual else {
+        return false;
+    };
+    let replaced = st.files.get(rel).map_or(0, Vec::len);
+    let total: usize = st.files.values().map(Vec::len).sum();
+    let new_file = !st.files.contains_key(rel);
+    (new_file && st.files.len() >= limits.max_files)
+        || (total - replaced + size) as u64 > limits.max_total_bytes
 }
 
 /// A file in the system temp directory; the name is unique per process.
