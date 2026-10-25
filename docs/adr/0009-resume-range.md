@@ -101,3 +101,13 @@ ADR-0007 sagt: „Abbruch und Fehler lassen die Zieldatei unberührt und entfern
 ## Nicht gewählt
 
 Last-Modified als Validator; schwache ETags; Fortsetzen ohne `If-Range`; Anhängen nach einem `200`; Teildaten als installierte Datei behandeln; stilles Wiederholen mit Anhängen; kooperativen Abbruch mit Teildaten-Aufbewahrung.
+
+## Härtung der Teildateien (MIG-032R2)
+
+Ein Review fand, dass Teildatei-Namen geprüft und danach geöffnet bzw. beschrieben wurden. Ein Hardlink oder ein zwischen Prüfung und Öffnen getauschter Eintrag hätte eine Datei außerhalb des Zielordners kürzen oder überschreiben können. Die Umsetzung ist in [MIG-032R2](../tasks/MIG-032R2.md) beschrieben. Kernpunkte:
+
+* Ein vorhandener Teilnamen wird **nie** zum Schreiben geöffnet. Ein frischer Start entfernt den Eintrag (nur den Verzeichniseintrag, nie das Ziel eines Links) und legt mit `create_new` neu an.
+* Ein Fortsetzen kopiert die gültigen Bytes lesend in eine neue, vom Adapter angelegte Datei (Suffix `.tmp`, bei Absturz vom Scan entfernt) und ersetzt damit den Namen per Rename. Der Kopierpfad kostet einen zusätzlichen Schreibvorgang der Präfixlänge.
+* Die Zustandsdatei wird über eine neue Temp-Datei und Rename geschrieben. Ein Link am Zustandsnamen wird ersetzt, sein Ziel nie beschrieben.
+* Öffnen bestehender Namen verweigert Links: `O_NOFOLLOW` unter Linux und macOS, unter Windows das Reparse-Point-Öffnen mit Prüfung des Handles. Windows-Handles ohne `FILE_SHARE_DELETE` verhindern, dass der Name während der Nutzung ersetzt wird.
+* **Grenze:** Die Linkzahl wird nicht geprüft; stabiles Rust (1.85) kann sie unter Windows nicht lesen. Unix-Pfadrennen (RB-01) bleibt offen.
