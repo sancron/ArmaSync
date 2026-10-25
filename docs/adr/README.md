@@ -12,5 +12,6 @@ Status: `vorgeschlagen`, `angenommen`, `ersetzt`, `verworfen`. Nur angenommene E
 | [0007](0007-transfer-ports.md) | Streaming-Übertragung, Staging, atomare Übernahme, Schutzpfade (Ports) | angenommen; umgesetzt in MIG-030P gegen In-Memory-Referenz |
 | [0006](0006-sync-metadata-and-http-transport.md) | Sync-Metadaten, SHA-1-Integrität, HTTP(S)-Client (`ureq`), Zerlegung von MIG-030 | angenommen für Wahl und Zerlegung; Port-Signaturen mit MIG-030B/C |
 | [0008](0008-packed-files-zip.md) | Gepackte Blätter (`.zip`): Entpacken mit festen Grenzen (`zip` 7.3.0, Ports `spool`/`ArchiveReader`) | angenommen für MIG-030E; Format echter Server-Archive nicht belegt |
+| [0009](0009-resume-range.md) | Resume mit `Range`: starker ETag als Validator, Teildaten je Schlüssel, Abbruchregeln (ändert ADR-0007 für Netzfehler) | angenommen für MIG-032R; Verhalten echter Server nicht belegt |
 
 Jede neue Entscheidung nennt Datum, Kontext, Optionen, Entscheidung/Status, Folgen, Belege und betroffene Tasks. Bestehende Entscheidung bei Richtungswechsel nicht kommentarlos umschreiben: neue ADR erstellen und alte als ersetzt verlinken.
