@@ -15,3 +15,5 @@ pub mod model;
 pub mod sync_screen;
 pub mod sync_ui;
 pub mod ui;
+pub mod upload_screen;
+pub mod upload_ui;

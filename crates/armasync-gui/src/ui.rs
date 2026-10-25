@@ -14,6 +14,8 @@ use armasync_core::{JobState, Phase};
 use crate::model::{Model, SortDirection, SortKey, synthetic_repositories};
 use crate::sync_screen::SyncScreen;
 use crate::sync_ui::show_sync;
+use crate::upload_screen::UploadScreen;
+use crate::upload_ui::show_upload;
 
 /// Colour theme choice persisted by the user (not yet persisted to disk in the prototype).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -125,6 +127,8 @@ pub enum AppView {
     Sync,
     /// The list prototype with simulated data (MIG-012).
     Prototype,
+    /// Upload of a local folder as a revision (MIG-042, step 4b).
+    Upload,
 }
 
 /// Application state for eframe.
@@ -132,6 +136,7 @@ pub enum AppView {
 pub struct ArmaSyncApp {
     model: Model,
     screen: SyncScreen,
+    upload: UploadScreen,
     view: AppView,
     settings: ViewSettings,
     applied: Option<ViewSettings>,
@@ -148,12 +153,15 @@ impl ArmaSyncApp {
             repaint.request_repaint()
         });
         let repaint = ctx.clone();
+        let upload_repaint = ctx.clone();
+        let upload = UploadScreen::new(move || upload_repaint.request_repaint());
         let screen = SyncScreen::new(None, armasync_workflow::platform_status(), move || {
             repaint.request_repaint()
         });
         Self {
             model,
             screen,
+            upload,
             view: AppView::Sync,
             settings: ViewSettings::default(),
             applied: None,
@@ -166,11 +174,13 @@ impl eframe::App for ArmaSyncApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         self.model.poll();
         self.screen.poll();
+        self.upload.poll();
         apply_view_settings(ui.ctx(), &self.settings, &mut self.applied);
         egui::Panel::top("navigation").show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label("Ansicht:");
                 ui.selectable_value(&mut self.view, AppView::Sync, "Synchronisation");
+                ui.selectable_value(&mut self.view, AppView::Upload, "Upload");
                 ui.selectable_value(
                     &mut self.view,
                     AppView::Prototype,
@@ -180,6 +190,7 @@ impl eframe::App for ArmaSyncApp {
         });
         match self.view {
             AppView::Sync => show_sync(&mut self.screen, &mut self.settings, ui),
+            AppView::Upload => show_upload(&mut self.upload, ui),
             AppView::Prototype => show(
                 &mut self.model,
                 &mut self.settings,
@@ -187,7 +198,7 @@ impl eframe::App for ArmaSyncApp {
                 ui,
             ),
         }
-        if self.model.is_busy() || self.screen.is_busy() {
+        if self.model.is_busy() || self.screen.is_busy() || self.upload.is_busy() {
             ui.ctx()
                 .request_repaint_after(std::time::Duration::from_millis(100));
         }
