@@ -14,5 +14,6 @@ Status: `vorgeschlagen`, `angenommen`, `ersetzt`, `verworfen`. Nur angenommene E
 | [0008](0008-packed-files-zip.md) | Gepackte Blätter (`.zip`): Entpacken mit festen Grenzen (`zip` 7.3.0, Ports `spool`/`ArchiveReader`) | angenommen für MIG-030E; Format echter Server-Archive nicht belegt |
 | [0009](0009-resume-range.md) | Resume mit `Range`: starker ETag als Validator, Teildaten je Schlüssel, Abbruchregeln (ändert ADR-0007 für Netzfehler) | angenommen für MIG-032R; Verhalten echter Server nicht belegt |
 | [0010](0010-ftp-sftp-webdav-contract.md) | FTP/FTPS, SFTP, WebDAV: Priorisierung, Transportvertrag, Auth, TLS-/Host-Key-Regeln (MIG-040A) | angenommen (2026-10-25) für Priorisierung, Vertrag, Auth/TLS und Entscheidung 4; Entscheidungen 1–3 und 5–8 offen; Nachtrag: Option b (`reqwest`) für MKCOL/PROPFIND umgesetzt (MIG-040B) |
+| [0011](0011-upload-contract.md) | Upload-Vertrag: Ports `LocalSource`/`RemoteTarget`, Plan und Apply, Abbruch, Sicherheitsregeln; getrennte TLS-Stacks (MIG-042, Schritt 1) | angenommen für Schritt 1; Metadaten, Revisionen, Ausschlüsse, Löschen, Parallelität offen |
 
 Jede neue Entscheidung nennt Datum, Kontext, Optionen, Entscheidung/Status, Folgen, Belege und betroffene Tasks. Bestehende Entscheidung bei Richtungswechsel nicht kommentarlos umschreiben: neue ADR erstellen und alte als ersetzt verlinken.
