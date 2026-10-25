@@ -1,6 +1,6 @@
 # Aktueller Migrationsstand
 
-Aktualisiert: **2026-10-25** (MIG-040A), Europe/Berlin. Diesen globalen Stand nur durch den jeweiligen Integrator ändern.
+Aktualisiert: **2026-10-25** (MIG-040B), Europe/Berlin. Diesen globalen Stand nur durch den jeweiligen Integrator ändern.
 
 ## Erreicht
 
@@ -40,6 +40,7 @@ Aktualisiert: **2026-10-25** (MIG-040A), Europe/Berlin. Diesen globalen Stand nu
 - MIG-032B (2026-10-25): Freiplatz-Vorabkontrolle (Port `free_space`, Standard unbekannt; Dateisystem über `fs4`; simulierter Platzbedarf inkl. Archiv und Gutschrift ersetzter Dateien; 16 MiB Reserve) und Abbruchtests in der GUI für große normale und gepackte Downloads (alte Datei bleibt, keine Reste). Windows: fmt, clippy, Workspace-Tests inkl. Ende-zu-Ende, MSRV 1.85 bestanden. **Nicht belegt:** Konsolen-Ctrl+C für diese Fälle, WSL/Linux, GitHub-CI (pausiert), echte Server, Unix-Freiplatzabfrage.
 
 - MIG-040A (2026-10-25): Planung für P4 ohne Implementierung. [ADR-0010](../adr/0010-ftp-sftp-webdav-contract.md) (vorgeschlagen) legt Priorisierung, gemeinsamen Transportvertrag, Auth-, TLS-/Host-Key-Regeln, Fehlerfälle und Testserver-Vorschlag fest; Bibliotheksbefunde aus der crates.io-API (nicht gebaut).
+- MIG-040B (2026-10-25, teilweise): WebDAV-Client `armasync-adapters::webdav` mit `OPTIONS` (WebDAV-Klasse 1), `PUT` (Upload einer Datei mit bekannter Länge in einen vorhandenen Ordner) und `DELETE`. Basic-Zugangsdaten nur über HTTPS und nur an die Herkunft der Basis-Adresse; Weiterleitungen auf eine andere Herkunft werden ohne Verbindung zum Ziel abgelehnt; schreibende Methoden folgen keinen Weiterleitungen. 13 Loopback-Tests unter Windows bestanden. **Blockiert:** `MKCOL` (Ordner anlegen) und `PROPFIND` (Existenz), weil `ureq` 3.4.2 diese Methoden über HTTP/1.1 ablehnt. Keine Verdrahtung in Sync, keine echten WebDAV-Server geprüft.
 
 ## Noch nicht erreicht
 
@@ -50,7 +51,7 @@ P0-Gate nach den Kriterien in [ROADMAP](ROADMAP.md) bewertet (Fixtures mit Herku
 * **P1-GUI-Gate schließen (manuell, Projektverantwortlicher):** [GUI_SCREENREADER_PROTOCOL](GUI_SCREENREADER_PROTOCOL.md) mit NVDA auf Windows und Orca auf einem Linux-Desktop durchführen und ausfüllen (inklusive Sichtprüfung des hellen Themes). Erst danach ADR-0002 auf „angenommen“ und das P1-Gate auf erfüllt setzen.
 * **GitHub-Schritte (brauchen eine Freigabe, nach außen wirksam):** Actions auf Commit-SHAs pinnen, Rulesets/Required Checks (der erste Lauf auf `development` war erfolgreich), Default-Branch, Release-Umgebung, Ersatz der WinGet-Automatik ([CI](CI.md)); Pausierte GitHub-CI (RB-06) bleibt offen; Remote-Stand siehe LAST_CHANGE.
 * **P3 (laufend):** 030A–E, MIG-031 (Sync-GUI) und MIG-032A integriert (CLI und GUI unter Windows gegen Loopback belegt; gepackte Blätter mit Archivgröße ebenfalls); Resume mit `Range` für gewöhnliche Dateien integriert (MIG-032R/R2; gepackte Archive nicht fortsetzbar); offen: Authentifizierung (ausgesetzt, ADR-0005), **RB-01 Linux-Pfadgrenze (`openat`)**, Abschlussvalidierung unter Linux, Screenreader-/Sichtprüfung (P1-Gate). P3-Gate (beide Frontends auf Windows **und** Linux) nicht erfüllt.
-* **P4 (begonnen):** MIG-040A-Planung ([ADR-0010](../adr/0010-ftp-sftp-webdav-contract.md), vorgeschlagen; Reihenfolge WebDAV → FTP/FTPS → SFTP). Umsetzung blockiert durch Entscheidungen (MSRV, SFTP-Bibliothek, Plaintext-FTP, Basic über `http`).
+* **P4 (begonnen):** [ADR-0010](../adr/0010-ftp-sftp-webdav-contract.md) angenommen (Basic nur über HTTPS entschieden). MIG-040B liefert WebDAV-Upload mit OPTIONS/PUT/DELETE; **MKCOL und PROPFIND sind blockiert** (Entscheidung nötig: eigener HTTP/1.1-Schreiber über `rustls`, andere HTTP-Bibliothek oder Ordner außerhalb des Clients). Offen in ADR-0010: MSRV, SFTP-Bibliothek, Plaintext-FTP, Host-Key-Speicher, Schlüsselauth, Testwerkzeuge, FTPS-Standard. Reihenfolge WebDAV → FTP/FTPS → SFTP.
 * **Rechtefragen RQ-01 bis RQ-08 offen** (RB-04); RB-01 offen; Linux-Abschlussvalidierung (RB-03) zurückgestellt.
 * **P2 (Rest):** die Entscheidung zur Entschlüsselung lokaler Repositorydateien (ADR-0003-Ergänzung, RQ-01) – ohne sie fehlen Download-Ordner, Ausschlüsse und Upload-Einstellungen; ebenso offen: ob der unverschlüsselte Konfigurationsexport `export.a3s.autoconfig` als zusätzliche Quelle zugelassen wird. MIG-022 ist integriert, ersetzt beides nicht. Die Schlüsselbund-Entscheidung (ADR-0005; MSRV bleibt vorläufig 1.85) wird erst getrennt getroffen, wenn ein konkretes Feature persistente Zugangsdaten braucht. Ein echter Sync-Adapter (P3) wird nicht vorgezogen. Offen bleiben die Plattformlücken (macOS/BSD, Hardlinks, FTP/FTPS/SFTP/TLS-Tests).
 

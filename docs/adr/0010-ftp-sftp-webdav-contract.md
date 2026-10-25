@@ -106,6 +106,16 @@ Grundsatz: nur Loopback, synthetische Zugangsdaten, selbst erzeugte Zertifikate,
 - Lizenzprüfung (RQ-06) für jede Abhängigkeit vor der Aufnahme.
 - Rechtefragen RQ-01 bis RQ-08 bleiben unberührt.
 
+## Nachtrag 2026-10-25 (MIG-040B): Blockade für MKCOL und PROPFIND
+
+- **Befund:** `ureq` 3.4.2 mit `ureq-proto` 0.6.5 lässt über HTTP/1.1 nur `GET`, `HEAD`, `POST`, `PUT`, `DELETE`, `CONNECT`, `OPTIONS` und `TRACE` zu. Andere Methoden werden vor dem Senden mit `MethodVersionMismatch` abgelehnt (`ureq-proto`, `src/ext.rs`; im Test belegt: `MKCOL` und `PROPFIND` schlagen fehl). WebDAV braucht `MKCOL` (Ordner anlegen) und `PROPFIND` (Existenzprüfung) über HTTP/1.1.
+- **Umgesetzt in MIG-040B:** `OPTIONS` (Fähigkeiten, WebDAV-Klasse 1), `PUT` (Upload einer Datei mit bekannter Länge in einen vorhandenen Ordner) und `DELETE`. Keine Änderung an `Cargo.toml` oder `Cargo.lock`.
+- **Nicht umgesetzt, Entscheidung nötig** (nicht vorweggenommen):
+  a. eigener minimaler HTTP/1.1-Schreiber über `rustls` (`rustls` wäre dann eine direkte Abhängigkeit des Adapters; bereits transitiv im Lockfile; ADR und Sicherheitsprüfung des eigenen Protokollcodes nötig);
+  b. eine HTTP-Bibliothek, die beliebige Methoden zulässt (neue Abhängigkeit; Lizenz-, MSRV- und Wartungsprüfung nach RQ-06);
+  c. Ordner außerhalb des Clients anlegen und Uploads nur in vorhandene Ordner zulassen (Stand von MIG-040B).
+- **Auswirkung:** Uploads in neu anzulegende Unterordner sind nicht möglich, bis a oder b entschieden ist. MIG-042 (Build/Upload) ist davon betroffen; MIG-040C und MIG-040D sind davon nicht berührt.
+
 ## Belege
 
 - Quellen: TRANSPORT_MATRIX (Zeilen HTTP, FTP, FTPS, SFTP, WebDAV, Authentifizierung), FEATURE_PARITY F05–F07, ADR-0005/0006/0007/0009, Workspace-`Cargo.toml` (`rust-version = "1.85"`).

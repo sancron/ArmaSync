@@ -1,6 +1,15 @@
 # Letzte integrierte Änderung
 
-**2026-10-25 · MIG-040A · Claude · Planung FTP/FTPS, SFTP und WebDAV (ADR-0010, vorgeschlagen)** (nach `development`, Fast-Forward)
+**2026-10-25 · MIG-040B · Claude · WebDAV-Upload, erster Schritt (OPTIONS, PUT, DELETE); MKCOL/PROPFIND blockiert** (nach `development`, Fast-Forward)
+
+* **MIG-040B** ([Bericht](2026-10-25-MIG-040B.md), [Handoff](../handoffs/MIG-040B.md), [ADR-0010](../adr/0010-ftp-sftp-webdav-contract.md)): `armasync-adapters::webdav` mit `OPTIONS` (WebDAV-Klasse 1), `PUT` (Datei mit bekannter Länge ab Offset 0) und `DELETE`. Basic-Zugangsdaten nur über HTTPS und nur an die Herkunft der Basis-Adresse, bei jeder Weiterleitung neu geprüft; Weiterleitungen auf eine andere Herkunft werden ohne Verbindung zum Ziel abgelehnt. Schreibende Methoden folgen keinen Weiterleitungen.
+* **Blockiert:** `MKCOL` und `PROPFIND`. `ureq` 3.4.2 lehnt beide über HTTP/1.1 ab (`MethodVersionMismatch`). Entscheidung nötig: eigener HTTP/1.1-Schreiber über `rustls`, andere HTTP-Bibliothek oder Ordner außerhalb des Clients (siehe ADR-0010, Nachtrag).
+* **Prüfungen (Windows, lokal):** 13 WebDAV-Tests (Loopback-HTTP und -TLS), `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --locked` und `cargo +1.85.0 test --workspace --exclude armasync-gui --locked` jeweils Exitcode 0. Keine neue Abhängigkeit.
+* **Nicht geprüft:** echte WebDAV-Server, WSL/Linux (zurückgestellt), GitHub-CI (pausiert).
+
+Vorheriger Stand:
+
+**2026-10-25 · MIG-040A · Claude · Planung FTP/FTPS, SFTP und WebDAV (ADR-0010, angenommen am 2026-10-25)** (nach `development`, Fast-Forward)
 
 * **MIG-040A** ([Bericht](2026-10-25-MIG-040A.md), [Handoff](../handoffs/MIG-040A.md), [ADR-0010](../adr/0010-ftp-sftp-webdav-contract.md)): Planung für P4, keine Protokollimplementierung und keine neue Abhängigkeit. Empfohlene Reihenfolge WebDAV (MIG-040B) → FTP/FTPS (MIG-040C) → SFTP (MIG-040D). Benannt: MSRV-Konflikt (`suppaftp` 1.88, `russh` 1.89 gegenüber 1.85), async-Laufzeitfrage, acht offene Entscheidungen.
 * **Abgleich:** Statusangaben in STATUS, Board, Roadmap, Changelog, Blockerliste und den Taskdateien MIG-030E und MIG-032A korrigiert; alle lokalen Markdown-Links geprüft.
