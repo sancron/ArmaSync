@@ -81,11 +81,11 @@ pub struct HttpRepository {
     config: HttpConfig,
 }
 
-fn network(message: impl Into<String>) -> Error {
+pub(crate) fn network(message: impl Into<String>) -> Error {
     Error::new(ErrorKind::Network, message)
 }
 
-fn map_ureq(error: &ureq::Error) -> Error {
+pub(crate) fn map_ureq(error: &ureq::Error) -> Error {
     use ureq::Error as E;
     match error {
         E::Timeout(_) => network("the server did not respond in time"),
@@ -108,7 +108,7 @@ fn map_ureq(error: &ureq::Error) -> Error {
 }
 
 /// Percent-encodes one path segment: unreserved characters and `@` stay, everything else is encoded.
-fn encode_segment(segment: &str) -> String {
+pub(crate) fn encode_segment(segment: &str) -> String {
     let mut out = String::with_capacity(segment.len());
     for byte in segment.bytes() {
         if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~' | b'@') {
@@ -120,7 +120,7 @@ fn encode_segment(segment: &str) -> String {
     out
 }
 
-fn origin_and_path(url: &str) -> Option<(&str, &str)> {
+pub(crate) fn origin_and_path(url: &str) -> Option<(&str, &str)> {
     let rest_start = url.find("://")? + 3;
     let path_start = url[rest_start..]
         .find('/')
@@ -171,6 +171,16 @@ pub fn redirect_target(from: &str, location: &str) -> Result<String, Error> {
 }
 
 impl HttpRepository {
+    /// The agent of this repository; the WebDAV client shares its TLS, timeout and redirect rules.
+    pub(crate) fn agent(&self) -> &Agent {
+        &self.agent
+    }
+
+    /// The base address without a trailing slash.
+    pub(crate) fn base(&self) -> &str {
+        &self.base
+    }
+
     /// A repository at `base` (a `http://` or `https://` address without credentials, query or fragment, as
     /// validated by [`armasync_core::RepositoryUrl`]).
     ///
@@ -291,7 +301,7 @@ impl HttpRepository {
         Err(network("too many redirects"))
     }
 
-    fn body_budget(&self, size: u64) -> Duration {
+    pub(crate) fn body_budget(&self, size: u64) -> Duration {
         let rate = self.config.min_bytes_per_second.max(1);
         Duration::from_secs(size / rate).max(self.config.min_body_timeout)
     }

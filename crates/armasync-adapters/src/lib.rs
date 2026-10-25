@@ -18,6 +18,7 @@ pub mod memory;
 pub mod paths;
 pub mod store;
 pub mod sync_meta;
+pub mod webdav;
 
 pub use credentials::SessionCredentialStore;
 pub use memory::{InMemoryRepository, InMemoryStore, MemoryEventSink, Sha256Hasher, ValidatorMode};
