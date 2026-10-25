@@ -47,7 +47,8 @@ use fs4::FileExt;
 
 use armasync_core::{
     CancelToken, ContentHash, Digest, Error, ErrorKind, HashAlgorithm, Hasher, LocalFile,
-    LocalStore, PartialFile, PartialKey, RelativePath, Spool, StagedFile, TRANSFER_CHUNK,
+    LocalSource, LocalStore, OpenedSource, PartialFile, PartialKey, RelativePath, SourceFile,
+    Spool, StagedFile, TRANSFER_CHUNK,
 };
 
 use crate::memory::Sha256Hasher;
@@ -425,6 +426,52 @@ fn hash_file(
             Ok(n) => digest.update(&buffer[..n]),
             Err(_) => return Ok(None),
         }
+    }
+}
+
+/// The source side of an upload (ADR-0011). Listing uses the scan rules; reading refuses links and non-regular files
+/// and keeps the verified folders pinned while the file is read (Windows).
+impl LocalSource for LocalDirectory {
+    fn files(&self, cancel: &CancelToken) -> Result<Vec<SourceFile>, Error> {
+        let listed = LocalStore::list(self, HashAlgorithm::Sha256, cancel)?;
+        Ok(listed
+            .into_iter()
+            .map(|file| SourceFile {
+                path: file.path,
+                size: file.size,
+            })
+            .collect())
+    }
+
+    fn open(&self, path: &RelativePath) -> Result<OpenedSource, Error> {
+        let relative = path.as_str();
+        let (target, pins) = self.secure_target(path, false)?;
+        let metadata =
+            fs::symlink_metadata(&target).map_err(|e| fs_error("inspect", relative, &e))?;
+        if is_link(&metadata) || !metadata.is_file() {
+            return Err(refused(relative, "only regular files can be uploaded"));
+        }
+        let file = File::open(&target).map_err(|e| fs_error("open", relative, &e))?;
+        let size = file
+            .metadata()
+            .map_err(|e| fs_error("inspect", relative, &e))?
+            .len();
+        Ok(OpenedSource {
+            size,
+            content: Box::new(PinnedReader { file, _pins: pins }),
+        })
+    }
+}
+
+/// Reads one source file and keeps the verified folders pinned until it is dropped.
+struct PinnedReader {
+    file: File,
+    _pins: Pins,
+}
+
+impl Read for PinnedReader {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.file.read(buf)
     }
 }
 

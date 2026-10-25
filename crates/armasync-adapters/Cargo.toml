@@ -22,6 +22,8 @@ ureq = { version = "3.4.2", default-features = false, features = ["rustls", "pla
 zip = { version = "7.3.0", default-features = false, features = ["deflate-flate2"] }
 
 [dev-dependencies]
+# Test-only: the upload use case is exercised end to end against the real adapters (ADR-0011).
+armasync-application.workspace = true
 armasync-testkit.workspace = true
 rcgen = { version = "0.14.7", default-features = false, features = ["crypto", "ring", "pem"] }
 rustls = { version = "0.23.46", default-features = false, features = ["ring", "std"] }

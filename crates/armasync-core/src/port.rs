@@ -452,6 +452,76 @@ pub trait Hasher {
     }
 }
 
+/// A local file that can be uploaded: its safe relative path and its size in bytes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SourceFile {
+    /// Relative path below the source root.
+    pub path: RelativePath,
+    /// Size in bytes at listing time.
+    pub size: u64,
+}
+
+/// A local file opened for an upload (ADR-0011).
+pub struct OpenedSource {
+    /// Size in bytes at the time the file was opened.
+    pub size: u64,
+    /// Reader over the whole content; it is read from the first byte.
+    pub content: Box<dyn Read + Send>,
+}
+
+impl std::fmt::Debug for OpenedSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OpenedSource")
+            .field("size", &self.size)
+            .finish_non_exhaustive()
+    }
+}
+
+/// Local files an upload reads from (ADR-0011). Implementations never list or open links, junctions or other
+/// non-regular files, and they never leave their root.
+pub trait LocalSource {
+    /// All regular files below the source root, sorted by path. `cancel` is checked between files.
+    ///
+    /// # Errors
+    /// File-system failures; [`ErrorKind::Cancelled`].
+    fn files(&self, cancel: &CancelToken) -> Result<Vec<SourceFile>, Error>;
+
+    /// Opens one regular file for reading.
+    ///
+    /// # Errors
+    /// [`ErrorKind::FileSystem`] for missing files, links or parents that are links, and other file-system failures.
+    fn open(&self, path: &RelativePath) -> Result<OpenedSource, Error>;
+}
+
+/// A destination that accepts uploads below a folder tree (ADR-0011). Folders are created one level per call.
+pub trait RemoteTarget {
+    /// Whether a file or a folder exists at `path`.
+    ///
+    /// # Errors
+    /// Transport and authentication failures.
+    fn exists(&self, path: &RelativePath) -> Result<bool, Error>;
+
+    /// Creates one folder; an existing folder is accepted. The parent folder must exist.
+    ///
+    /// # Errors
+    /// Transport failures; [`ErrorKind::FileSystem`] when the parent is missing or the target refuses the folder.
+    fn make_folder(&self, path: &RelativePath) -> Result<(), Error>;
+
+    /// Replaces the file at `path` with the whole content of `source`. The parent folder must exist. An upload
+    /// that is cancelled before its last byte leaves no complete file at `path`, as far as the server guarantees
+    /// it; the adapter reports [`ErrorKind::Cancelled`].
+    ///
+    /// # Errors
+    /// [`ErrorKind::Cancelled`] when cancelled; [`ErrorKind::FileSystem`] for refused targets; transport
+    /// failures otherwise.
+    fn upload(
+        &self,
+        path: &RelativePath,
+        source: OpenedSource,
+        cancel: &CancelToken,
+    ) -> Result<(), Error>;
+}
+
 /// Cooperative cancellation shared between a frontend and a running operation.
 #[derive(Debug, Clone, Default)]
 pub struct CancelToken(Arc<AtomicBool>);

@@ -8,6 +8,7 @@
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 pub mod sync;
+pub mod upload;
 
 use armasync_core::product;
 

@@ -33,7 +33,7 @@ pub use model::{
 pub use path::{PathError, RelativePath};
 pub use plan::{LocalFile, PlanOptions, PlanSummary, PlanWarning, SyncPlan, SyncStep, plan_sync};
 pub use port::{
-    ArchiveReader, CancelToken, Digest, Hasher, LocalStore, Opened, PartialFile, PartialKey,
-    RepositorySource, Spool, StagedFile, StoredPartial, TRANSFER_CHUNK, copy_body, copy_in_chunks,
-    is_strong_validator,
+    ArchiveReader, CancelToken, Digest, Hasher, LocalSource, LocalStore, Opened, OpenedSource,
+    PartialFile, PartialKey, RemoteTarget, RepositorySource, SourceFile, Spool, StagedFile,
+    StoredPartial, TRANSFER_CHUNK, copy_body, copy_in_chunks, is_strong_validator,
 };

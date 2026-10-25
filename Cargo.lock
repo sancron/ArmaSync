@@ -216,6 +216,7 @@ dependencies = [
 name = "armasync-adapters"
 version = "0.0.0"
 dependencies = [
+ "armasync-application",
  "armasync-compat",
  "armasync-core",
  "armasync-testkit",

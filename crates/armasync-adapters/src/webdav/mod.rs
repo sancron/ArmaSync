@@ -25,10 +25,10 @@
 use std::error::Error as StdError;
 use std::fmt;
 use std::fs::File;
-use std::io::{Seek, SeekFrom};
+use std::io::{Read, Seek, SeekFrom};
 use std::time::Duration;
 
-use armasync_core::{Error, ErrorKind, RelativePath};
+use armasync_core::{CancelToken, Error, ErrorKind, OpenedSource, RelativePath, RemoteTarget};
 use reqwest::blocking::{Body, Client, Response};
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, LOCATION};
 use reqwest::{Certificate, Method, redirect::Policy};
@@ -298,17 +298,39 @@ impl WebDavClient {
         file.seek(SeekFrom::Start(0)).map_err(local_read_error)?;
         let length = file.metadata().map_err(local_read_error)?.len();
         let copy = file.try_clone().map_err(local_read_error)?;
+        self.send_upload(path, Box::new(copy), length, &CancelToken::new())
+    }
+
+    /// Streams `content` (exactly `length` bytes) to `path`. The stream stops at the next read once `cancel` is set,
+    /// and a failure after cancellation is reported as [`ErrorKind::Cancelled`].
+    fn send_upload(
+        &self,
+        path: &RelativePath,
+        content: Box<dyn Read + Send>,
+        length: u64,
+        cancel: &CancelToken,
+    ) -> Result<(), Error> {
         let url = self.url_for(path);
+        let stream = CancelReader {
+            inner: content,
+            cancel: cancel.clone(),
+        };
         let mut request = self
             .client
             .put(url.as_str())
             .timeout(self.body_budget(length))
             .header(CONTENT_TYPE, "application/octet-stream")
-            .body(Body::sized(copy, length));
+            .body(Body::sized(stream, length));
         if let Some(value) = self.authorization_for(&url) {
             request = request.header(AUTHORIZATION, value);
         }
-        let response = request.send().map_err(|e| map_reqwest(&e))?;
+        let response = match request.send() {
+            Ok(response) => response,
+            Err(_) if cancel.is_cancelled() => {
+                return Err(Error::new(ErrorKind::Cancelled, "the upload was cancelled"));
+            }
+            Err(error) => return Err(map_reqwest(&error)),
+        };
         match response.status().as_u16() {
             200 | 201 | 204 => Ok(()),
             other => Err(status_error(other)),
@@ -327,6 +349,44 @@ impl WebDavClient {
             404 => Ok(false),
             other => Err(status_error(other)),
         }
+    }
+}
+
+/// The upload side of the folder tree (ADR-0011). The methods keep their WebDAV semantics and their safety rules.
+impl RemoteTarget for WebDavClient {
+    fn exists(&self, path: &RelativePath) -> Result<bool, Error> {
+        WebDavClient::exists(self, path)
+    }
+
+    fn make_folder(&self, path: &RelativePath) -> Result<(), Error> {
+        self.make_collection(path)
+    }
+
+    fn upload(
+        &self,
+        path: &RelativePath,
+        source: OpenedSource,
+        cancel: &CancelToken,
+    ) -> Result<(), Error> {
+        self.send_upload(path, source.content, source.size, cancel)
+    }
+}
+
+/// Ends a streamed upload at the next read once cancellation was requested.
+struct CancelReader {
+    inner: Box<dyn Read + Send>,
+    cancel: CancelToken,
+}
+
+impl Read for CancelReader {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        if self.cancel.is_cancelled() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Interrupted,
+                "the upload was cancelled",
+            ));
+        }
+        self.inner.read(buf)
     }
 }
 
