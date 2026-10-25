@@ -24,4 +24,13 @@ Aufgenommen in `armasync-adapters`: `ureq` 3.4.2 mit `rustls` und `platform-veri
 
 **Nachtrag MIG-030H (2026-10-19):** `fs4` 1.1.0 (MIT OR Apache-2.0; Dateisperren) in `armasync-adapters`; keine weiteren Normalabhängigkeiten.
 
+**Nachtrag MIG-040B (2026-10-25, ADR-0010 Entscheidung b; Prüfung nach RQ-06; keine Rechtsberatung):** `reqwest` 0.13.5 (MIT OR Apache-2.0; MSRV 1.85.0; Features `blocking` und `rustls`, Default-Features aus) in `armasync-adapters` für den WebDAV-Client (`MKCOL`, `PROPFIND`, `OPTIONS`, `PUT`, `DELETE`). Der HTTP-Download-Pfad bleibt bei `ureq`.
+
+Im kompilierten Normalbaum des Adapters neu hinzugekommen (`cargo tree -p armasync-adapters -e normal`, 21 Pakete) und jeweils nach Cargo-Metadaten:
+`reqwest` 0.13.5 (MIT OR Apache-2.0); `hyper` 1.12.0 (MIT); `hyper-util` 0.1.21 (MIT); `hyper-rustls` 0.27.10 (Apache-2.0 OR ISC OR MIT); `tokio-rustls` 0.26.6 (MIT OR Apache-2.0); `tower` 0.5.3 (MIT); `tower-http` 0.6.11 (MIT); `tower-layer` 0.3.3 (MIT); `tower-service` 0.3.3 (MIT); `http-body` 1.1.0 (MIT); `http-body-util` 0.1.5 (MIT); `futures-channel` 0.3.34 und `futures-sink` 0.3.34 (MIT OR Apache-2.0); `ipnet` 2.12.2 (MIT OR Apache-2.0); `mio` 1.2.4 (MIT); `socket2` 0.6.5 (MIT OR Apache-2.0); `sync_wrapper` 1.0.2 (Apache-2.0); `try-lock` 0.2.5 (MIT); `want` 0.3.2 (MIT); **`aws-lc-rs` 1.18.2 (ISC AND (Apache-2.0 OR ISC))** und **`aws-lc-sys` 0.46.0** (Mischlizenz laut Cargo-Metadaten: ISC, Apache-2.0, MIT, BSD-3-Clause; enthält C-Quellen; Lizenztexte aus dem Crate-Paket für die Release-BOM übernehmen).
+
+Nur im Lockfile (featureunabhängig eingetragen, **nicht kompiliert und nicht ausgeliefert**): `quinn` 0.11.12, `quinn-proto` 0.11.19, `quinn-udp` 0.5.16 (MIT OR Apache-2.0; HTTP/3, nicht aktiv), `lru-slab` 0.1.3 (MIT OR Apache-2.0 OR Zlib). Nur Build-Zeit (für `aws-lc-sys`, auf dem Build-Rechner): `cmake` 0.1.58, `dunce` 1.0.5, `fs_extra` 1.3.0 (MIT). Zweite `rand`-Linie nur im Lockfile bzw. über Build-/Test-Pfade: `rand` 0.10.3, `rand_core` 0.10.1, `rand_pcg` 0.10.2, `chacha20` 0.10.2 (MIT OR Apache-2.0); `tinyvec` 1.13.3 (Zlib OR Apache-2.0 OR MIT).
+
+Offen: Zwei TLS-Stacks im Programm (`ring` für `ureq`, `aws-lc-rs` für `reqwest`); Vereinheitlichung ist eine Folgeentscheidung. Die vollständige Release-BOM (Lizenztexte, Systembestandteile) bleibt offen (RQ-06).
+
 Neue Übernahmen erhalten Original-Commit/URL, Lizenz, Rechtebeleg, Zielpfad und Prüfdatum. Vor Rust-Release vollständigen Bericht aus Cargo.lock und ausgelieferten Assets/Systembestandteilen erzeugen. Die Java-Credits stimmen nicht vollständig mit Gradle überein und sind keine verlässliche Abhängigkeitsinventur.

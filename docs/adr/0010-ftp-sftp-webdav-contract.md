@@ -114,7 +114,18 @@ Grundsatz: nur Loopback, synthetische Zugangsdaten, selbst erzeugte Zertifikate,
   a. eigener minimaler HTTP/1.1-Schreiber über `rustls` (`rustls` wäre dann eine direkte Abhängigkeit des Adapters; bereits transitiv im Lockfile; ADR und Sicherheitsprüfung des eigenen Protokollcodes nötig);
   b. eine HTTP-Bibliothek, die beliebige Methoden zulässt (neue Abhängigkeit; Lizenz-, MSRV- und Wartungsprüfung nach RQ-06);
   c. Ordner außerhalb des Clients anlegen und Uploads nur in vorhandene Ordner zulassen (Stand von MIG-040B).
-- **Auswirkung:** Uploads in neu anzulegende Unterordner sind nicht möglich, bis a oder b entschieden ist. MIG-042 (Build/Upload) ist davon betroffen; MIG-040C und MIG-040D sind davon nicht berührt.
+- **Entscheidung (2026-10-25, Projektverantwortlicher): Option b.** Eine gepflegte HTTP-Bibliothek mit benutzerdefinierten Methoden, kein eigener HTTP/1.1- oder TLS-Client. Gewählt wird **`reqwest` 0.13.5** mit blockierender API und den Features `blocking` und `rustls` (ohne Default-Features).
+- **Prüfung vor der Aufnahme** (Probe außerhalb des Repositorys und Loopback-Probe; Windows 11, Rust 1.85.0 und 1.99.1):
+  - Version 0.13.5 (crates.io, letzte Aktualisierung 2026-09-08), **MSRV 1.85.0** (`rust-version` des Pakets; Build mit 1.85.0 erfolgreich), Lizenz **MIT OR Apache-2.0**.
+  - Methoden: `MKCOL` und `PROPFIND` werden unverändert gesendet (Serverprotokoll der Probe).
+  - Redirects: mit `Policy::none()` folgt der Client keinem Redirect; der Aufrufer sieht `302` und `Location` (Probe). Der Adapter prüft jeden Hop selbst (ADR-0010, Umsetzungsregeln).
+  - TLS: `rustls` mit `rustls-platform-verifier` (Windows-Zertifikatsspeicher). Ein Test-Wurzelzertifikat wird über `tls_certs_only` nur für diesen Client gesetzt und ersetzt die Plattformwurzeln; die Prüfung bleibt aktiv (quelltextgeprüft in `reqwest` 0.13.5, `async_impl/client.rs`).
+  - Abhängigkeiten im kompilierten Baum des Adapters: 123 Pakete. Gegenüber dem vorherigen Stand kommen 21 Pakete hinzu (u. a. `reqwest`, `hyper`, `hyper-util`, `hyper-rustls`, `tokio-rustls`, `tower`, `tower-http`, `http-body`, `http-body-util`, `aws-lc-rs`, `aws-lc-sys`, `mio`, `socket2`, `ipnet`, `sync_wrapper`, `try-lock`, `want`, `futures-channel`, `futures-sink`, `tower-layer`, `tower-service`). `tokio` ist bereits durch `ureq`-Abhängigkeiten im Lockfile.
+  - Lockfile: 33 neue Paketeinträge; 12 davon sind nur im Lockfile, weil optionale Features (u. a. `quinn` für HTTP/3) featureunabhängig eingetragen werden, und nicht kompiliert. Bestehende Versionen bleiben unverändert; `rand` 0.10.3 steht zusätzlich zu 0.8.8.
+  - Windows-Build: `aws-lc-sys` baut seine C-Quellen lokal mit dem MSVC-Toolchain (erfolgreich mit 1.85.0 und 1.99.1). Ob zusätzlich ein CMake-Programm benötigt wird, ist nicht abschließend geprüft.
+  - Zwei TLS-Stacks im Binärprogramm: `ring` (`ureq`, Downloads) und `aws-lc-rs` (`reqwest`, WebDAV). Das ist ein Risiko (zweite Kryptobibliothek, C-Build); eine Vereinheitlichung ist eine eigene Folgeentscheidung.
+- **Umsetzung:** `MKCOL` und `PROPFIND` sind umgesetzt; die Blockade ist damit aufgehoben. Der Adapter nutzt `reqwest` nur im WebDAV-Modul; der HTTP-Download-Pfad bleibt bei `ureq`.
+- **Auswirkung (aufgehoben):** Uploads in neu anzulegende Unterordner sind jetzt möglich. MIG-042 (Build/Upload) muss den Ablauf noch verdrahten; MIG-040C und MIG-040D sind davon nicht berührt.
 
 ## Belege
 
