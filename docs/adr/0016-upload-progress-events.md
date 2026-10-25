@@ -22,7 +22,7 @@ Die Veröffentlichung liefert bisher nur ein Ergebnis am Ende. Die GUI zeigt ein
    - `upload.finished` trägt `files_done == files_total` und `bytes_done == bytes_total`.
 6. **Was nicht gemeldet wird.** Die Schreibvorgänge für Manifest, Zeiger und Verlauf sowie das Rücklesen (ADR-0012) erzeugen keine Datei-Ereignisse. Sie zählen weder zu den Gesamtwerten noch zu `bytes_done`. Die Vorschau erzeugt keine Ereignisse.
 7. **Übertragene Bytes.** Gezählt werden die Bytes, die der Ziel-Adapter aus der Quelle liest. Das nähert die gesendeten Bytes an, ist aber keine Netzwerkmessung.
-8. **Geheimnisfreiheit.** Ereignisse enthalten nur: Schemaversion, Vorgangskennung, Sequenz, Ereignistyp, relative Pfade der Revisionsdateien, Größen, Zähler und die Fehlerkategorie (`ErrorKind`). Sie enthalten **keinen** Fehlertext, keine absoluten Pfade, keine Adresse, keinen Benutzernamen und kein Kennwort. Fehlertexte bleiben in den bestehenden Fehlermeldungen des jeweiligen Frontends.
+8. **Geheimnisfreiheit.** Ereignisse enthalten nur: Schemaversion, Vorgangskennung, Sequenz, Ereignistyp, relative Pfade der Revisionsdateien, Größen, Zähler und die Fehlerkategorie (`ErrorKind`). Sie enthalten **keinen** Fehlertext, keine absoluten Pfade, keine Adresse, keinen Benutzernamen und kein Kennwort. Fehlertexte bleiben in den bestehenden Fehlermeldungen des jeweiligen Frontends. Zur Einordnung relativer Pfade siehe den Abschnitt „Einordnung der Pfade“.
 9. **Senke.** `UploadEventSink` ist ein Trait mit `emit(&mut self, UploadEvent)`, und `Send` ist Voraussetzung. Der Vorgang besitzt die Senke (`Box<dyn UploadEventSink + Send>`). Sie wird aus dem Vorgangsthread aufgerufen und darf nicht lange blockieren.
 10. **Abbruch.** Ausschließlich über den vorhandenen `CancelToken`. Ein Abbruch mitten in einer Datei endet mit `upload.cancelled`; die bisherige Veröffentlichung bleibt unverändert (ADR-0012).
 11. **Verdrahtung.**
@@ -30,6 +30,20 @@ Die Veröffentlichung liefert bisher nur ein Ergebnis am Ende. Die GUI zeigt ein
     - CLI: Die Veröffentlichung läuft in einem eigenen Thread, der Hauptthread liest die Ereignisse und schreibt sie im Textmodus auf stderr (Beginn und Ende je Datei). Im `--json`-Modus wird nichts zusätzlich ausgegeben. Stdout-Envelope und Exitcodes bleiben unverändert.
     - GUI: Der Worker sendet Ereignisse über denselben Kanal wie das Ergebnis. `poll` verarbeitet alle wartenden Ereignisse pro Bild. Der Fenster-Thread blockiert nie.
 12. **Parallelität und Wiederaufnahme.** Beides bleibt aus. Dateien werden nacheinander übertragen.
+
+## Einordnung der Pfade (Entscheidung vom 2026-10-25)
+
+Relative Pfade der Revisionsdateien dürfen in den flüchtigen Upload-Ereignissen sowie in der lokalen Fortschrittsanzeige der CLI (stderr, Textmodus) und der GUI stehen. Es sind die Revisionspfade, die der Nutzer in der Vorschau geprüft hat und die an den Zielserver veröffentlicht werden. Sie sind kein Geheimnis im Sinne dieses ADR.
+
+Ausgeschlossen bleiben unverändert: absolute lokale Pfade, Zugangsdaten (Benutzername, Kennwort), Adressen und URLs, Fehlertexte.
+
+Für relative Pfade gilt darüber hinaus:
+
+- **Nicht dauerhaft speichern.** Ereignisse werden nur im Speicher des laufenden Vorgangs und in der Anzeige des laufenden Frontends verwendet. Kein Protokolleintrag, keine Datenbank, keine Zwischendatei, keine Wiederaufnahme-Information.
+- **Nicht in Telemetrie aufnehmen.** Die Pfade gehen nicht an Analyse-, Diagnose- oder Absturzberichte.
+- **Nicht als strukturierte Ausgabe.** Die JSON-Ausgabe der CLI (Envelope, `--json`) enthält keine Fortschrittsereignisse und keine Pfade aus ihnen. Der Textmodus schreibt sie nur als lokale Zeilen auf stderr.
+
+Wird der Ereigniskanal künftig für persistente Protokolle, Exporte oder externe Dienste genutzt, muss die Pfadweitergabe dafür neu bewertet werden. Diese Einordnung gilt dann nicht mehr automatisch; es braucht eine neue Entscheidung.
 
 ## Grenzen
 
