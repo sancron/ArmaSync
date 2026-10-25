@@ -26,6 +26,8 @@ struct State {
     files: BTreeMap<String, Vec<u8>>,
     dirs: BTreeSet<String>,
     seen: Vec<Seen>,
+    /// Path whose `PUT` is answered with `500` and not stored (fault injection).
+    fail_put: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -63,6 +65,35 @@ impl Server {
 
     pub fn file(&self, name: &str) -> Option<Vec<u8>> {
         self.state.lock().unwrap().files.get(name).cloned()
+    }
+
+    /// Stores a file directly, as if an earlier run had left it there.
+    pub fn set_file(&self, name: &str, bytes: &[u8]) {
+        self.state
+            .lock()
+            .unwrap()
+            .files
+            .insert(name.to_owned(), bytes.to_vec());
+    }
+
+    /// Answers every `PUT` to `name` with `500` from now on (fault injection).
+    pub fn fail_puts_to(&self, name: &str) {
+        self.state.lock().unwrap().fail_put = Some(name.to_owned());
+    }
+
+    /// Stops the fault injection.
+    pub fn clear_failures(&self) {
+        self.state.lock().unwrap().fail_put = None;
+    }
+
+    /// Names of all stored files, sorted.
+    pub fn file_names(&self) -> Vec<String> {
+        self.state.lock().unwrap().files.keys().cloned().collect()
+    }
+
+    /// Number of `PUT` requests the server has seen.
+    pub fn puts(&self) -> usize {
+        self.seen().iter().filter(|s| s.method == "PUT").count()
     }
 
     pub fn folder(&self, name: &str) {
@@ -288,7 +319,9 @@ fn handle<S: Read + Write>(stream: &mut S, state: &Mutex<State>, options: &Optio
             }
         }
         "PUT" => {
-            if rel.contains("full") {
+            if st.fail_put.as_deref() == Some(rel) {
+                respond(stream, "500 Internal Server Error", &[], b"");
+            } else if rel.contains("full") {
                 respond(stream, "507 Insufficient Storage", &[], b"");
             } else if rel.contains("locked") {
                 respond(stream, "423 Locked", &[], b"");
@@ -316,6 +349,10 @@ fn handle<S: Read + Write>(stream: &mut S, state: &Mutex<State>, options: &Optio
                 respond(stream, "404 Not Found", &[], b"");
             }
         }
+        "GET" => match st.files.get(rel) {
+            Some(bytes) => respond(stream, "200 OK", &[], bytes),
+            None => respond(stream, "404 Not Found", &[], b""),
+        },
         _ => respond(stream, "405 Method Not Allowed", &[], b""),
     }
 }

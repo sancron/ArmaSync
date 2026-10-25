@@ -434,13 +434,22 @@ fn hash_file(
 impl LocalSource for LocalDirectory {
     fn files(&self, cancel: &CancelToken) -> Result<Vec<SourceFile>, Error> {
         let listed = LocalStore::list(self, HashAlgorithm::Sha256, cancel)?;
-        Ok(listed
+        listed
             .into_iter()
-            .map(|file| SourceFile {
-                path: file.path,
-                size: file.size,
+            .map(|file| {
+                let hash = file.hash.ok_or_else(|| {
+                    Error::new(
+                        ErrorKind::FileSystem,
+                        format!("'{}' could not be read for hashing", file.path),
+                    )
+                })?;
+                Ok(SourceFile {
+                    path: file.path,
+                    size: file.size,
+                    hash,
+                })
             })
-            .collect())
+            .collect()
     }
 
     fn open(&self, path: &RelativePath) -> Result<OpenedSource, Error> {

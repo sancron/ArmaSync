@@ -452,13 +452,15 @@ pub trait Hasher {
     }
 }
 
-/// A local file that can be uploaded: its safe relative path and its size in bytes.
+/// A local file that can be uploaded: its safe relative path, its size and its SHA-256 content hash (ADR-0012).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SourceFile {
     /// Relative path below the source root.
     pub path: RelativePath,
     /// Size in bytes at listing time.
     pub size: u64,
+    /// SHA-256 of the content at listing time.
+    pub hash: ContentHash,
 }
 
 /// A local file opened for an upload (ADR-0011).
@@ -520,6 +522,12 @@ pub trait RemoteTarget {
         source: OpenedSource,
         cancel: &CancelToken,
     ) -> Result<(), Error>;
+
+    /// Reads the whole file at `path`, at most `limit` bytes (ADR-0012). `None` when nothing is there.
+    ///
+    /// # Errors
+    /// [`ErrorKind::Format`] for a file larger than `limit`; transport and authentication failures otherwise.
+    fn fetch(&self, path: &RelativePath, limit: u64) -> Result<Option<Vec<u8>>, Error>;
 }
 
 /// Cooperative cancellation shared between a frontend and a running operation.

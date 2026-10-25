@@ -370,6 +370,28 @@ impl RemoteTarget for WebDavClient {
     ) -> Result<(), Error> {
         self.send_upload(path, source.content, source.size, cancel)
     }
+
+    fn fetch(&self, path: &RelativePath, limit: u64) -> Result<Option<Vec<u8>>, Error> {
+        let url = self.url_for(path);
+        let response = self.send_bodyless(Method::GET, &url, &[], b"", true)?;
+        match response.status().as_u16() {
+            200 => {}
+            404 => return Ok(None),
+            other => return Err(status_error(other)),
+        }
+        let mut data = Vec::new();
+        response
+            .take(limit + 1)
+            .read_to_end(&mut data)
+            .map_err(|_| network("the connection was lost while reading a file"))?;
+        if data.len() as u64 > limit {
+            return Err(Error::new(
+                ErrorKind::Format,
+                "a file on the server is larger than accepted",
+            ));
+        }
+        Ok(Some(data))
+    }
 }
 
 /// Ends a streamed upload at the next read once cancellation was requested.

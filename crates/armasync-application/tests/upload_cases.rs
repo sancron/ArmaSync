@@ -7,10 +7,11 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io::{Cursor, Read};
 use std::sync::Mutex;
 
+use armasync_adapters::Sha256Hasher;
 use armasync_application::upload::{self, UploadStep};
 use armasync_core::{
-    CancelToken, Error, ErrorKind, LocalSource, OpenedSource, RelativePath, RemoteTarget,
-    SourceFile,
+    CancelToken, Error, ErrorKind, HashAlgorithm, Hasher, LocalSource, OpenedSource, RelativePath,
+    RemoteTarget, SourceFile,
 };
 
 fn path(text: &str) -> RelativePath {
@@ -45,6 +46,7 @@ impl LocalSource for FakeSource {
             .map(|(p, bytes)| SourceFile {
                 path: path(p),
                 size: bytes.len() as u64,
+                hash: Sha256Hasher.hash(HashAlgorithm::Sha256, bytes),
             })
             .collect())
     }
@@ -93,6 +95,10 @@ impl FakeTarget {
 }
 
 impl RemoteTarget for FakeTarget {
+    fn fetch(&self, path: &RelativePath, _limit: u64) -> Result<Option<Vec<u8>>, Error> {
+        Ok(self.stored.lock().unwrap().get(path.as_str()).cloned())
+    }
+
     fn exists(&self, path: &RelativePath) -> Result<bool, Error> {
         self.calls.lock().unwrap().push(format!("exists {path}"));
         Ok(self.existing.lock().unwrap().contains(path.as_str()))
