@@ -1,5 +1,14 @@
 # Letzte integrierte Änderung
 
+**2026-10-25 · MIG-040B · Claude · WebDAV-Upload mit OPTIONS, PROPFIND, MKCOL, PUT und DELETE über `reqwest`** (nach `development`, Fast-Forward)
+
+* **MIG-040B** ([Bericht](2026-10-25-MIG-040B.md), [Handoff](../handoffs/MIG-040B.md), [ADR-0010](../adr/0010-ftp-sftp-webdav-contract.md)): Die Blockade aus dem ersten Schritt ist aufgelöst. Entschieden wurde Option b: `reqwest` 0.13.5 (MIT OR Apache-2.0, MSRV 1.85.0, blockierend, Features `blocking` und `rustls`). Der Client folgt keinen Redirects selbst; Basic-Zugangsdaten nur über HTTPS und nur an die Herkunft der Basisadresse, bei jeder Anfrage und jedem Redirect geprüft.
+* **Lizenz:** Nachtrag in `THIRD_PARTY_NOTICES.md`. 21 neue Pakete im kompilierten Baum, 12 nur im Lockfile (nicht kompiliert). Zwei TLS-Stacks (`ring` für Downloads, `aws-lc-rs` für WebDAV) als Folgeentscheidung.
+* **Prüfungen (Windows, lokal):** 17 WebDAV-Loopback-Tests (HTTP und TLS), `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --locked` und `cargo +1.85.0 test --workspace --exclude armasync-gui --locked` jeweils Exitcode 0. Markdown-Links 175 Dateien, 0 defekt.
+* **Nicht geprüft:** echte WebDAV-Server, WSL/Linux (zurückgestellt), GitHub-CI (pausiert); ob ein CMake-Programm für `aws-lc-sys` nötig ist.
+
+Vorheriger Stand:
+
 **2026-10-25 · MIG-040B · Claude · WebDAV-Upload, erster Schritt (OPTIONS, PUT, DELETE); MKCOL/PROPFIND blockiert** (nach `development`, Fast-Forward)
 
 * **MIG-040B** ([Bericht](2026-10-25-MIG-040B.md), [Handoff](../handoffs/MIG-040B.md), [ADR-0010](../adr/0010-ftp-sftp-webdav-contract.md)): `armasync-adapters::webdav` mit `OPTIONS` (WebDAV-Klasse 1), `PUT` (Datei mit bekannter Länge ab Offset 0) und `DELETE`. Basic-Zugangsdaten nur über HTTPS und nur an die Herkunft der Basis-Adresse, bei jeder Weiterleitung neu geprüft; Weiterleitungen auf eine andere Herkunft werden ohne Verbindung zum Ziel abgelehnt. Schreibende Methoden folgen keinen Weiterleitungen.
