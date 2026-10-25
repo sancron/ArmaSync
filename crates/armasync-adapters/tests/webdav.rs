@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Tests of the WebDAV client (OPTIONS, PUT, DELETE) against local loopback servers: plain HTTP and TLS with a
-//! freshly generated, self-signed test certificate. Synthetic credentials only; no real server and no real data.
+//! Tests of the WebDAV client (OPTIONS, PROPFIND, MKCOL, PUT, DELETE) against local loopback servers: plain HTTP and
+//! TLS with a freshly generated, self-signed test certificate. Synthetic credentials only; no real server and no real
+//! data.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -65,7 +66,6 @@ impl Server {
         self.state.lock().unwrap().files.get(name).cloned()
     }
 
-    /// Creates a folder on the server (folders cannot be created by the client yet, see the module documentation).
     fn folder(&self, name: &str) {
         self.state.lock().unwrap().dirs.insert(name.to_owned());
     }
@@ -253,13 +253,34 @@ fn handle<S: Read + Write>(stream: &mut S, state: &Mutex<State>, options: &Optio
     let mut st = state.lock().unwrap();
     let parent = rel.rsplit_once('/').map_or("", |(parent, _)| parent);
     let parent_missing = !parent.is_empty() && !st.dirs.contains(parent);
+    let exists = rel.is_empty() || st.dirs.contains(rel) || st.files.contains_key(rel);
     match request.method.as_str() {
         "OPTIONS" => {
             let headers = vec![
                 ("DAV", "1".to_owned()),
-                ("Allow", "OPTIONS, PUT, DELETE, GET".to_owned()),
+                (
+                    "Allow",
+                    "OPTIONS, PROPFIND, MKCOL, PUT, DELETE, GET".to_owned(),
+                ),
             ];
             respond(stream, "200 OK", &headers, b"");
+        }
+        "PROPFIND" => {
+            if exists {
+                respond(stream, "207 Multi-Status", &[], b"");
+            } else {
+                respond(stream, "404 Not Found", &[], b"");
+            }
+        }
+        "MKCOL" => {
+            if exists {
+                respond(stream, "405 Method Not Allowed", &[], b"");
+            } else if parent_missing {
+                respond(stream, "409 Conflict", &[], b"");
+            } else {
+                st.dirs.insert(rel.to_owned());
+                respond(stream, "201 Created", &[], b"");
+            }
         }
         "PUT" => {
             if rel.contains("full") {
@@ -345,6 +366,18 @@ fn credentials_must_be_complete_and_are_never_printed() {
 }
 
 #[test]
+fn the_client_debug_output_never_shows_the_password() {
+    let client = WebDavClient::new(
+        "https://127.0.0.1:9/dav",
+        HttpConfig::default(),
+        Some(BasicCredentials::new("user", "topsecret-value").unwrap()),
+    )
+    .unwrap();
+    let debug = format!("{client:?}");
+    assert!(!debug.contains("topsecret-value"), "{debug}");
+}
+
+#[test]
 fn an_untrusted_certificate_is_rejected_with_the_default_trust_store() {
     let server = start(true, true, "");
     let client =
@@ -370,14 +403,16 @@ fn options_declare_class_1_anonymously_over_plain_http() {
 }
 
 #[test]
-fn anonymous_upload_over_plain_http_sends_no_authorization() {
+fn anonymous_folder_creation_and_upload_over_plain_http_send_no_authorization() {
     let server = start(false, false, "");
-    server.folder("docs");
     let client = WebDavClient::new(&server.http(), HttpConfig::default(), None).unwrap();
+    client.make_collection(&path("docs")).unwrap();
     let mut file = File::open(scratch_file("anon.txt", b"hello")).unwrap();
     client.put(&path("docs/hello.txt"), &mut file).unwrap();
     assert_eq!(server.file("docs/hello.txt").unwrap(), b"hello");
-    assert!(server.seen().iter().all(|s| s.authorization.is_none()));
+    let seen = server.seen();
+    assert!(seen.iter().any(|s| s.method == "MKCOL"), "{seen:?}");
+    assert!(seen.iter().all(|s| s.authorization.is_none()));
 }
 
 // ---- authenticated round trip over TLS ------------------------------------------------------------------------
@@ -385,17 +420,27 @@ fn anonymous_upload_over_plain_http_sends_no_authorization() {
 #[test]
 fn basic_auth_round_trip_over_https_carries_the_header_on_every_request() {
     let server = start(true, true, "");
-    server.folder("docs");
     let client = WebDavClient::new(&server.https(), server.trust(), Some(credentials())).unwrap();
     client.capabilities().unwrap();
+    client.make_collection(&path("docs")).unwrap();
+    assert!(client.exists(&path("docs")).unwrap());
     let content = payload();
     let mut file = File::open(scratch_file("payload.bin", &content)).unwrap();
     client.put(&path("docs/payload.bin"), &mut file).unwrap();
     assert_eq!(server.file("docs/payload.bin").unwrap(), content);
+    assert!(client.exists(&path("docs/payload.bin")).unwrap());
     assert!(client.delete(&path("docs/payload.bin")).unwrap());
     assert!(!client.delete(&path("docs/payload.bin")).unwrap());
+    assert!(!client.exists(&path("docs/payload.bin")).unwrap());
     let seen = server.seen();
-    assert_eq!(seen.len(), 4, "{seen:?}");
+    let methods: Vec<&str> = seen.iter().map(|s| s.method.as_str()).collect();
+    assert_eq!(
+        methods,
+        [
+            "OPTIONS", "MKCOL", "PROPFIND", "PUT", "PROPFIND", "DELETE", "DELETE", "PROPFIND"
+        ],
+        "{seen:?}"
+    );
     assert!(
         seen.iter()
             .all(|s| s.authorization.as_deref() == Some(EXPECTED_AUTH)),
@@ -416,6 +461,26 @@ fn a_wrong_password_is_refused_without_echoing_it() {
     );
     assert!(!error.message().contains("wrong-secret-value"));
     assert!(!server.seen().is_empty());
+}
+
+// ---- folders ------------------------------------------------------------------------------------------------
+
+#[test]
+fn make_collection_creates_a_folder_and_accepts_an_existing_one() {
+    let server = start(true, true, "");
+    let client = WebDavClient::new(&server.https(), server.trust(), Some(credentials())).unwrap();
+    client.make_collection(&path("docs")).unwrap();
+    client.make_collection(&path("docs")).unwrap();
+    assert!(client.exists(&path("docs")).unwrap());
+    assert!(!client.exists(&path("other")).unwrap());
+}
+
+#[test]
+fn make_collection_without_a_parent_folder_is_a_file_system_error() {
+    let server = start(true, true, "");
+    let client = WebDavClient::new(&server.https(), server.trust(), Some(credentials())).unwrap();
+    let error = client.make_collection(&path("missing/sub")).unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::FileSystem, "{error}");
 }
 
 // ---- redirects ------------------------------------------------------------------------------------------------
@@ -440,6 +505,18 @@ fn write_requests_do_not_follow_redirects() {
 }
 
 #[test]
+fn a_redirected_folder_creation_is_not_followed() {
+    let server = start(true, true, "");
+    let client = WebDavClient::new(&server.https(), server.trust(), Some(credentials())).unwrap();
+    let error = client
+        .make_collection(&path("redirect/same/newdir"))
+        .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::Network);
+    assert!(error.message().contains("not followed"), "{error}");
+    assert!(server.seen().iter().all(|s| s.target != "/dav/newdir"));
+}
+
+#[test]
 fn same_origin_redirect_keeps_the_credentials_for_read_requests() {
     let server = start(true, true, "");
     let base = format!("https://{}/dav/redirect/same", server.addr);
@@ -460,7 +537,7 @@ fn a_cross_origin_redirect_never_receives_credentials() {
     let server = start(true, true, &target);
     let base = format!("https://{}/dav/redirect/cross", server.addr);
     let client = WebDavClient::new(&base, server.trust(), Some(credentials())).unwrap();
-    let error = client.capabilities().unwrap_err();
+    let error = client.exists(&path("docs")).unwrap_err();
     assert_eq!(error.kind(), ErrorKind::Network);
     assert!(error.message().contains("refused"), "{error}");
     assert!(other.seen().is_empty(), "{:?}", other.seen());

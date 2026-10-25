@@ -85,7 +85,7 @@ pub(crate) fn network(message: impl Into<String>) -> Error {
     Error::new(ErrorKind::Network, message)
 }
 
-pub(crate) fn map_ureq(error: &ureq::Error) -> Error {
+fn map_ureq(error: &ureq::Error) -> Error {
     use ureq::Error as E;
     match error {
         E::Timeout(_) => network("the server did not respond in time"),
@@ -171,16 +171,6 @@ pub fn redirect_target(from: &str, location: &str) -> Result<String, Error> {
 }
 
 impl HttpRepository {
-    /// The agent of this repository; the WebDAV client shares its TLS, timeout and redirect rules.
-    pub(crate) fn agent(&self) -> &Agent {
-        &self.agent
-    }
-
-    /// The base address without a trailing slash.
-    pub(crate) fn base(&self) -> &str {
-        &self.base
-    }
-
     /// A repository at `base` (a `http://` or `https://` address without credentials, query or fragment, as
     /// validated by [`armasync_core::RepositoryUrl`]).
     ///
@@ -301,7 +291,7 @@ impl HttpRepository {
         Err(network("too many redirects"))
     }
 
-    pub(crate) fn body_budget(&self, size: u64) -> Duration {
+    fn body_budget(&self, size: u64) -> Duration {
         let rate = self.config.min_bytes_per_second.max(1);
         Duration::from_secs(size / rate).max(self.config.min_body_timeout)
     }

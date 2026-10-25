@@ -1,38 +1,44 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! WebDAV upload client (MIG-040B, ADR-0010, feature F07), in its first step.
+//! WebDAV upload client (MIG-040B, ADR-0010 decision 4 and the addendum of 2026-10-25).
 //!
-//! Implemented: [`WebDavClient::capabilities`] (`OPTIONS`, must declare WebDAV class 1), [`WebDavClient::put`]
-//! (`PUT` of a file with a known length, into an existing folder) and [`WebDavClient::delete`] (`DELETE`).
+//! Operations: [`WebDavClient::capabilities`] (`OPTIONS`, must declare WebDAV class 1),
+//! [`WebDavClient::exists`] (`PROPFIND` with `Depth: 0`, decided by the status code alone),
+//! [`WebDavClient::make_collection`] (`MKCOL`), [`WebDavClient::put`] (`PUT` of a whole file with a known length) and
+//! [`WebDavClient::delete`] (`DELETE`). There is no listing, no XML parsing, no locking and no resume. The client is
+//! not wired into the sync commands; that belongs to the build and upload task (MIG-042).
 //!
-//! **Blocked, not implemented:** folder creation (`MKCOL`) and existence checks (`PROPFIND`). The HTTP stack `ureq`
-//! 3.4.2 (`ureq-proto` 0.6.5) rejects every method outside its list for HTTP/1.1 before anything is sent, and WebDAV
-//! uses `MKCOL` and `PROPFIND` over HTTP/1.1. Solving this needs a decision on the transport (see ADR-0010,
-//! addendum of 2026-10-25). The client is not wired into the sync commands; that belongs to MIG-042.
-//! No listing, no XML parsing, no locking and no resume.
+//! Transport: the blocking `reqwest` client with rustls and the platform certificate verifier. `ureq`, which the
+//! download path uses, cannot send `MKCOL` or `PROPFIND` over HTTP/1.1 (see the ADR addendum).
 //!
 //! Safety rules (ADR-0010, decision 4):
 //! * Basic credentials are sent only to `https://` base addresses. Combining them with `http://` is refused before
 //!   any connection is made. Anonymous access over `http://` stays possible without credentials.
 //! * Credentials go only to the origin (scheme, host, port) of the base address. This is checked for every request,
 //!   including every redirect. A redirect to another origin is refused without connecting to the target.
-//! * Write methods (`PUT`, `DELETE`) never follow redirects, because their bodies could not be sent again.
-//!   `OPTIONS` follows same-origin redirects only.
-//! * TLS verification and timeouts are those of [`HttpRepository`]; verification is never disabled.
+//! * Redirects are never followed by the HTTP client itself (`Policy::none`). Write methods (`PUT`, `MKCOL`,
+//!   `DELETE`) never follow redirects. `OPTIONS` and `PROPFIND` follow same-origin redirects only.
+//! * Certificate and host-name verification is never disabled. Tests inject their own trust root through
+//!   `HttpConfig::trusted_roots_der`, which replaces the platform roots for that client only.
 //! * No secret appears in an error message or in `Debug` output.
 //! * `DELETE` removes a folder together with its content. Callers must pass only paths they manage.
 
+use std::error::Error as StdError;
 use std::fmt;
 use std::fs::File;
 use std::io::{Seek, SeekFrom};
+use std::time::Duration;
 
 use armasync_core::{Error, ErrorKind, RelativePath};
-use ureq::Body;
-use ureq::http::{self, Response};
+use reqwest::blocking::{Body, Client, Response};
+use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, LOCATION};
+use reqwest::{Certificate, Method, redirect::Policy};
 
 use crate::http::{
-    HttpConfig, HttpRepository, MAX_REDIRECTS, encode_segment, map_ureq, network, origin_and_path,
-    redirect_target,
+    HttpConfig, MAX_REDIRECTS, encode_segment, network, origin_and_path, redirect_target,
 };
+
+/// Body of the minimal `PROPFIND` used for existence checks. The answer's body is not read.
+const PROPFIND_BODY: &[u8] = br#"<?xml version="1.0" encoding="utf-8"?><propfind xmlns="DAV:"><prop><resourcetype/></prop></propfind>"#;
 
 /// A user name and password for HTTP Basic authentication. The password is never printed.
 #[derive(Clone, PartialEq, Eq)]
@@ -86,11 +92,22 @@ pub struct WebDavCapabilities {
 }
 
 /// A WebDAV client for the folder tree below `base`.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct WebDavClient {
-    http: HttpRepository,
-    credentials: Option<BasicCredentials>,
+    base: String,
     origin: String,
+    client: Client,
+    config: HttpConfig,
+    credentials: Option<BasicCredentials>,
+}
+
+impl fmt::Debug for WebDavClient {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("WebDavClient")
+            .field("base", &self.base)
+            .field("credentials", &self.credentials)
+            .finish_non_exhaustive()
+    }
 }
 
 impl WebDavClient {
@@ -98,33 +115,41 @@ impl WebDavClient {
     ///
     /// # Errors
     /// [`ErrorKind::Unsupported`] for other schemes; [`ErrorKind::Config`] when credentials are combined with
-    /// `http://` (no connection is made in that case).
+    /// `http://` (no connection is made in that case) or the trust configuration is unusable.
     pub fn new(
         base: &str,
         config: HttpConfig,
         credentials: Option<BasicCredentials>,
     ) -> Result<Self, Error> {
-        let http = HttpRepository::new(base, config)?;
-        if credentials.is_some() && !http.base().to_ascii_lowercase().starts_with("https://") {
+        if !(base.starts_with("http://") || base.starts_with("https://")) {
+            return Err(Error::new(
+                ErrorKind::Unsupported,
+                "this transport only handles http and https addresses",
+            ));
+        }
+        if credentials.is_some() && !base.starts_with("https://") {
             return Err(Error::new(
                 ErrorKind::Config,
                 "credentials are only sent over HTTPS; use an https:// address",
             ));
         }
-        let origin = origin_and_path(http.base())
+        let origin = origin_and_path(base)
             .map(|(origin, _)| origin.to_owned())
             .ok_or_else(|| Error::new(ErrorKind::Config, "the address cannot be used"))?;
+        let client = build_client(&config)?;
         Ok(Self {
-            http,
-            credentials,
+            base: base.trim_end_matches('/').to_owned(),
             origin,
+            client,
+            config,
+            credentials,
         })
     }
 
     /// The address of a path below the base.
     fn url_for(&self, path: &RelativePath) -> String {
         let encoded: Vec<String> = path.as_str().split('/').map(encode_segment).collect();
-        format!("{}/{}", self.http.base(), encoded.join("/"))
+        format!("{}/{}", self.base, encoded.join("/"))
     }
 
     /// The `Authorization` value for `url`, or `None` when the request must not carry credentials.
@@ -135,27 +160,37 @@ impl WebDavClient {
         same_origin.then(|| credentials.authorization())
     }
 
+    /// The total time allowed for a body of `size` bytes: at least the configured minimum, otherwise the size divided
+    /// by the slowest acceptable rate.
+    fn body_budget(&self, size: u64) -> Duration {
+        let rate = self.config.min_bytes_per_second.max(1);
+        Duration::from_secs(size / rate).max(self.config.min_body_timeout)
+    }
+
     /// Sends a request with a fixed body. Redirects are followed only when `follow` is set, and then only to the
     /// same origin; every hop is checked for credentials on its own.
     fn send_bodyless(
         &self,
-        method: &str,
+        method: Method,
         url: &str,
+        headers: &[(&str, &str)],
         body: &'static [u8],
         follow: bool,
-    ) -> Result<Response<Body>, Error> {
+    ) -> Result<Response, Error> {
         let mut current = url.to_owned();
         for _ in 0..=MAX_REDIRECTS {
-            let mut builder = http::Request::builder()
-                .method(method)
-                .uri(current.as_str());
-            if let Some(value) = self.authorization_for(&current) {
-                builder = builder.header("Authorization", value);
+            let mut request = self
+                .client
+                .request(method.clone(), current.as_str())
+                .timeout(self.config.response_timeout)
+                .body(body);
+            for (name, value) in headers.iter().copied() {
+                request = request.header(name, value);
             }
-            let request = builder
-                .body(body)
-                .map_err(|_| Error::new(ErrorKind::Config, "the address cannot be used"))?;
-            let response = self.http.agent().run(request).map_err(|e| map_ureq(&e))?;
+            if let Some(value) = self.authorization_for(&current) {
+                request = request.header(AUTHORIZATION, value);
+            }
+            let response = request.send().map_err(|e| map_reqwest(&e))?;
             let status = response.status().as_u16();
             if !matches!(status, 301 | 302 | 303 | 307 | 308) {
                 return Ok(response);
@@ -165,7 +200,7 @@ impl WebDavClient {
             }
             let location = response
                 .headers()
-                .get("location")
+                .get(LOCATION)
                 .and_then(|v| v.to_str().ok())
                 .ok_or_else(|| network("a redirect without a target"))?;
             current = redirect_target(&current, location)?;
@@ -179,8 +214,7 @@ impl WebDavClient {
     /// [`ErrorKind::Network`] for transport and authentication problems; [`ErrorKind::Unsupported`] when the server
     /// declares no WebDAV class 1.
     pub fn capabilities(&self) -> Result<WebDavCapabilities, Error> {
-        let url = self.http.base().to_owned();
-        let response = self.send_bodyless("OPTIONS", &url, b"", true)?;
+        let response = self.send_bodyless(Method::OPTIONS, &self.base, &[], b"", true)?;
         let status = response.status().as_u16();
         if !(200..300).contains(&status) {
             return Err(status_error(status));
@@ -214,45 +248,67 @@ impl WebDavClient {
         })
     }
 
+    /// Whether something exists at `path`. Decided by the status code only: `207` or `200` means yes, `404` means no.
+    ///
+    /// # Errors
+    /// As [`WebDavClient::capabilities`].
+    pub fn exists(&self, path: &RelativePath) -> Result<bool, Error> {
+        let url = self.url_for(path);
+        let response = self.send_bodyless(
+            custom_method(b"PROPFIND")?,
+            &url,
+            &[("Depth", "0"), ("Content-Type", "application/xml")],
+            PROPFIND_BODY,
+            true,
+        )?;
+        match response.status().as_u16() {
+            200 | 207 => Ok(true),
+            404 => Ok(false),
+            other => Err(status_error(other)),
+        }
+    }
+
+    /// Creates one folder. An existing folder at `path` is accepted.
+    ///
+    /// # Errors
+    /// [`ErrorKind::FileSystem`] when the parent folder is missing or the server refuses the folder; otherwise as
+    /// [`WebDavClient::capabilities`].
+    pub fn make_collection(&self, path: &RelativePath) -> Result<(), Error> {
+        let url = self.url_for(path);
+        let method = custom_method(b"MKCOL")?;
+        let response = self.send_bodyless(method, &url, &[], b"", false)?;
+        let status = response.status().as_u16();
+        if status == 201 {
+            return Ok(());
+        }
+        if status == 405 && self.exists(path)? {
+            return Ok(());
+        }
+        Err(status_error(status))
+    }
+
     /// Uploads the whole content of `file` to `path`, replacing an existing file. The upload always starts at offset
     /// 0 and its length is taken from the file, so the file must not change during the upload. The parent folder must
-    /// already exist on the server.
+    /// exist on the server.
     ///
     /// # Errors
     /// [`ErrorKind::FileSystem`] for a missing parent folder, a locked target, insufficient space, a file the server
     /// refuses as too large and an unreadable local file; [`ErrorKind::Network`] otherwise.
     pub fn put(&self, path: &RelativePath, file: &mut File) -> Result<(), Error> {
-        file.seek(SeekFrom::Start(0)).map_err(|e| {
-            Error::new(
-                ErrorKind::FileSystem,
-                format!("the file cannot be read: {e}"),
-            )
-        })?;
-        let length = file
-            .metadata()
-            .map_err(|e| {
-                Error::new(
-                    ErrorKind::FileSystem,
-                    format!("the file cannot be read: {e}"),
-                )
-            })?
-            .len();
+        file.seek(SeekFrom::Start(0)).map_err(local_read_error)?;
+        let length = file.metadata().map_err(local_read_error)?.len();
+        let copy = file.try_clone().map_err(local_read_error)?;
         let url = self.url_for(path);
-        let mut builder = self
-            .http
-            .agent()
+        let mut request = self
+            .client
             .put(url.as_str())
-            .header("Content-Type", "application/octet-stream");
+            .timeout(self.body_budget(length))
+            .header(CONTENT_TYPE, "application/octet-stream")
+            .body(Body::sized(copy, length));
         if let Some(value) = self.authorization_for(&url) {
-            builder = builder.header("Authorization", value);
+            request = request.header(AUTHORIZATION, value);
         }
-        let budget = self.http.body_budget(length);
-        let response = builder
-            .config()
-            .timeout_send_body(Some(budget))
-            .build()
-            .send(&*file)
-            .map_err(|e| map_ureq(&e))?;
+        let response = request.send().map_err(|e| map_reqwest(&e))?;
         match response.status().as_u16() {
             200 | 201 | 204 => Ok(()),
             other => Err(status_error(other)),
@@ -265,13 +321,75 @@ impl WebDavClient {
     /// As [`WebDavClient::put`], without the space and size cases.
     pub fn delete(&self, path: &RelativePath) -> Result<bool, Error> {
         let url = self.url_for(path);
-        let response = self.send_bodyless("DELETE", &url, b"", false)?;
+        let response = self.send_bodyless(Method::DELETE, &url, &[], b"", false)?;
         match response.status().as_u16() {
             200 | 202 | 204 => Ok(true),
             404 => Ok(false),
             other => Err(status_error(other)),
         }
     }
+}
+
+/// The blocking client: redirects are never followed by the client itself; the trust configuration is the platform
+/// store, unless test roots were given (then only those roots are trusted).
+fn build_client(config: &HttpConfig) -> Result<Client, Error> {
+    let mut builder = Client::builder()
+        .redirect(Policy::none())
+        .connect_timeout(config.connect_timeout)
+        .user_agent("ArmaSync");
+    if let Some(list) = &config.trusted_roots_der {
+        if list.is_empty() {
+            return Err(Error::new(
+                ErrorKind::Config,
+                "no trusted root certificates given",
+            ));
+        }
+        let certs = list
+            .iter()
+            .map(|der| Certificate::from_der(der))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| {
+                Error::new(ErrorKind::Config, "a trusted root certificate is not valid")
+            })?;
+        builder = builder.tls_certs_only(certs);
+    }
+    builder
+        .build()
+        .map_err(|_| Error::new(ErrorKind::Config, "the HTTP client cannot be created"))
+}
+
+/// Maps a transport error to a fixed message. The message never contains the URL or credentials.
+fn map_reqwest(error: &reqwest::Error) -> Error {
+    let mut chain = String::new();
+    let mut source = error.source();
+    while let Some(cause) = source {
+        chain.push_str(&cause.to_string());
+        chain.push(' ');
+        source = cause.source();
+    }
+    let lower = chain.to_ascii_lowercase();
+    if lower.contains("certificate") || lower.contains("tls") || lower.contains("handshake") {
+        network("secure connection failed")
+    } else if error.is_timeout() {
+        network("the server did not respond in time")
+    } else if error.is_connect() {
+        network("the connection to the server failed")
+    } else {
+        network("network error")
+    }
+}
+
+fn local_read_error(error: std::io::Error) -> Error {
+    Error::new(
+        ErrorKind::FileSystem,
+        format!("the file cannot be read: {error}"),
+    )
+}
+
+/// A WebDAV method token such as `PROPFIND` or `MKCOL`.
+fn custom_method(name: &[u8]) -> Result<Method, Error> {
+    Method::from_bytes(name)
+        .map_err(|_| Error::new(ErrorKind::Config, "the HTTP method is not valid"))
 }
 
 fn redirected_write() -> Error {
