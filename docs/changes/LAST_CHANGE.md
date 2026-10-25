@@ -1,5 +1,13 @@
 # Letzte integrierte Änderung
 
+**2026-10-25 · MIG-042 (Schritt 3a) · Claude · Rückleseprüfung vor der Veröffentlichung** (nach `development`, Fast-Forward)
+
+* **MIG-042, Schritt 3a** ([Bericht](2026-10-25-MIG-042-S3A.md), [Handoff](../handoffs/MIG-042-S3A.md), [ADR-0012](../adr/0012-revisions-and-publication.md) Nachtrag, [Task](../tasks/MIG-042.md)): Jede Datei der Revision wird über den Ziel-Port zurückgelesen und auf Größe und SHA-256 geprüft. Erst danach folgen `manifest.json` und `current.json`. Fehlende, verkürzte, veränderte oder nicht lesbare Dateien sowie Abbruch lassen den Zeiger unverändert. **Keine atomare Veröffentlichung behauptet.**
+* **Tests:** 6 neue Loopback-Tests (`publish_readback`); die bestehenden Veröffentlichungs- und Anwendungstests bleiben grün.
+* **Prüfungen (Windows, finaler Stand):** fmt, Clippy `-D warnings`, Workspace-Test (56 Suiten) und MSRV 1.85 (50 Suiten) jeweils Exitcode 0; Markdown-Links 184 Dateien, 0 defekt; `git diff --check` Exitcode 0.
+
+Vorheriger Stand:
+
 **2026-10-25 · MIG-042 (Schritt 2) · Claude · Revisionen und Veröffentlichung (ADR-0012)** (nach `development`, Fast-Forward)
 
 * **MIG-042, Schritt 2** ([Bericht](2026-10-25-MIG-042-S2.md), [Handoff](../handoffs/MIG-042-S2.md), [ADR-0012](../adr/0012-revisions-and-publication.md), [Task](../tasks/MIG-042.md)): Revisionskennung aus dem Inhalt; Revisions-Manifest; Dateien in `revisions/<id>/files/`, Manifest zuletzt; Zeiger `current.json` zuletzt, alter Zeiger in `history/` gesichert und per GET verifiziert. Keine Löschungen. **Atomarität wird nicht behauptet**; das Legacy-Metadatenformat (ADR-0003) ist nicht geschrieben.
